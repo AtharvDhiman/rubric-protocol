@@ -476,7 +476,7 @@ export default function CreatePage() {
             <pre
               style={{
                 background: "var(--raised)",
-                border: "1px solid var(--border)",
+                border: "1px solid var(--border-strong)",
                 borderRadius: 2,
                 padding: 16,
                 marginTop: 20,
@@ -599,7 +599,7 @@ function ClauseRow({
         {value.length >= CLAUSE_COUNTER_VISIBLE_FROM && (
           <div
             className="data"
-            style={{ fontSize: 11, color: "var(--text-faint)", marginTop: 4 }}
+            style={{ fontSize: 11, color: "#52525b", marginTop: 4 }}
           >
             {value.length} / {MAX_CLAUSE_LENGTH}
           </div>

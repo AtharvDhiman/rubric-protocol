@@ -150,7 +150,7 @@ export default async function DocketPage({
         {/* ---------------- THE LEDGER ---------------- */}
         <section>
           <div
-            className="label"
+            className="label docket-head"
             style={{
               display: "flex",
               gap: 16,

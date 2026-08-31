@@ -44,16 +44,20 @@ const CLASSES: Record<StampVariant, string> = {
 export function Stamp({
   variant,
   small = false,
+  large = false,
 }: {
   variant: StampVariant;
   small?: boolean;
+  /** The verdict sheet's headline stamp. The only one that carries a glow. */
+  large?: boolean;
 }) {
   const label = LABELS[variant];
+  const size = small ? "stamp-sm" : large ? "stamp-lg" : "";
   return (
     <>
       <span
         aria-hidden="true"
-        className={`stamp ${small ? "stamp-sm" : ""} ${CLASSES[variant]}`}
+        className={`stamp ${size} ${CLASSES[variant]}`}
       >
         {label}
       </span>

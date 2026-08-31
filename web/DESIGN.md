@@ -9,22 +9,11 @@ Rubric is an escrow protocol where acceptance criteria are sealed on-chain and a
 AI judge rules against them. The interface should look like a serious financial
 record system: a document, a ledger, a receipt. Restrained, dense, precise.
 
-**One dark surface throughout** (revised 2026-09-01, at the owner's direction):
-
-1. THE LANDING PAGE (`/`) — dark, one strong animated visual, otherwise plain.
-2. THE APP (`/docket`, `/create`, `/task/[id]`) — the same dark ground, no ornament.
-
-This replaces the original split, where the app was a light document surface and
-only the landing page was dark. The record-system character is now carried by
-structure rather than by paper: hairline-separated rows, mono data, § clause
-marks and the verdict stamp all stay exactly as they were.
-
-What did NOT change with the theme, and must not drift:
-
-- Type is still IBM Plex Sans + IBM Plex Mono, and nothing else.
-- Every number a person might compare, copy or verify is still mono.
-- Borders, never shadows. Radius 2px on inputs and buttons, 0 elsewhere.
-- The only rotation in the product is still the verdict stamp.
+ONE visual system across the whole product. The landing page and the app share
+the same dark ground, the same type, the same borders, the same accents. The
+landing has exactly one extra thing: the animated aperture in its hero. Nothing
+else differs. A visitor moving from the landing into the app should not feel a
+seam.
 
 ## What this must NOT look like
 
@@ -53,10 +42,6 @@ Rules:
 
 - Headings: Plex Sans 600, tight tracking (-0.01em to -0.02em on large sizes).
   Sentence case, not ALL CAPS, except the landing hero.
-- App page titles use the landing display scale: `.page-title`, Plex Sans 700 at
-  `clamp(34px, 4.2vw, 52px)`, tracking -0.03em. Scoped to the page title ONLY -
-  record rows, table headers and mono data keep their size, because a ledger is
-  read by scanning and enlarging everything works against that.
 - Body: Plex Sans 400, 15–16px, line-height 1.6.
 - Labels and metadata: Plex Mono, uppercase, 10–11px, letter-spacing 0.14em–0.18em.
   Do not exceed 0.18em — wider tracking starts to look decorative.
@@ -64,70 +49,67 @@ Rules:
   addresses, hashes, times — is Plex Mono, never Plex Sans. This is the single
   most important typographic rule in the app.**
 
-## Tokens — APP (dark)
+> Implementation note. `next/font` publishes `--font-plex-sans` / `--font-plex-mono`
+> and the stylesheet maps those onto `--font-sans` / `--font-mono`. The two names
+> MUST differ. `:root` IS the `html` element — the same element `next/font` sets
+> its variable on — so reusing the name makes the declaration reference itself.
+> A cyclic `var()` is invalid at computed-value time, the variable resolves to
+> nothing, and every screen silently falls back to the system font stack. That
+> shipped once and was invisible until someone read the computed style.
 
-| Role            | Value     | Notes                                   |
-| --------------- | --------- | --------------------------------------- |
-| Page background | `#0a0a0c` | same ground as the landing page          |
-| Surface         | `#101014` | the content column                       |
-| Surface raised  | `#16161b` | receipts, panels, the wallet modal       |
-| Border strong   | `#3a3a46` | structural rules under headers           |
-| Border          | `#26262f` | column dividers                          |
-| Border hairline | `#1f1f26` | between record rows                      |
-| Row hover       | `#16161b` | hover only; never a lift or a shadow     |
-| Text            | `#f4f4f5` |                                          |
-| Text secondary  | `#d4d4d8` |                                          |
-| Text muted      | `#a1a1aa` |                                          |
-| Text faint      | `#71717a` |                                          |
-| Accent (purple) | `#b57bff` | clause numerals, active nav, key labels   |
-| Accent strong   | `#9945FF` | only in the Solana mark and one rule      |
-| Positive        | `#14F195` | approved, paid                            |
-| Negative        | `#ff5c8a` | rejected                                  |
-| Warning         | `#fbbf24` | held for review                           |
-| Overlay         | `rgba(0,0,0,.66)` | modal scrim                       |
+## Tokens — THE WHOLE PRODUCT
 
-The accent, positive, negative and warning values are the BRIGHT variants. The
-originals (`#7c33d6`, `#0b7d5a`, `#b3234a`, `#92400e`) were picked to be legible
-on cream and are close to unreadable on `#0a0a0c`. If you ever move a surface
-back to light, these have to move back with it.
+| Role          | Value     | Used for                                                       |
+| ------------- | --------- | -------------------------------------------------------------- |
+| Ground        | `#0a0a0c` | page background everywhere                                      |
+| Section       | `#101014` | alternating band, and the active/hover row wash                 |
+| Panel         | `#121216` | log panels, hash previews, settlement records                   |
+| Border        | `#1f1f26` | hairline dividers, record rows, section rules                   |
+| Border strong | `#26262f` | table header rules, panel borders                               |
+| Input rule    | `#3f3f46` | the underline beneath a form field                              |
+| Text          | `#f4f4f5` |                                                                 |
+| Text body     | `#d4d4d8` | clause text and other long-form reading                         |
+| Text muted    | `#a1a1aa` |                                                                 |
+| Text faint    | `#71717a` | labels, timestamps, units                                       |
+| Purple        | `#9945FF` | § numerals, active nav underline, sealed stamp                  |
+| Green         | `#14F195` | approved, paid, live indicators                                 |
+| Red           | `#ff4d6d` | rejected — brighter than a light-theme red so it holds on dark  |
+| Amber         | `#f59e0b` | held for review                                                 |
 
-**The verdict stamp carries no `mix-blend-mode`.** `multiply` was correct for ink
-pressed into a light page; on a dark ground it drives the stamp toward black and
-erases it.
+**There is no light theme. Do not introduce white or cream surfaces anywhere.**
 
-## Tokens — LANDING (dark)
-
-```
-Ground #0a0a0c · Section #101014 · Panel #16161b · Panel dark #121216
-Borders #1f1f26 / #26262f
-Text #f4f4f5 · Muted #a1a1aa · Faint #71717a
-Solana purple #9945FF · Solana green #14F195
-```
+> Implementation note. `color-scheme: dark` is set on `html`/`body`. Without it the
+> browser paints its own widgets in light mode: a `<select>` popup opens white with
+> near-white option text, and the scrollbar stays pale. That popup is drawn by the
+> OS and ignores CSS colours — `color-scheme` is the only thing it obeys.
 
 ## Layout rules
 
 - Corner radius: 2px on inputs and buttons, 0 elsewhere. Never above 4px.
-- Elevation: borders, not shadows. The only permitted shadow is a 1px hairline
-  under a sticky header.
+- Elevation: borders, not shadows. On dark, depth comes from the `#101014` /
+  `#121216` surface steps and 1px `#1f1f26` hairlines — never from drop shadows.
+  The only glow permitted is a soft one behind the APPROVED stamp.
 - Everything sits on a strict 8px spacing scale.
 - Tables and record rows are separated by 1px hairlines, never by gaps or cards.
-- Section breaks use a 1px `#3a3a46` rule (`--border-strong`). Use these sparingly
-  and only where a real structural break exists.
-- Nothing is rotated except verdict stamps (see below). No element sits off-axis
-  "for character".
+- Section breaks use a 1px `#1f1f26` rule. Use these sparingly and only where a
+  real structural break exists.
+- Nothing is rotated except verdict stamps. No element sits off-axis "for character".
 
 ## The two motifs that are allowed (because they mean something)
 
 1. **THE CLAUSE MARK.** Acceptance criteria are numbered §1 §2 §3, in Plex Mono, in
-   `#b57bff`. Never bullets, never "1." — the section mark signals that clauses are
+   `#9945FF`. Never bullets, never "1." — the section mark signals that clauses are
    binding terms, which is literally true here. Used everywhere clauses appear.
 
 2. **THE VERDICT STAMP.** A rectangular outline containing a single uppercase word in
-   Plex Mono 600 at 0.16em tracking: APPROVED (`#14F195`), REJECTED (`#ff5c8a`),
-   SEALED (`#b57bff`), HELD (`#fbbf24`). 2px border, no fill, rotated exactly -4deg,
-   and NO blend mode. The rotation is the ONE permitted tilt in the product — it
-   reads as a stamp pressed by hand onto a record, which is exactly the mental
-   model. Everything else stays square.
+   Plex Mono 600 at 0.16em tracking: APPROVED (`#14F195`), REJECTED (`#ff4d6d`),
+   SEALED (`#9945FF`), HELD (`#f59e0b`), IN REVIEW (`#a1a1aa`). 2px border, no fill,
+   rotated exactly -4deg. The large APPROVED stamp on the verdict screen gets
+   `box-shadow: 0 0 28px rgba(20,241,149,0.14)`; the small row stamps get none.
+   **No `mix-blend-mode`** — `multiply` was correct for ink on a light page; on a
+   dark ground it drives the stamp toward black and erases it. The rotation is the
+   ONE permitted tilt in the product: it reads as a stamp pressed by hand onto a
+   record, which is exactly the mental model. Everything else stays square.
 
 Do not invent additional motifs.
 
@@ -160,7 +142,7 @@ mark, and the primary button. Nowhere else.
 
 - Headings in document order, one real `<h1>` per page.
 - Labelled form controls. Real `<button>` elements.
-- A visible 2px `#9945FF` focus ring at offset 2px, on every interactive element.
+- A visible 2px `#9945FF` focus ring at offset 2px on every interactive element.
 - Decorative SVG is `aria-hidden="true"`.
 - Stamps are `aria-hidden` with the status also present as text.
 - Every status colour is paired with a word, so nothing depends on colour alone.
@@ -172,3 +154,18 @@ mark, and the primary button. Nowhere else.
 Below 900px: stack all multi-column sections, scale the aperture to ~130vw so it
 bleeds off-screen rather than shrinking, and stack the landing figures 2×2.
 **Never scroll horizontally**, at any width down to 375px.
+
+## Deviations from the source brief, recorded so they are decisions and not drift
+
+1. **No scroll cue in the hero.** The brief's LAYER 8 specifies a hairline, an
+   animated tick and a "Scroll" label at the bottom of the hero. The owner asked
+   for it to be removed after seeing it built, so it is gone along with its
+   keyframes. If you want it back, the spec is in the source brief.
+
+2. **The docket row restacks below 700px rather than scrolling.** The ledger is
+   six fixed-width columns, which cannot shrink. At 375px that forced a 597px
+   row and the page scrolled sideways, which this file forbids at any width.
+   Below 700px the row wraps onto two lines - Nº and matter, then the data - and
+   the column headings hide, because they no longer sit above anything. The
+   values stay self-describing: a USDC amount, a duration, a stamp. The header
+   bar wraps the same way. Verified at 375px on all four screens.

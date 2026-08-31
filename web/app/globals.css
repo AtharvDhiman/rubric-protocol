@@ -11,27 +11,28 @@
    =========================================================================== */
 
 :root {
-  /* --- APP (dark) ---
-     The app now shares the landing page's dark ground rather than the light
-     document surface the original design used. Accent colours are the BRIGHT
-     variants: the previous ones (#7c33d6, #0b7d5a, #b3234a, #92400e) were chosen
-     to be legible on cream and are close to unreadable on #0a0a0c. */
-  --page: #0a0a0c;
-  --surface: #101014;
-  --raised: #16161b;
-  --border-strong: #3a3a46;
-  --border: #26262f;
-  --hairline: #1f1f26;
-  --row-hover: #16161b;
+  /* ===== ONE SYSTEM. Landing and app share every token below. =====
+     Values are fixed by web/DESIGN.md. The accent, positive, negative and
+     warning colours are the BRIGHT variants; light-theme equivalents are
+     unreadable on #0a0a0c. */
+  --page: #0a0a0c;        /* Ground        - page background everywhere      */
+  --surface: #101014;     /* Section       - alternating band, row hover     */
+  --raised: #121216;      /* Panel         - log panels, settlement records  */
+  --border: #1f1f26;      /* Border        - hairlines, record rows, rules   */
+  --hairline: #1f1f26;    /* alias of Border, kept for existing references   */
+  --border-strong: #26262f; /* Border strong - table header rules, panels    */
+  --input-rule: #3f3f46;  /* Input rule    - underline beneath a form field  */
+  --row-hover: #101014;   /* the Section wash, per DESIGN.md                 */
   --text: #f4f4f5;
-  --text-2: #d4d4d8;
+  --text-2: #d4d4d8;      /* Text body     - clause text, long-form reading  */
   --text-muted: #a1a1aa;
-  --text-faint: #71717a;
-  --accent: #b57bff;
+  --text-faint: #71717a;  /* labels, timestamps, units                       */
+  --accent: #9945ff;      /* Purple        - section marks, active nav       */
   --accent-strong: #9945ff;
-  --positive: #14f195;
-  --negative: #ff5c8a;
-  --warning: #fbbf24;
+  --positive: #14f195;    /* Green         - approved, paid, live            */
+  --negative: #ff4d6d;    /* Red           - rejected                        */
+  --warning: #f59e0b;     /* Amber         - held for review                 */
+  --rule-strong: #f4f4f5; /* structural break: under headers and table heads  */
   --overlay: rgba(0, 0, 0, 0.66);
 
   /* --- LANDING (dark) --- */
@@ -140,18 +141,21 @@ h3 {
    Deliberately scoped to the page title only: record rows, table headers and
    mono data keep their size, because a ledger is read by scanning and blowing
    up every element would work against that. */
+/* DESIGN.md sets app screen titles at 30px / 600 / -0.02em. The landing hero is
+   the ONE place that uses a display scale; a ledger is read by scanning, and
+   oversized headings in a record list work against that. */
 .page-title {
-  font-size: clamp(34px, 4.2vw, 52px);
-  font-weight: 700;
-  letter-spacing: -0.03em;
-  line-height: 1.05;
+  font-size: 30px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1.15;
 }
 
 .page-lede {
-  font-size: 17px;
-  color: var(--text-muted);
-  margin: 12px 0 0;
-  max-width: 60ch;
+  font-size: 15px;
+  color: var(--text-faint);
+  margin: 8px 0 0;
+  max-width: 62ch;
 }
 
 /* ---------------------------------------------------------------------------
@@ -193,6 +197,17 @@ h3 {
   border-width: 2px;
 }
 
+/* The single permitted glow in the product: the large APPROVED stamp on the
+   verdict sheet. Row stamps get none. */
+.stamp-lg.stamp-approved {
+  box-shadow: 0 0 28px rgba(20, 241, 149, 0.14);
+}
+
+.stamp-lg {
+  font-size: 13px;
+  padding: 7px 13px;
+}
+
 .stamp-approved,
 .stamp-paid {
   color: var(--positive);
@@ -205,9 +220,14 @@ h3 {
   color: var(--accent);
 }
 .stamp-held,
-.stamp-inreview,
 .stamp-expired {
   color: var(--warning);
+}
+
+/* IN REVIEW is deliberately the muted grey, not amber: nothing is wrong with a
+   task awaiting a verdict, and amber would read as a warning. */
+.stamp-inreview {
+  color: var(--text-muted);
 }
 
 /* ---------------------------------------------------------------------------
@@ -290,7 +310,7 @@ h3 {
 .field {
   width: 100%;
   border: none;
-  border-bottom: 1px solid var(--border-strong);
+  border-bottom: 1px solid var(--input-rule);
   background: transparent;
   color: var(--text);
   font-family: var(--font-sans);
@@ -359,7 +379,7 @@ select.field option {
 
 .rule {
   height: 1px;
-  background: var(--border-strong);
+  background: var(--rule-strong);
   border: 0;
   margin: 0;
 }
@@ -712,5 +732,63 @@ select.field option {
     padding-left: 0 !important;
     border-top: 1px solid var(--border);
     padding-top: 32px;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   NARROW SCREENS - THE LEDGER
+   The docket row is six fixed-width columns, which is right on a desk and
+   impossible at 375px: the columns cannot shrink, so the page scrolls
+   sideways. DESIGN.md forbids that at any width. Below 700px the row wraps
+   into two lines - Nº and matter on the first, the data on the second - and
+   the column headings are hidden, because they no longer sit above anything.
+   The values stay self-describing: a USDC amount, a duration, a stamp.
+   --------------------------------------------------------------------------- */
+@media (max-width: 700px) {
+  .docket-head > span:nth-child(n + 3) {
+    display: none !important;
+  }
+  .docket-head > span:nth-child(2) {
+    flex: 1 1 auto !important;
+  }
+
+  .record-row {
+    flex-wrap: wrap;
+    gap: 6px 12px !important;
+    align-items: baseline;
+  }
+  /* line 1: the number, then the title taking the rest of the width */
+  .record-row > span:nth-child(2) {
+    flex: 1 1 calc(100% - 72px) !important;
+  }
+  /* line 2: the data columns, natural width, left aligned, status pushed right */
+  .record-row > span:nth-child(n + 3) {
+    flex: 0 0 auto !important;
+    width: auto !important;
+    text-align: left !important;
+  }
+  .record-row > span:nth-child(6) {
+    margin-left: auto !important;
+  }
+}
+
+/* The header bar: logo, four nav links and the wallet chip do not fit on a
+   phone. Let it wrap onto a second line and grow rather than overflow. */
+@media (max-width: 700px) {
+  .app-header-inner {
+    flex-wrap: wrap;
+    height: auto !important;
+    padding: 12px 16px !important;
+    gap: 12px 16px !important;
+  }
+  .app-header-inner > nav {
+    order: 3;
+    flex: 1 1 100% !important;
+    gap: 16px !important;
+    overflow-x: auto;
+  }
+  .app-main {
+    padding-left: 16px !important;
+    padding-right: 16px !important;
   }
 }

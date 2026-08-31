@@ -28,14 +28,14 @@ export function AppHeader() {
         position: "sticky",
         top: 0,
         zIndex: 20,
-        background: "var(--surface)",
-        borderBottom: "1px solid var(--border-strong)",
-        boxShadow: "0 1px 0 rgba(244,244,245,0.06)",
+        background: "var(--page)",
+        borderBottom: "1px solid var(--rule-strong)",
       }}
     >
       <div
+        className="app-header-inner"
         style={{
-          maxWidth: 1200,
+          maxWidth: 1240,
           margin: "0 auto",
           padding: "0 32px",
           height: 64,
@@ -96,10 +96,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     <div style={{ minHeight: "100vh", background: "var(--page)" }}>
       <AppHeader />
       <main
+        className="app-main"
         style={{
-          maxWidth: 1200,
+          maxWidth: 1240,
           margin: "0 auto",
-          background: "var(--surface)",
+          background: "var(--page)",
           borderLeft: "1px solid var(--border)",
           borderRight: "1px solid var(--border)",
           minHeight: "calc(100vh - 64px)",

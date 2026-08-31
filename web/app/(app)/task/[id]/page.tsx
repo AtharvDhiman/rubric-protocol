@@ -327,7 +327,7 @@ export default async function TaskPage({
                   marginBottom: 20,
                 }}
               >
-                <Stamp variant={verdict.approved ? "approved" : "rejected"} />
+                <Stamp variant={verdict.approved ? "approved" : "rejected"} large />
                 <div>
                   <div className="label">CONFIDENCE</div>
                   <div
@@ -405,7 +405,10 @@ export default async function TaskPage({
                   style={{
                     marginTop: 28,
                     background: "var(--raised)",
-                    border: "1px solid var(--border)",
+                    border: "1px solid var(--border-strong)",
+                    borderLeft: `2px solid ${
+                      settled ? "var(--positive)" : "var(--negative)"
+                    }`,
                     borderRadius: 2,
                     padding: "16px 20px",
                     display: "flex",

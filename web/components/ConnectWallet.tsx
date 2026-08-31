@@ -122,7 +122,7 @@ export function ConnectWallet() {
           <div
             onClick={(e) => e.stopPropagation()}
             style={{
-              background: "var(--raised)",
+              background: "var(--surface)",
               border: "1px solid var(--border-strong)",
               borderRadius: 0,
               padding: 24,
@@ -180,7 +180,7 @@ const chipStyle: React.CSSProperties = {
   display: "flex",
   alignItems: "center",
   gap: 10,
-  border: "1px solid var(--border-strong)",
+  border: "1px solid var(--rule-strong)",
   borderRadius: 2,
   padding: "8px 12px",
   background: "transparent",
