@@ -1,0 +1,110 @@
+//! # Rubric
+//!
+//! An escrow program for work that is too subjective for a deterministic check.
+//!
+//! A poster writes acceptance criteria ("clauses"), hashes them, and funds a
+//! bounty. The hash and the money are written into a program-derived address in
+//! the same transaction. From that moment the criteria are fixed: a PDA has no
+//! private key, so nobody - not the poster, not the worker, not the operators of
+//! this protocol - can rewrite the clauses after work has started. That single
+//! property is what the whole product is selling.
+//!
+//! A worker submits. An off-chain AI judge reads only the sealed clauses and the
+//! submission and produces a ruling. The key that signs `submit_verdict` is the
+//! only key that can move escrowed money, and it can only move it in the two
+//! shapes this program allows: pay the worker (minus the protocol fee), or refund
+//! the poster in full.
+//!
+//! ## Reading this program
+//!
+//! Every `#[account(...)]` block has a plain-English comment above it saying what
+//! it prevents. Read those first - they are the security surface. The handlers
+//! themselves are deliberately boring.
+//!
+//! ## The state machine
+//!
+//! `Open -> Submitted -> Settled | Refunded`, plus `Open -> Refunded` on expiry.
+//! `Settled` and `Refunded` are terminal: every instruction requires an explicit
+//! prior state, and no instruction accepts a terminal one, so money can never
+//! leave a task twice.
+
+use anchor_lang::prelude::*;
+
+pub mod constants;
+pub mod errors;
+pub mod instructions;
+pub mod state;
+
+use instructions::*;
+
+/// PLACEHOLDER PROGRAM ID.
+///
+/// This is Anchor's example key. Before the first devnet deploy run:
+///
+/// ```text
+/// anchor keys sync
+/// ```
+///
+/// which generates `target/deploy/rubric-keypair.json`, reads its public key, and
+/// rewrites this line and `Anchor.toml` to match. That keypair is the program's
+/// identity - it is gitignored, and losing it means you can never upgrade the
+/// deployed program.
+declare_id!("Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS");
+
+#[program]
+pub mod rubric {
+    use super::*;
+
+    /// Create the singleton `Config`. Run once per deployment, by the admin.
+    pub fn initialize_config(
+        ctx: Context<InitializeConfig>,
+        verifier_authority: Pubkey,
+        fee_bps: u16,
+        fee_destination: Pubkey,
+    ) -> Result<()> {
+        instructions::initialize_config::handler(ctx, verifier_authority, fee_bps, fee_destination)
+    }
+
+    /// Rotate the verifier authority. Admin only.
+    ///
+    /// Exists because the verifier key is a single point of failure in the MVP:
+    /// if it leaks, the admin must be able to cut it off without redeploying.
+    pub fn set_verifier_authority(
+        ctx: Context<SetVerifierAuthority>,
+        new_verifier_authority: Pubkey,
+    ) -> Result<()> {
+        instructions::set_verifier_authority::handler(ctx, new_verifier_authority)
+    }
+
+    /// Seal a rubric and fund its escrow. The poster signs.
+    pub fn create_task(
+        ctx: Context<CreateTask>,
+        task_id: u64,
+        rubric_hash: [u8; 32],
+        bounty_amount: u64,
+        deadline: i64,
+    ) -> Result<()> {
+        instructions::create_task::handler(ctx, task_id, rubric_hash, bounty_amount, deadline)
+    }
+
+    /// Claim a task by submitting work. The worker signs.
+    pub fn submit_work(ctx: Context<SubmitWork>, submission_hash: [u8; 32]) -> Result<()> {
+        instructions::submit_work::handler(ctx, submission_hash)
+    }
+
+    /// Rule on a submission and settle the escrow. ONLY the verifier authority
+    /// may sign this. It is the single most security-critical instruction here.
+    pub fn submit_verdict(
+        ctx: Context<SubmitVerdict>,
+        approved: bool,
+        confidence: u8,
+        reasoning_hash: [u8; 32],
+    ) -> Result<()> {
+        instructions::submit_verdict::handler(ctx, approved, confidence, reasoning_hash)
+    }
+
+    /// Take back an unworked bounty after the deadline. The poster signs.
+    pub fn reclaim_expired(ctx: Context<ReclaimExpired>) -> Result<()> {
+        instructions::reclaim_expired::handler(ctx)
+    }
+}

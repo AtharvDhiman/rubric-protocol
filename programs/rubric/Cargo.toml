@@ -1,0 +1,34 @@
+[package]
+name = "rubric"
+version = "0.1.0"
+description = "Rubric - AI-judged escrow on Solana. Pay on proof, not on trust."
+edition = "2021"
+rust-version = "1.89.0"
+
+[lib]
+crate-type = ["cdylib", "lib"]
+name = "rubric"
+
+[features]
+default = []
+cpi = ["no-entrypoint"]
+no-entrypoint = []
+no-log-ix-name = []
+# Required since Anchor 0.30 for IDL generation. `anchor build` turns this on
+# itself; without it the build produces no IDL and the TypeScript client has
+# nothing to generate types from.
+idl-build = ["anchor-lang/idl-build", "anchor-spl/idl-build"]
+anchor-debug = []
+custom-heap = []
+custom-panic = []
+
+[dependencies]
+# Anchor 1.1.2 (released 2026-06-26) is the current stable line. 2.0.0-rc.1
+# exists but is a pre-release - do not move to it without re-reading the
+# changelog, since 1.0 already broke CpiContext and the TS package name.
+anchor-lang = "1.1.2"
+# Default features already include `token`, `token_2022` and `associated_token`.
+anchor-spl = "1.1.2"
+
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(target_os, values("solana"))'] }

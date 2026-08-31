@@ -1,0 +1,25 @@
+[workspace]
+members = ["programs/*"]
+resolver = "2"
+
+[workspace.package]
+edition = "2021"
+# Anchor 1.1.2 sets its minimum supported Rust version to 1.89.
+rust-version = "1.89.0"
+
+[profile.release]
+# THIS LINE IS A SAFETY FEATURE, NOT AN OPTIMIZATION SETTING.
+#
+# Rust's release profile normally WRAPS on integer overflow instead of panicking.
+# This program does arithmetic on money. Every such spot also uses explicit
+# checked_* calls, but leaving overflow-checks on means that if anyone ever adds
+# a plain `a + b` on a u64 amount, the program aborts instead of silently
+# computing a wrong payout. Do not turn this off to save compute units.
+overflow-checks = true
+lto = "fat"
+codegen-units = 1
+
+[profile.release.build-override]
+opt-level = 3
+incremental = false
+codegen-units = 1

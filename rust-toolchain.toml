@@ -1,0 +1,5 @@
+[toolchain]
+# Anchor 1.1.2's declared MSRV. `anchor init` pins exactly this.
+channel = "1.89.0"
+components = ["rustfmt", "clippy"]
+profile = "minimal"
