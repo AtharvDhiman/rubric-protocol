@@ -1,0 +1,47 @@
+# ---- Secrets. Nothing in here ever gets committed. ----
+.env
+.env.*
+!.env.example
+*.pem
+# Solana keypairs are raw byte arrays in .json files. Never commit one.
+keypair*.json
+*-keypair.json
+id.json
+/wallets/
+
+# ---- Rust / Anchor ----
+target/
+**/*.rs.bk
+.anchor/
+test-ledger/
+# Anchor writes the program keypair here on first build. It is a real private
+# key for the program's upgrade authority path - keep it local, back it up
+# yourself, do not commit it.
+/target/deploy/*-keypair.json
+
+# ---- Node ----
+node_modules/
+.pnp
+.pnp.js
+npm-debug.log*
+yarn-error.log*
+
+# ---- Next.js ----
+web/.next/
+web/out/
+web/build/
+web/.vercel/
+web/next-env.d.ts
+web/tsconfig.tsbuildinfo
+
+# ---- Prisma ----
+web/prisma/*.db
+web/prisma/*.db-journal
+web/prisma/migrations/dev.db*
+
+# ---- Editors / OS ----
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/extensions.json
