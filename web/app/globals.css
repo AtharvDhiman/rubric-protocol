@@ -41,8 +41,15 @@
   --sol-purple: #9945ff;
   --sol-green: #14f195;
 
-  --font-sans: var(--font-sans), "IBM Plex Sans", sans-serif;
-  --font-mono: var(--font-mono), "IBM Plex Mono", monospace;
+  /* Sourced from next/font under a DIFFERENT name (--font-plex-*).
+     If both sides used --font-sans this line would reference itself, because
+     :root IS the html element - the same element next/font sets its variable
+     on. That cycle makes the value invalid at computed-value time, the variable
+     resolves to nothing, and every font in the app silently falls back to the
+     system stack. Which is exactly what happened, and it is invisible unless
+     you inspect the computed style. */
+  --font-sans: var(--font-plex-sans), "IBM Plex Sans", sans-serif;
+  --font-mono: var(--font-plex-mono), "IBM Plex Mono", monospace;
 }
 
 * {
