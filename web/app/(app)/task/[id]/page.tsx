@@ -118,13 +118,7 @@ export default async function TaskPage({
         {formatDate(task.createdAt)}
       </p>
 
-      <h1
-        style={{
-          fontSize: 30,
-          letterSpacing: "-0.02em",
-          margin: "12px 0 0",
-        }}
-      >
+<h1 className="page-title" style={{ margin: "12px 0 0" }}>
         {task.title}
       </h1>
 
@@ -476,7 +470,7 @@ export default async function TaskPage({
 function Empty({ heading, body }: { heading: string; body: string }) {
   return (
     <article>
-      <h1 style={{ fontSize: 30, letterSpacing: "-0.02em" }}>{heading}</h1>
+      <h1 className="page-title">{heading}</h1>
       <p style={{ fontSize: 15, color: "var(--text-muted)", marginTop: 12 }}>
         {body}{" "}
         <Link href="/docket" style={{ color: "var(--accent)" }}>

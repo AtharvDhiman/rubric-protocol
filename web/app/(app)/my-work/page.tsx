@@ -53,8 +53,8 @@ export default function MyWorkPage() {
 
   return (
     <article>
-      <h1 style={{ fontSize: 30, letterSpacing: "-0.02em" }}>My work</h1>
-      <p style={{ fontSize: 15, color: "var(--text-muted)", margin: "8px 0 0" }}>
+      <h1 className="page-title">My work</h1>
+      <p className="page-lede">
         Matters posted by the connected wallet.
       </p>
       <hr className="rule" style={{ marginTop: 24 }} />

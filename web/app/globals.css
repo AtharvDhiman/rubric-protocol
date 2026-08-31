@@ -4,28 +4,35 @@
    RUBRIC DESIGN SYSTEM
    web/DESIGN.md is the authority. This file implements it.
 
-   Two surfaces: the app (light, document-like) and the landing page (dark).
+   One dark surface throughout: the app now shares the landing page ground.
+   App page titles use the landing display scale via .page-title.
    Borders, never shadows. Radius 2px on inputs and buttons, 0 elsewhere.
    Strict 8px spacing scale. Nothing rotates except the verdict stamp.
    =========================================================================== */
 
 :root {
-  /* --- APP (light) --- */
-  --page: #f5f2ea;
-  --surface: #fbfaf6;
-  --raised: #ffffff;
-  --border-strong: #1c1917;
-  --border: #d6d1c4;
-  --hairline: #e5e1d6;
-  --text: #1c1917;
-  --text-2: #44403c;
-  --text-muted: #78716c;
-  --text-faint: #a8a29e;
-  --accent: #7c33d6;
+  /* --- APP (dark) ---
+     The app now shares the landing page's dark ground rather than the light
+     document surface the original design used. Accent colours are the BRIGHT
+     variants: the previous ones (#7c33d6, #0b7d5a, #b3234a, #92400e) were chosen
+     to be legible on cream and are close to unreadable on #0a0a0c. */
+  --page: #0a0a0c;
+  --surface: #101014;
+  --raised: #16161b;
+  --border-strong: #3a3a46;
+  --border: #26262f;
+  --hairline: #1f1f26;
+  --row-hover: #16161b;
+  --text: #f4f4f5;
+  --text-2: #d4d4d8;
+  --text-muted: #a1a1aa;
+  --text-faint: #71717a;
+  --accent: #b57bff;
   --accent-strong: #9945ff;
-  --positive: #0b7d5a;
-  --negative: #b3234a;
-  --warning: #92400e;
+  --positive: #14f195;
+  --negative: #ff5c8a;
+  --warning: #fbbf24;
+  --overlay: rgba(0, 0, 0, 0.66);
 
   /* --- LANDING (dark) --- */
   --d-ground: #0a0a0c;
@@ -121,6 +128,24 @@ h3 {
   margin: 0;
 }
 
+/* Landing-page display scale, applied to app screen titles.
+   Deliberately scoped to the page title only: record rows, table headers and
+   mono data keep their size, because a ledger is read by scanning and blowing
+   up every element would work against that. */
+.page-title {
+  font-size: clamp(34px, 4.2vw, 52px);
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  line-height: 1.05;
+}
+
+.page-lede {
+  font-size: 17px;
+  color: var(--text-muted);
+  margin: 12px 0 0;
+  max-width: 60ch;
+}
+
 /* ---------------------------------------------------------------------------
    THE CLAUSE MARK  (motif 1 of 2)
    --------------------------------------------------------------------------- */
@@ -149,7 +174,8 @@ h3 {
   border-radius: 0;
   background: transparent;
   transform: rotate(-4deg);
-  mix-blend-mode: multiply;
+  /* No mix-blend-mode. Multiply was right for ink on a cream page; on a dark
+     ground it drives the stamp toward black and erases it. */
   white-space: nowrap;
 }
 
@@ -174,11 +200,6 @@ h3 {
 .stamp-inreview,
 .stamp-expired {
   color: var(--warning);
-}
-
-/* On the dark landing surface, multiply would swallow the stamp. */
-.on-dark .stamp {
-  mix-blend-mode: normal;
 }
 
 /* ---------------------------------------------------------------------------
@@ -206,7 +227,7 @@ h3 {
 }
 
 .btn:hover:not(:disabled) {
-  background: var(--page);
+  background: var(--row-hover);
 }
 
 .btn-primary {
@@ -327,9 +348,11 @@ h3 {
   color: inherit;
 }
 
-/* Hover changes the background and nothing else. No lift, no shadow, no scale. */
+/* Hover changes the background and nothing else. No lift, no shadow, no scale.
+   Uses --row-hover rather than --page: on the dark ground --page is darker than
+   the surface the row sits on, so hovering would make the row recede. */
 .record-row:hover {
-  background: var(--page);
+  background: var(--row-hover);
 }
 
 /* ---------------------------------------------------------------------------

@@ -30,7 +30,7 @@ export function AppHeader() {
         zIndex: 20,
         background: "var(--surface)",
         borderBottom: "1px solid var(--border-strong)",
-        boxShadow: "0 1px 0 rgba(28,25,23,0.06)",
+        boxShadow: "0 1px 0 rgba(244,244,245,0.06)",
       }}
     >
       <div

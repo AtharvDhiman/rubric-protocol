@@ -229,8 +229,8 @@ export default function CreatePage() {
         }}
       >
         <div>
-          <h1 style={{ fontSize: 30, letterSpacing: "-0.02em" }}>Draft a rubric</h1>
-          <p style={{ fontSize: 15, color: "var(--text-muted)", margin: "8px 0 0" }}>
+          <h1 className="page-title">Draft a rubric</h1>
+          <p className="page-lede">
             Write the clauses, seal them, fund the escrow.
           </p>
         </div>
@@ -434,7 +434,7 @@ export default function CreatePage() {
           style={{
             position: "fixed",
             inset: 0,
-            background: "rgba(28,25,23,0.42)",
+            background: "var(--overlay)",
             display: "grid",
             placeItems: "center",
             padding: 24,

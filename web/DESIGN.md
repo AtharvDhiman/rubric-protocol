@@ -9,10 +9,22 @@ Rubric is an escrow protocol where acceptance criteria are sealed on-chain and a
 AI judge rules against them. The interface should look like a serious financial
 record system: a document, a ledger, a receipt. Restrained, dense, precise.
 
-Two surfaces, deliberately different:
+**One dark surface throughout** (revised 2026-09-01, at the owner's direction):
 
 1. THE LANDING PAGE (`/`) — dark, one strong animated visual, otherwise plain.
-2. THE APP (`/docket`, `/create`, `/task/[id]`) — light, document-like, no ornament.
+2. THE APP (`/docket`, `/create`, `/task/[id]`) — the same dark ground, no ornament.
+
+This replaces the original split, where the app was a light document surface and
+only the landing page was dark. The record-system character is now carried by
+structure rather than by paper: hairline-separated rows, mono data, § clause
+marks and the verdict stamp all stay exactly as they were.
+
+What did NOT change with the theme, and must not drift:
+
+- Type is still IBM Plex Sans + IBM Plex Mono, and nothing else.
+- Every number a person might compare, copy or verify is still mono.
+- Borders, never shadows. Radius 2px on inputs and buttons, 0 elsewhere.
+- The only rotation in the product is still the verdict stamp.
 
 ## What this must NOT look like
 
@@ -41,6 +53,10 @@ Rules:
 
 - Headings: Plex Sans 600, tight tracking (-0.01em to -0.02em on large sizes).
   Sentence case, not ALL CAPS, except the landing hero.
+- App page titles use the landing display scale: `.page-title`, Plex Sans 700 at
+  `clamp(34px, 4.2vw, 52px)`, tracking -0.03em. Scoped to the page title ONLY -
+  record rows, table headers and mono data keep their size, because a ledger is
+  read by scanning and enlarging everything works against that.
 - Body: Plex Sans 400, 15–16px, line-height 1.6.
 - Labels and metadata: Plex Mono, uppercase, 10–11px, letter-spacing 0.14em–0.18em.
   Do not exceed 0.18em — wider tracking starts to look decorative.
@@ -48,25 +64,36 @@ Rules:
   addresses, hashes, times — is Plex Mono, never Plex Sans. This is the single
   most important typographic rule in the app.**
 
-## Tokens — APP (light)
+## Tokens — APP (dark)
 
-| Role            | Value     | Notes                                     |
-| --------------- | --------- | ----------------------------------------- |
-| Page background | `#f5f2ea` |                                           |
-| Surface         | `#fbfaf6` |                                           |
-| Surface raised  | `#ffffff` |                                           |
-| Border strong   | `#1c1917` |                                           |
-| Border          | `#d6d1c4` |                                           |
-| Border hairline | `#e5e1d6` |                                           |
-| Text            | `#1c1917` |                                           |
-| Text secondary  | `#44403c` |                                           |
-| Text muted      | `#78716c` |                                           |
-| Text faint      | `#a8a29e` |                                           |
-| Accent (purple) | `#7c33d6` | clause numerals, active nav, key labels    |
-| Accent strong   | `#9945FF` | only in the Solana mark and one rule       |
-| Positive        | `#0b7d5a` | approved, paid                             |
-| Negative        | `#b3234a` | rejected                                   |
-| Warning         | `#92400e` | held for review                            |
+| Role            | Value     | Notes                                   |
+| --------------- | --------- | --------------------------------------- |
+| Page background | `#0a0a0c` | same ground as the landing page          |
+| Surface         | `#101014` | the content column                       |
+| Surface raised  | `#16161b` | receipts, panels, the wallet modal       |
+| Border strong   | `#3a3a46` | structural rules under headers           |
+| Border          | `#26262f` | column dividers                          |
+| Border hairline | `#1f1f26` | between record rows                      |
+| Row hover       | `#16161b` | hover only; never a lift or a shadow     |
+| Text            | `#f4f4f5` |                                          |
+| Text secondary  | `#d4d4d8` |                                          |
+| Text muted      | `#a1a1aa` |                                          |
+| Text faint      | `#71717a` |                                          |
+| Accent (purple) | `#b57bff` | clause numerals, active nav, key labels   |
+| Accent strong   | `#9945FF` | only in the Solana mark and one rule      |
+| Positive        | `#14F195` | approved, paid                            |
+| Negative        | `#ff5c8a` | rejected                                  |
+| Warning         | `#fbbf24` | held for review                           |
+| Overlay         | `rgba(0,0,0,.66)` | modal scrim                       |
+
+The accent, positive, negative and warning values are the BRIGHT variants. The
+originals (`#7c33d6`, `#0b7d5a`, `#b3234a`, `#92400e`) were picked to be legible
+on cream and are close to unreadable on `#0a0a0c`. If you ever move a surface
+back to light, these have to move back with it.
+
+**The verdict stamp carries no `mix-blend-mode`.** `multiply` was correct for ink
+pressed into a light page; on a dark ground it drives the stamp toward black and
+erases it.
 
 ## Tokens — LANDING (dark)
 
@@ -84,23 +111,23 @@ Solana purple #9945FF · Solana green #14F195
   under a sticky header.
 - Everything sits on a strict 8px spacing scale.
 - Tables and record rows are separated by 1px hairlines, never by gaps or cards.
-- Section breaks use a 1px `#1c1917` rule. Use these sparingly and only where a
-  real structural break exists.
+- Section breaks use a 1px `#3a3a46` rule (`--border-strong`). Use these sparingly
+  and only where a real structural break exists.
 - Nothing is rotated except verdict stamps (see below). No element sits off-axis
   "for character".
 
 ## The two motifs that are allowed (because they mean something)
 
 1. **THE CLAUSE MARK.** Acceptance criteria are numbered §1 §2 §3, in Plex Mono, in
-   `#7c33d6`. Never bullets, never "1." — the section mark signals that clauses are
+   `#b57bff`. Never bullets, never "1." — the section mark signals that clauses are
    binding terms, which is literally true here. Used everywhere clauses appear.
 
 2. **THE VERDICT STAMP.** A rectangular outline containing a single uppercase word in
-   Plex Mono 600 at 0.16em tracking: APPROVED (`#0b7d5a`), REJECTED (`#b3234a`),
-   SEALED (`#7c33d6`), HELD (`#92400e`). 2px border, no fill, rotated exactly -4deg,
-   `mix-blend-mode: multiply` on light surfaces. The rotation is the ONE permitted
-   tilt in the product — it reads as a stamp pressed by hand onto a record, which
-   is exactly the mental model. Everything else stays square.
+   Plex Mono 600 at 0.16em tracking: APPROVED (`#14F195`), REJECTED (`#ff5c8a`),
+   SEALED (`#b57bff`), HELD (`#fbbf24`). 2px border, no fill, rotated exactly -4deg,
+   and NO blend mode. The rotation is the ONE permitted tilt in the product — it
+   reads as a stamp pressed by hand onto a record, which is exactly the mental
+   model. Everything else stays square.
 
 Do not invent additional motifs.
 

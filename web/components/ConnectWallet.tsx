@@ -113,7 +113,7 @@ export function ConnectWallet() {
           style={{
             position: "fixed",
             inset: 0,
-            background: "rgba(28,25,23,0.42)",
+            background: "var(--overlay)",
             display: "grid",
             placeItems: "center",
             zIndex: 100,

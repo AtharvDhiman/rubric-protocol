@@ -111,8 +111,8 @@ export default async function DocketPage({
         }}
       >
         <div>
-          <h1 style={{ fontSize: 30, letterSpacing: "-0.02em" }}>The docket</h1>
-          <p style={{ fontSize: 15, color: "var(--text-muted)", margin: "8px 0 0" }}>
+          <h1 className="page-title">The docket</h1>
+          <p className="page-lede">
             Open matters awaiting submission or verdict.
           </p>
         </div>
