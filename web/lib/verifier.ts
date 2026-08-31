@@ -23,10 +23,41 @@
 
 import Anthropic from "@anthropic-ai/sdk";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
+import { GoogleGenAI } from "@google/genai";
 import * as z from "zod/v4";
 
-/** Judge model. Do not silently downgrade this - see README "Known limitations". */
-export const VERIFIER_MODEL = "claude-opus-5";
+/**
+ * WHICH MODEL JUDGES.
+ *
+ * The original brief specified the Anthropic API. Gemini was added because it
+ * has a free tier and the Anthropic API does not; both paths are kept so the
+ * choice stays reversible.
+ *
+ * What does NOT change with the provider, and is the actual safety layer:
+ * the system prompt, the per-request untrusted-input delimiter, the zod schema
+ * (both providers derive their structured-output contract from it), and every
+ * rule in `applyVerdictGuards`. A different model can be more or less resistant
+ * to a hostile submission - it cannot make this module approve a task whose
+ * clauses did not all pass.
+ *
+ * Selection: JUDGE_PROVIDER, else whichever key is present, else anthropic.
+ */
+export type JudgeProvider = "anthropic" | "gemini";
+
+export const ANTHROPIC_MODEL = "claude-opus-5";
+export const GEMINI_MODEL = process.env.GEMINI_MODEL ?? "gemini-3.7-flash";
+
+export function judgeProvider(): JudgeProvider {
+  const explicit = process.env.JUDGE_PROVIDER?.toLowerCase();
+  if (explicit === "gemini" || explicit === "anthropic") return explicit;
+  if (process.env.GEMINI_API_KEY) return "gemini";
+  return "anthropic";
+}
+
+/** The model id actually used, recorded in the published verdict. */
+export function judgeModel(provider: JudgeProvider = judgeProvider()): string {
+  return provider === "gemini" ? GEMINI_MODEL : ANTHROPIC_MODEL;
+}
 
 /**
  * Below this confidence the protocol refuses to settle automatically and holds
@@ -264,6 +295,86 @@ export interface RunVerdictOptions {
   client?: Anthropic;
   threshold?: number;
   model?: string;
+  provider?: JudgeProvider;
+}
+
+/**
+ * One model call. Returns the raw parsed object, or a reason it could not.
+ *
+ * Both adapters derive their structured-output contract from the SAME zod
+ * schema, so the two providers cannot drift apart, and the caller re-validates
+ * with zod regardless of which one answered.
+ */
+type JudgeResponse =
+  | { kind: "ok"; value: unknown }
+  | { kind: "refused" }
+  | { kind: "unusable"; reason: string };
+
+async function askAnthropic(
+  userMessage: string,
+  model: string,
+  client?: Anthropic
+): Promise<JudgeResponse> {
+  const anthropic = client ?? new Anthropic();
+  const response = await anthropic.messages.parse({
+    model,
+    max_tokens: 8000,
+    system: SYSTEM_PROMPT,
+    thinking: { type: "adaptive" },
+    messages: [{ role: "user", content: userMessage }],
+    output_config: {
+      format: zodOutputFormat(JudgePayloadSchema),
+      effort: "high",
+    },
+  });
+
+  // A safety refusal is a legitimate signal, not a crash.
+  if (response.stop_reason === "refusal") return { kind: "refused" };
+  if (!response.parsed_output) {
+    return { kind: "unusable", reason: "The judge's response did not match the required schema." };
+  }
+  return { kind: "ok", value: response.parsed_output };
+}
+
+async function askGemini(
+  userMessage: string,
+  model: string
+): Promise<JudgeResponse> {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) throw new Error("GEMINI_API_KEY is not set.");
+  const genai = new GoogleGenAI({ apiKey });
+
+  // The same zod schema the response is validated against, expressed as JSON
+  // Schema. Deriving it means the constraint sent to the model and the check
+  // applied to its answer can never disagree.
+  const schema = z.toJSONSchema(JudgePayloadSchema) as Record<string, unknown>;
+
+  const interaction = await genai.interactions.create({
+    model,
+    // Gemini has no separate system field on this endpoint, so the system
+    // prompt is prepended. The untrusted submission is still fenced by the
+    // per-request nonce inside userMessage, which is what actually matters.
+    input: `${SYSTEM_PROMPT}
+
+---
+
+${userMessage}`,
+    response_format: {
+      type: "text",
+      mime_type: "application/json",
+      schema,
+    },
+  } as never);
+
+  const text = (interaction as { output_text?: string }).output_text;
+  if (!text) {
+    return { kind: "unusable", reason: "The judge returned no output." };
+  }
+  try {
+    return { kind: "ok", value: JSON.parse(text) };
+  } catch {
+    return { kind: "unusable", reason: "The judge's response was not valid JSON." };
+  }
 }
 
 /**
@@ -284,8 +395,8 @@ export async function runVerdict(
   }
 
   const threshold = options.threshold ?? confidenceThreshold();
-  const model = options.model ?? VERIFIER_MODEL;
-  const client = options.client ?? new Anthropic();
+  const provider = options.provider ?? judgeProvider();
+  const model = options.model ?? judgeModel(provider);
 
   const nonce = makeNonce();
   const userMessage = buildUserMessage(rubric, submission, nonce);
@@ -312,34 +423,25 @@ export async function runVerdict(
   // is a judge we should not be trusting with this task right now.
   for (let attempt = 0; attempt < 2; attempt++) {
     try {
-      const response = await client.messages.parse({
-        model,
-        max_tokens: 8000,
-        system: SYSTEM_PROMPT,
-        thinking: { type: "adaptive" },
-        messages: [{ role: "user", content: userMessage }],
-        output_config: {
-          format: zodOutputFormat(JudgePayloadSchema),
-          effort: "high",
-        },
-      });
+      const response =
+        provider === "gemini"
+          ? await askGemini(userMessage, model)
+          : await askAnthropic(userMessage, model, options.client);
 
       // A safety refusal is a legitimate signal, not a crash. Hold the task.
-      if (response.stop_reason === "refusal") {
+      if (response.kind === "refused") {
         return held(
           "The judge declined to rule on this submission's content. A human needs to look at it."
         );
       }
-
-      const parsed = response.parsed_output;
-      if (!parsed) {
-        lastFailure = "The judge's response did not match the required schema.";
+      if (response.kind === "unusable") {
+        lastFailure = response.reason;
         continue;
       }
 
-      // Belt and braces: parse() already validated, but this module must not
-      // depend on that for a money decision.
-      const validated = JudgePayloadSchema.safeParse(parsed);
+      // The provider may already have enforced the schema. This module must
+      // not depend on that for a money decision, so it validates regardless.
+      const validated = JudgePayloadSchema.safeParse(response.value);
       if (!validated.success) {
         lastFailure = "The judge's response failed schema validation.";
         continue;
