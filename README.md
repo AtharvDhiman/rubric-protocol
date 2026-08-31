@@ -23,7 +23,7 @@ the reasoning is public and its hash is on-chain.
 | Part | State |
 | --- | --- |
 | Anchor program (5 instructions + admin rotation) | Written, **not yet compiled** — no Rust toolchain on this machine |
-| 18 integration tests (13 attack cases) | Written, **not yet run** — needs a local validator |
+| 19 integration tests (14 attack cases) | Written, **not yet run** — needs a local validator |
 | Judge (`web/lib/verifier.ts`) | Working. 12 guard tests pass; 7 live judge tests are opt-in |
 | Canonical hashing | Working. 25 tests pass, including a pinned golden digest |
 | API routes + Prisma schema | Written; compile and typecheck clean |
@@ -48,7 +48,7 @@ The chain holds only what has to be tamper-proof:
 
 | Account | Holds |
 | --- | --- |
-| `Config` (singleton PDA, seeds `[b"config"]`) | admin, verifier authority, fee bps, fee destination |
+| `Config` (singleton PDA, seeds `[b"config"]`) | admin, verifier authority, bounty mint, fee bps, fee destination |
 | `Task` (PDA, seeds `[b"task", creator, task_id]`) | creator, worker, mint, **rubric hash**, submission hash, bounty, deadline, state, verdict |
 | Escrow | an associated token account whose **authority is the Task PDA** |
 
@@ -59,6 +59,12 @@ bounty deposited into their wallet.
 
 `Settled` and `Refunded` are terminal. Every instruction requires an explicit prior
 state and none accepts a terminal one, so escrow cannot leave a task twice.
+
+A task can also leave `Submitted` without a verdict, but only after the deadline
+plus a seven-day grace period. That door exists because anyone may call
+`submit_work`, so anyone can push every open task into `Submitted`; without it, a
+griefer plus a lost verifier key would freeze every escrow in the protocol
+permanently. A verdict takes seconds, so in normal operation it never fires.
 
 ### What lives off-chain
 
@@ -106,7 +112,7 @@ programs/rubric/src/
   errors.rs                 every failure mode, named
   constants.rs              seeds, fee ceiling, MAX_BOUNTY, work-window cap
   instructions/             one file per instruction
-tests/rubric.ts             18 integration tests
+tests/rubric.ts             19 integration tests
 web/
   lib/verifier.ts           the judge
   lib/hash.ts               canonical rubric hashing — load-bearing
@@ -234,12 +240,32 @@ only recourse is the public reasoning.
 **5. The clock is the validator's.** `Clock::get()` is not a precise wall clock;
 deadlines are accurate to within a slot or so, which is fine at hour granularity.
 
-**6. A task can strand if the worker's token account disappears.** `submit_work`
-requires the worker's ATA to exist so payout cannot fail, but if the worker closes
-it between submitting and the verdict, `submit_verdict` fails and the task sits in
-`Submitted` — there is no reclaim path out of that state.
+**6. A closed destination token account delays settlement.** `submit_verdict`
+requires the worker's, the poster's, and the fee destination's token accounts to
+exist, on both the approve and reject paths. If one is closed, the verdict
+transaction fails. The verifier recreates any missing account idempotently in the
+same transaction, which closes the race — but a determined party could still hold
+up their own settlement, and the grace-period reclaim is the backstop.
 
-**7. Landing-page figures are targets, not measurements.** They are labelled as
+**7. Dust sent to a settled task's escrow address is unrecoverable.** Once a task
+settles, its escrow account is closed and the task is terminal. ATA creation is
+permissionless, so anyone can recreate that address and send tokens to it, and no
+instruction will ever sign for it again. Do not retry a deposit against a settled
+task.
+
+**8. Task ids are sequential per creator, so a specific id can be blocked.** The
+escrow uses `init`, which fails if the account already exists. Someone who
+predicts `(creator, task_id)` can pre-create the escrow ATA and make that one id
+unusable. The cost is theirs (rent per blocked id), the poster simply gets the
+next id, and no funds are at risk — but it is a cheap nuisance.
+
+**9. `initialize_config` must be run by the program's upgrade authority.** This is
+enforced on-chain, and it is what stops a bystander from front-running the setup
+transaction and installing themselves as admin and verifier. The consequence: do
+not make the program immutable before initializing the config, or the deployment
+is unusable.
+
+**10. Landing-page figures are targets, not measurements.** They are labelled as
 such in the UI and live in `web/lib/constants.ts`.
 
 ---
@@ -253,7 +279,8 @@ anchor build
 anchor deploy --provider.cluster devnet
 ```
 
-Then initialize the config once, with the verifier pubkey you generated:
+Then initialize the config once, **from the wallet that deployed the program** —
+the instruction requires the signer to be the program's upgrade authority:
 
 ```bash
 solana-keygen new --no-bip39-passphrase -o verifier.json

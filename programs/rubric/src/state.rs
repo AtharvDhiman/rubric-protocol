@@ -67,6 +67,14 @@ pub struct Config {
     /// The ONLY key permitted to call `submit_verdict`. This is the MVP's
     /// centralization point and it is documented as such in the README.
     pub verifier_authority: Pubkey,
+    /// The ONE SPL mint this deployment escrows in (USDC).
+    ///
+    /// Without this, `create_task` accepted any mint the poster passed, which
+    /// made `MAX_BOUNTY` meaningless: "50_000_000 base units" is 50 USDC at 6
+    /// decimals but 50 million whole tokens against a 0-decimal mint the poster
+    /// minted themselves. The cap is the MVP's blast-radius limit, so the mint
+    /// it is denominated in has to be fixed too.
+    pub bounty_mint: Pubkey,
     /// Protocol fee in basis points (200 = 2%). Capped at `MAX_FEE_BPS`.
     pub fee_bps: u16,
     /// Wallet that owns the token account fees are paid into.

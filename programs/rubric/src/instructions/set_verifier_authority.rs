@@ -7,6 +7,7 @@
 use anchor_lang::prelude::*;
 
 use crate::constants::CONFIG_SEED;
+use crate::errors::RubricError;
 use crate::state::Config;
 
 #[derive(Accounts)]
@@ -27,7 +28,7 @@ pub struct SetVerifierAuthority<'info> {
         mut,
         seeds = [CONFIG_SEED],
         bump = config.bump,
-        has_one = admin
+        has_one = admin @ RubricError::NotAdmin
     )]
     pub config: Account<'info, Config>,
 }

@@ -1,17 +1,32 @@
-//! `reclaim_expired` - the poster takes back an unworked bounty.
+//! `reclaim_expired` - the poster takes back a bounty nobody resolved.
 //!
 //! This is the only way money leaves a task without a verdict, and it is
-//! deliberately narrow: the task must still be `Open` (nobody has submitted) and
-//! the work window must have closed. A task that has a submission waiting on a
-//! ruling can NOT be reclaimed - otherwise a poster could receive good work and
-//! then yank the bounty back before the judge ruled.
+//! deliberately narrow. Two doors, and nothing else:
+//!
+//!   1. `Open` and past the deadline. Nobody submitted; the money goes home.
+//!   2. `Submitted` and past the deadline PLUS `VERDICT_GRACE_SECONDS`. A worker
+//!      claimed the task but the verifier never ruled on it.
+//!
+//! Door 2 needs justifying, because it looks like a hole in the promise that a
+//! poster cannot receive good work and then yank the bounty back. It is not, for
+//! two reasons: it only opens a full week after the work window closed, and a
+//! verdict takes seconds, so in normal operation it is unreachable. What it
+//! prevents is much worse than what it risks. Anyone may call `submit_work`, so
+//! anyone can push every open task into `Submitted`; without door 2, only the
+//! verifier key could ever move them out again, and a griefer plus a lost or
+//! offline verifier key would freeze every escrow in the protocol permanently.
+//! A one-key liveness dependency on an unaudited MVP is not acceptable, so the
+//! poster gets a slow escape hatch.
+//!
+//! `submit_verdict` has no deadline check, so the verifier can still rule
+//! normally at any point inside the grace window.
 
 use anchor_lang::prelude::*;
 use anchor_spl::token::{
     close_account, transfer_checked, CloseAccount, Mint, Token, TokenAccount, TransferChecked,
 };
 
-use crate::constants::TASK_SEED;
+use crate::constants::{TASK_SEED, VERDICT_GRACE_SECONDS};
 use crate::errors::RubricError;
 use crate::state::{Task, TaskState};
 
@@ -63,23 +78,34 @@ pub struct ReclaimExpired<'info> {
 }
 
 pub fn handler(ctx: Context<ReclaimExpired>) -> Result<()> {
-    // Only an Open task can be reclaimed. This rejects reclaiming a task that has
-    // a submission awaiting a ruling (Submitted), and rejects reclaiming a task
-    // that has already paid out or refunded (Settled / Refunded) - which is what
-    // keeps the terminal states terminal for this instruction too.
-    require!(
-        ctx.accounts.task.state == TaskState::Open,
-        RubricError::InvalidState
-    );
-
-    // The work window must actually have closed. Without this a poster could
-    // fund a task and immediately pull the money back out, which would make
-    // every open bounty on the docket a lie.
     let now = Clock::get()?.unix_timestamp;
-    require!(
-        now > ctx.accounts.task.deadline,
-        RubricError::DeadlineNotPassed
-    );
+    let deadline = ctx.accounts.task.deadline;
+
+    // The state machine, and the clock, in one place.
+    //
+    // Note what is NOT here: `Settled` and `Refunded` fall through to the catch-
+    // all and are rejected, so the terminal states stay terminal for this
+    // instruction too. There is no arm that accepts them.
+    match ctx.accounts.task.state {
+        // Nobody submitted. The work window must actually have closed - without
+        // that check a poster could fund a task and immediately pull the money
+        // back out, which would make every open bounty on the docket a lie.
+        TaskState::Open => {
+            require!(now > deadline, RubricError::DeadlineNotPassed);
+        }
+        // A worker claimed it but no verdict ever landed. The poster waits a
+        // further grace period on top of the deadline before the escape hatch
+        // opens. See the module comment for why this door exists at all.
+        TaskState::Submitted => {
+            let grace_end = deadline
+                .checked_add(VERDICT_GRACE_SECONDS)
+                .ok_or(RubricError::MathOverflow)?;
+            require!(now > grace_end, RubricError::DeadlineNotPassed);
+        }
+        TaskState::Settled | TaskState::Refunded => {
+            return Err(RubricError::InvalidState.into());
+        }
+    }
 
     // Drain whatever is actually in the escrow, not just the recorded bounty, so
     // that any stray tokens sent to the account come back too and the account can
@@ -135,5 +161,8 @@ pub fn handler(ctx: Context<ReclaimExpired>) -> Result<()> {
         task.task_id,
         amount
     );
+    // NOTE: a task reclaimed out of `Submitted` records no verdict. That is
+    // correct - nobody ruled on it - and the off-chain record shows it as
+    // refunded on a timeout rather than on the merits.
     Ok(())
 }

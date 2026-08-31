@@ -25,6 +25,8 @@ import {
   type Commitment,
 } from "@solana/web3.js";
 
+import { createAssociatedTokenAccountIdempotentInstruction } from "@solana/spl-token";
+
 import { rpcUrl } from "../env";
 import {
   associatedTokenAddress,
@@ -278,6 +280,49 @@ export async function fetchTask(
  * `Submitted` on-chain first - see the idempotency check in the verify route.
  * This function does not decide anything; it transmits a decision.
  */
+/**
+ * Build idempotent "create this ATA if it is missing" instructions for the three
+ * payout destinations.
+ *
+ * `submit_verdict` requires all three token accounts to exist, on BOTH the
+ * approve and reject branches, because Anchor deserializes every account before
+ * the handler branches. That is a liveness hazard: a worker who closes their own
+ * zero-balance token account after submitting - or an admin who never created
+ * the fee destination's account for this mint - makes the task unsettleable, and
+ * a task stuck in `Submitted` can only be freed by the grace-period reclaim a
+ * week later.
+ *
+ * ATA creation is permissionless (only the funder signs), so the verifier can
+ * simply create any that are missing. Doing it as preInstructions in the SAME
+ * transaction is what makes it safe: there is no window in which someone
+ * re-closes the account between our check and the verdict.
+ *
+ * The idempotent variant is a no-op when the account already exists, so this
+ * costs one extra instruction and nothing else in the normal case.
+ */
+function ataPreInstructions(
+  payer: PublicKey,
+  mint: PublicKey,
+  owners: PublicKey[]
+) {
+  const seen = new Set<string>();
+  const instructions = [];
+  for (const owner of owners) {
+    const key = owner.toBase58();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    instructions.push(
+      createAssociatedTokenAccountIdempotentInstruction(
+        payer,
+        associatedTokenAddress(mint, owner),
+        owner,
+        mint
+      )
+    );
+  }
+  return instructions;
+}
+
 export async function sendVerdict(params: {
   creator: PublicKey;
   taskId: bigint;
@@ -290,6 +335,7 @@ export async function sendVerdict(params: {
   const program = verifierProgram();
   const config = await fetchConfig();
   const task = taskPda(params.creator, params.taskId);
+  const verifier = getVerifierKeypair().publicKey;
 
   return await program.methods
     .submitVerdict(
@@ -298,7 +344,7 @@ export async function sendVerdict(params: {
       Array.from(params.reasoningHash)
     )
     .accounts({
-      verifier: getVerifierKeypair().publicKey,
+      verifier,
       config: configPda(),
       task,
       mint: params.mint,
@@ -314,6 +360,13 @@ export async function sendVerdict(params: {
       ),
       tokenProgram: TOKEN_PROGRAM_ID,
     })
+    .preInstructions(
+      ataPreInstructions(verifier, params.mint, [
+        params.worker,
+        params.creator,
+        config.feeDestination,
+      ])
+    )
     .rpc();
 }
 

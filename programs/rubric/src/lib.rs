@@ -23,7 +23,8 @@
 //!
 //! ## The state machine
 //!
-//! `Open -> Submitted -> Settled | Refunded`, plus `Open -> Refunded` on expiry.
+//! `Open -> Submitted -> Settled | Refunded`, plus `Open -> Refunded` on expiry
+//! and `Submitted -> Refunded` if no verdict lands within the grace period.
 //! `Settled` and `Refunded` are terminal: every instruction requires an explicit
 //! prior state, and no instruction accepts a terminal one, so money can never
 //! leave a task twice.
@@ -55,14 +56,24 @@ declare_id!("Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS");
 pub mod rubric {
     use super::*;
 
-    /// Create the singleton `Config`. Run once per deployment, by the admin.
+    /// Create the singleton `Config`. Run once per deployment.
+    ///
+    /// The signer must be the program's upgrade authority - see the instruction
+    /// for why anything weaker loses the protocol to whoever calls this first.
     pub fn initialize_config(
         ctx: Context<InitializeConfig>,
         verifier_authority: Pubkey,
+        bounty_mint: Pubkey,
         fee_bps: u16,
         fee_destination: Pubkey,
     ) -> Result<()> {
-        instructions::initialize_config::handler(ctx, verifier_authority, fee_bps, fee_destination)
+        instructions::initialize_config::handler(
+            ctx,
+            verifier_authority,
+            bounty_mint,
+            fee_bps,
+            fee_destination,
+        )
     }
 
     /// Rotate the verifier authority. Admin only.
@@ -103,7 +114,10 @@ pub mod rubric {
         instructions::submit_verdict::handler(ctx, approved, confidence, reasoning_hash)
     }
 
-    /// Take back an unworked bounty after the deadline. The poster signs.
+    /// Take back a bounty nobody resolved. The poster signs.
+    ///
+    /// `Open` past the deadline, or `Submitted` past the deadline plus the
+    /// verdict grace period. Never a terminal task.
     pub fn reclaim_expired(ctx: Context<ReclaimExpired>) -> Result<()> {
         instructions::reclaim_expired::handler(ctx)
     }

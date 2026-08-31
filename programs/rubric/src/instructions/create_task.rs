@@ -46,10 +46,13 @@ pub struct CreateTask<'info> {
 
     /// The SPL token the bounty is denominated in - USDC in production.
     ///
-    /// Passed in rather than hardcoded so the same program works with devnet USDC
-    /// and mainnet USDC without a code change. The mint is recorded on the task,
-    /// and every later instruction requires the same mint back, so a task funded
-    /// in USDC can never be settled in some worthless token.
+    /// `address = config.bounty_mint` pins it to the single mint this deployment
+    /// was configured for. It is passed in rather than hardcoded so the same
+    /// program works with devnet and mainnet USDC without a code change, but it
+    /// is NOT free choice: without this constraint a poster could escrow a token
+    /// they minted themselves, and `MAX_BOUNTY` - which is denominated in base
+    /// units and assumes 6 decimals - would stop meaning what it says.
+    #[account(address = config.bounty_mint @ RubricError::MintMismatch)]
     pub mint: Account<'info, Mint>,
 
     /// The poster's own token account, which the bounty comes out of.
@@ -168,21 +171,16 @@ pub fn handler(
     // without trusting a bump supplied by whoever builds the transaction.
     task.bump = ctx.bumps.task;
 
+    // Deliberately does NOT log the rubric hash. Formatting 32 bytes as hex cost
+    // 33 heap allocations from the bump allocator (which never frees) and 32
+    // trips through core::fmt, on the compute budget of the instruction that
+    // also creates two accounts and does a token CPI - all to print something
+    // already readable in the account data.
     msg!(
-        "Task sealed. id={} bounty={} deadline={} rubric_hash={}",
+        "Task sealed. id={} bounty={} deadline={}",
         task_id,
         bounty_amount,
-        deadline,
-        hex32(&rubric_hash)
+        deadline
     );
     Ok(())
-}
-
-/// Small helper so log lines carry a readable hash instead of a byte array.
-fn hex32(bytes: &[u8; 32]) -> String {
-    let mut out = String::with_capacity(64);
-    for b in bytes.iter() {
-        out.push_str(&format!("{:02x}", b));
-    }
-    out
 }

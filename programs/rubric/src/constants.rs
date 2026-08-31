@@ -29,6 +29,17 @@ pub const MAX_BOUNTY: u64 = 50_000_000;
 /// unreachable for a human lifetime.
 pub const MAX_WORK_WINDOW_SECONDS: i64 = 30 * 24 * 60 * 60;
 
+/// How long after the deadline the creator must wait before they may reclaim a
+/// task that a worker claimed but the verifier never ruled on.
+///
+/// This exists because `Submitted` would otherwise be a one-way door: only the
+/// verifier can move a task out of it, so a griefer who claims every open task
+/// (anyone may call `submit_work`) combined with a lost or offline verifier key
+/// would lock every escrow in the protocol forever. Seven days is long enough
+/// that it never fires in normal operation - a verdict takes seconds - and short
+/// enough that capital is not hostage to one key indefinitely.
+pub const VERDICT_GRACE_SECONDS: i64 = 7 * 24 * 60 * 60;
+
 /// A hash of all zeroes. Used to reject "I didn't actually commit to anything"
 /// values for both the rubric hash and the submission hash.
 pub const ZERO_HASH: [u8; 32] = [0u8; 32];

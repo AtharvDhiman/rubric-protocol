@@ -1,7 +1,7 @@
 /**
  * Rubric program integration tests.
  *
- * Five happy paths and nine attack/edge cases. The attack cases are the point:
+ * Five happy paths and fourteen attack/edge cases. The attack cases are the point:
  * each one must fail, and must fail with the SPECIFIC error we expect. A test
  * that passes because the transaction failed for some unrelated reason is worse
  * than no test at all, so every negative assertion checks the error code by name.
@@ -45,6 +45,11 @@ const MAX_BOUNTY = 50_000_000; // 50 USDC
 const CONFIG_SEED = Buffer.from("config");
 const TASK_SEED = Buffer.from("task");
 
+/** Where ProgramData lives, so we can prove the signer is the upgrade authority. */
+const BPF_LOADER_UPGRADEABLE = new PublicKey(
+  "BPFLoaderUpgradeab1e11111111111111111111111"
+);
+
 /** Deterministic non-zero hashes. The program rejects all-zero hashes. */
 const RUBRIC_HASH = Array.from({ length: 32 }, (_, i) => (i + 1) % 256);
 const SUBMISSION_HASH = Array.from({ length: 32 }, (_, i) => (i + 64) % 256);
@@ -78,6 +83,7 @@ describe("rubric", () => {
   let attackerAta: PublicKey;
   let feeAta: PublicKey;
   let configPda: PublicKey;
+  let programDataPda: PublicKey;
 
   /** Monotonic task ids so tests never collide on a PDA. */
   let nextTaskId = 1;
@@ -256,18 +262,32 @@ describe("rubric", () => {
       [CONFIG_SEED],
       program.programId
     );
+    [programDataPda] = PublicKey.findProgramAddressSync(
+      [program.programId.toBuffer()],
+      BPF_LOADER_UPGRADEABLE
+    );
 
+    // The signer must be the program's upgrade authority. Under `anchor test`
+    // that is the provider wallet, which deployed the program.
     await program.methods
-      .initializeConfig(verifier.publicKey, FEE_BPS, feeDestination.publicKey)
+      .initializeConfig(
+        verifier.publicKey,
+        mint,
+        FEE_BPS,
+        feeDestination.publicKey
+      )
       .accounts({
         admin: admin.publicKey,
         config: configPda,
+        program: program.programId,
+        programData: programDataPda,
         systemProgram: SystemProgram.programId,
       })
       .rpc();
 
     const config = await program.account.config.fetch(configPda);
     assert.equal(config.verifierAuthority.toBase58(), verifier.publicKey.toBase58());
+    assert.equal(config.bountyMint.toBase58(), mint.toBase58());
     assert.equal(config.feeBps, FEE_BPS);
   });
 
@@ -646,6 +666,35 @@ describe("rubric", () => {
     );
   });
 
+  it("19. a Submitted task cannot be reclaimed before the grace period", async () => {
+    // The escape hatch out of Submitted opens a week after the deadline. Before
+    // that, the worker still has a claim and only the verifier may resolve it.
+    const { task } = await createTask({ deadlineOffsetSeconds: 2 });
+    await submitWork(task);
+    await sleep(5000); // past the deadline, nowhere near the grace period
+
+    await expectError(
+      program.methods
+        .reclaimExpired()
+        .accounts({
+          creator: creator.publicKey,
+          task,
+          mint,
+          escrow: escrowFor(task),
+          creatorTokenAccount: creatorAta,
+          tokenProgram: TOKEN_PROGRAM_ID,
+        })
+        .signers([creator])
+        .rpc(),
+      "DeadlineNotPassed"
+    );
+
+    // Still Submitted, still funded.
+    const account = await program.account.task.fetch(task);
+    assert.deepEqual(Object.keys(account.state), ["submitted"]);
+    assert.equal(await balanceOf(escrowFor(task)), 25 * ONE_USDC);
+  });
+
   it("18. only the admin can rotate the verifier authority", async () => {
     await expectError(
       program.methods
@@ -653,7 +702,7 @@ describe("rubric", () => {
         .accounts({ admin: attacker.publicKey, config: configPda })
         .signers([attacker])
         .rpc(),
-      ["CreatorMismatch", "ConstraintHasOne", "ConstraintRaw"]
+      "NotAdmin"
     );
 
     const config = await program.account.config.fetch(configPda);
