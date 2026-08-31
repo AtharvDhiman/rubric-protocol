@@ -8,6 +8,11 @@ keypair*.json
 *-keypair.json
 id.json
 /wallets/
+# The verifier secret. Whoever holds this can approve or reject any task, which
+# means they can move every escrowed bounty in the protocol.
+verifier.json
+*verifier*.json
+admin.json
 
 # ---- Rust / Anchor ----
 target/
