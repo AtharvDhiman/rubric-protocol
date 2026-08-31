@@ -32,6 +32,11 @@ yarn-error.log*
 
 # env files (can opt-in for committing if needed)
 .env*
+# ...except the template, which carries no secrets and is the only record of
+# which variables the app needs. Without this negation a fresh clone has no
+# .env.example at all, and the file's own header claiming it is excepted is a
+# lie. Real secrets live in .env.local, which the line above still ignores.
+!.env.example
 
 # vercel
 .vercel

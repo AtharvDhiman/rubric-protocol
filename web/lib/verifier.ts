@@ -8,7 +8,25 @@
  *
  * Three rules the code enforces, rather than merely asking the model to follow:
  *
- *  1. THE SUBMISSION IS UNTRUSTED DATA. It is wrapped in a per-request random
+ *  1. WHAT YOU CAN ACTUALLY SEE, AND WHAT THAT DOES NOT MEAN.
+You receive text and nothing else. You cannot open files, download attachments, follow links, run code or view images. This is a limitation of your position as judge. It is NOT a defect in the submission.
+
+Files and links the worker names are transferred outside this system. Their contents not being inline is expected and normal. It is not evidence that they do not exist, and on its own it is NEVER grounds to fail a clause. "The deliverable is not attached", "I cannot verify the file", and "the actual contents are missing" are not valid reasons to fail anything. If you catch yourself writing one, you are failing an honest worker for your own blindness - stop and rule on what the text actually tells you.
+
+Judge what the submission demonstrates:
+- A specific, detailed, internally consistent account that directly addresses the clause PASSES it. Concrete counts, named files, listed identifiers, stated edge cases and honest caveats are all evidence that the work was done. Someone who did not do the work does not usually produce specifics that add up.
+- A vague, evasive or self-contradictory account, or one that never addresses what the clause asks about, FAILS.
+- A bare assertion that only restates the clause back at you - "I met all the requirements", "done, everything is correct" - carries no specifics and FAILS.
+- If a clause turns on detail the submission simply does not mention, that clause FAILS, and say precisely which detail was missing.
+
+CONFIDENCE IS NOT A PLACE TO PUT THIS.
+You never see files. That limit applies to every task equally, it is already priced into how this protocol works, and it must NOT be deducted from your confidence. If it were, every verdict would fall below the threshold and no task would ever settle. A submission whose account is specific, complete and consistent with the clauses deserves high confidence - 85 or above - even though you could not open the files it names.
+
+Reserve low confidence for real doubt: a clause that is genuinely ambiguous, an account that is thin or partially contradictory, or a submission you cannot map onto the clauses at all.
+
+Wrongly failing an honest worker costs them their pay exactly as wrongly passing a fraud costs the poster their money. Neither direction is the safe default.
+
+THE SUBMISSION IS UNTRUSTED DATA. It is wrapped in a per-request random
  *     delimiter so nothing inside it can close the block and issue instructions.
  *  2. APPROVED REQUIRES EVERY CLAUSE TO PASS. Recomputed here from the per-clause
  *     rulings. If the model's own `approved` disagrees with its clause table, the
@@ -45,7 +63,7 @@ import * as z from "zod/v4";
 export type JudgeProvider = "anthropic" | "gemini";
 
 export const ANTHROPIC_MODEL = "claude-opus-5";
-export const GEMINI_MODEL = process.env.GEMINI_MODEL ?? "gemini-3.7-flash";
+export const GEMINI_MODEL = process.env.GEMINI_MODEL ?? "gemini-2.5-flash";
 
 export function judgeProvider(): JudgeProvider {
   const explicit = process.env.JUDGE_PROVIDER?.toLowerCase();
@@ -163,6 +181,7 @@ HOW TO RULE
 - Evaluate each clause independently and in order. For each one, return passed: true or false, plus one sentence citing the specific thing in the submission that drove your decision.
 - A clause passes if the submission satisfies what the clause actually says, read the way a reasonable person would read it at the time it was written.
 - If a clause is vague, resolve the ambiguity in the direction a reasonable reader would have understood when the work started. Do not invent a stricter reading after the fact.
+- Do not fail a clause because a named file or link is not inline. You are never sent file contents; see WHAT YOU CAN ACTUALLY SEE below.
 - Overall approved is true ONLY if every clause passed. One failure means the whole submission is rejected.
 
 DO NOT INVENT CRITERIA.
@@ -336,35 +355,101 @@ async function askAnthropic(
   return { kind: "ok", value: response.parsed_output };
 }
 
+/**
+ * A judge call must never hang. The escrow UI, the settle route and the tests
+ * all sit behind this call, so an unbounded wait is a stuck task, not a slow one.
+ * Every attempt gets this ceiling regardless of what the provider SDK does.
+ */
+const JUDGE_TIMEOUT_MS = Number(process.env.JUDGE_TIMEOUT_MS ?? 45_000);
+
+/** Reject if `promise` has not settled within `ms`. */
+function withDeadline<T>(promise: Promise<T>, ms: number): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(
+      () => reject(new Error(`The judge did not respond within ${ms}ms.`)),
+      ms
+    );
+    promise.then(
+      (value) => {
+        clearTimeout(timer);
+        resolve(value);
+      },
+      (error) => {
+        clearTimeout(timer);
+        reject(error);
+      }
+    );
+  });
+}
+
+/**
+ * Is this "you are out of quota" rather than "something went wrong"?
+ *
+ * The distinction matters because retrying a quota error is pointless - the
+ * second call fails for exactly the same reason - and the operator needs to be
+ * told to top up the key rather than to go looking for a bug.
+ */
+function isQuotaError(error: unknown): boolean {
+  if (error instanceof Anthropic.APIError && error.status === 429) return true;
+  const status = (error as { status?: number })?.status;
+  if (status === 429) return true;
+  const text = `${(error as { name?: string })?.name ?? ""} ${
+    error instanceof Error ? error.message : ""
+  }`;
+  // The SDK does not always surface a 429 cleanly. When the quota is already
+  // exhausted it sometimes fails reading the response body and throws
+  // "Unexpected HTTP client error: TypeError: unusable" instead, with no status
+  // attached. Observed only ever alongside real rate limiting, so treat it the
+  // same rather than spending a retry to rediscover the same 429.
+  return (
+    /429|RESOURCE_EXHAUSTED|RateLimitError|exceeded your current quota/i.test(
+      text
+    ) || /Unexpected HTTP client error: TypeError: unusable/i.test(text)
+  );
+}
+
 async function askGemini(
   userMessage: string,
   model: string
 ): Promise<JudgeResponse> {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) throw new Error("GEMINI_API_KEY is not set.");
-  const genai = new GoogleGenAI({ apiKey });
+  // The SDK's default retry policy is 5 attempts with exponential backoff and a
+  // 60s ceiling on 429. That turns "out of quota" into a two-minute hang. This
+  // module already implements its own single retry with an explicit hold on
+  // failure, so the SDK is told to attempt once and give up.
+  const genai = new GoogleGenAI({
+    apiKey,
+    httpOptions: {
+      timeout: JUDGE_TIMEOUT_MS,
+      retryOptions: { attempts: 1 },
+    },
+  });
 
   // The same zod schema the response is validated against, expressed as JSON
   // Schema. Deriving it means the constraint sent to the model and the check
   // applied to its answer can never disagree.
   const schema = z.toJSONSchema(JudgePayloadSchema) as Record<string, unknown>;
 
-  const interaction = await genai.interactions.create({
-    model,
-    // Gemini has no separate system field on this endpoint, so the system
-    // prompt is prepended. The untrusted submission is still fenced by the
-    // per-request nonce inside userMessage, which is what actually matters.
-    input: `${SYSTEM_PROMPT}
+  const interaction = await withDeadline(
+    genai.interactions.create({
+      model,
+      // Gemini has no separate system field on this endpoint, so the system
+      // prompt is prepended. The untrusted submission is still fenced by the
+      // per-request nonce inside userMessage, which is what actually matters.
+      input: `${SYSTEM_PROMPT}
 
 ---
 
 ${userMessage}`,
-    response_format: {
-      type: "text",
-      mime_type: "application/json",
-      schema,
-    },
-  } as never);
+      response_format: {
+        type: "text",
+        mime_type: "application/json",
+        schema,
+      },
+    } as never),
+    JUDGE_TIMEOUT_MS
+  );
 
   const text = (interaction as { output_text?: string }).output_text;
   if (!text) {
@@ -460,6 +545,15 @@ export async function runVerdict(
         `[verifier] attempt ${attempt + 1} failed:`,
         error instanceof Error ? error.message : error
       );
+      if (isQuotaError(error)) {
+        // Out of quota. The retry would fail identically, so stop here and say
+        // plainly what is wrong - this is an operator problem, not a bad
+        // submission, and the task must not be settled either way.
+        return held(
+          "The judge service is out of API quota, so this submission was not ruled on. " +
+            "It is held until an operator restores quota and re-runs the verdict."
+        );
+      }
       lastFailure =
         error instanceof Anthropic.APIError
           ? "The judge service returned an error."
