@@ -38,9 +38,13 @@ the reasoning is public and its hash is on-chain.
 - `next build`, `tsc --noEmit` and `eslint` all clean; 37 web tests pass
 - `.next/static` contains no reference to `VERIFIER_SECRET_KEY` or `ANTHROPIC_API_KEY`
 
-**What is still unverified:** the devnet deploy, and the `/task/[id]` screen (it
-needs a Postgres connection). The judge's live prompt-injection tests are opt-in
-and cost money — run them with `RUN_JUDGE_TESTS=1`.
+All four screens render against a real Postgres, and the Task PDA shown on
+`/task/[id]` was checked against an independent derivation — the TypeScript and
+the Rust seeds agree.
+
+**What is still unverified:** the devnet deploy. The judge's live
+prompt-injection tests are opt-in and cost money — run them with
+`RUN_JUDGE_TESTS=1`.
 
 ### The program keypair
 
@@ -204,7 +208,33 @@ anchor build        # again, so the id is baked in
 anchor test         # runs the 18 integration tests on a local validator
 ```
 
-### 3. Web
+### 3. A database for local development
+
+If you have no Postgres to hand, run one inside WSL. Use a port other than 5432
+so it cannot collide with anything already on the host:
+
+```bash
+sudo apt-get install -y postgresql
+sudo sed -i "s/^port = .*/port = 5433/" /etc/postgresql/*/main/postgresql.conf
+sudo pg_ctlcluster 18 main restart
+sudo -u postgres psql -p 5433 -c "CREATE ROLE rubric LOGIN PASSWORD 'rubric_local_dev';"
+sudo -u postgres psql -p 5433 -c "CREATE DATABASE rubric_dev OWNER rubric;"
+```
+
+Two things that will otherwise cost you an afternoon:
+
+- **WSL2 shuts an idle VM down, and takes Postgres with it.** The app then says
+  "the record store is unavailable" with nothing apparently wrong, and the next
+  command you run silently restarts the VM so it looks fine again. Keep a
+  process alive inside the distro, or set `vmIdleTimeout` in `.wslconfig`.
+- **Run the Prisma CLI inside WSL, not from Windows.** Prisma 7 splits in two:
+  the client uses the `pg` driver adapter and reaches a WSL database from
+  Windows without trouble, but the CLI uses a Rust engine that cannot, and fails
+  with `P1001: Can't reach database server` at every address you try. So
+  `db push` and `db:seed` belong in the distro; `npm run dev` can stay on
+  Windows.
+
+### 4. Web
 
 ```bash
 cd web
