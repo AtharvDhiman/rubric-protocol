@@ -28,7 +28,7 @@ the reasoning is public and its hash is on-chain.
 | Canonical hashing | Working. 25 tests pass, including a pinned golden digest |
 | API routes + Prisma schema | Written; compile and typecheck clean |
 | Frontend (4 screens) | Built. `next build` passes |
-| Devnet deploy | Not done — needs the toolchain first |
+| Devnet deploy | **Live** at `F2Uo5JUfGQtho8s9ZbwcpWBd8iJ4XvBqamUaqdjcrRxz` (config not yet initialized) |
 
 **Verified by running it:**
 
@@ -321,8 +321,33 @@ anchor build
 anchor deploy --provider.cluster devnet
 ```
 
-Then initialize the config once, **from the wallet that deployed the program** —
-the instruction requires the signer to be the program's upgrade authority:
+### The devnet deployment
+
+```
+Program Id   F2Uo5JUfGQtho8s9ZbwcpWBd8iJ4XvBqamUaqdjcrRxz
+ProgramData  5fhXV18Qs7U5dtfaRL2neoa2sAMezKr6Pjuuxmc23QiH
+Config PDA   4q6XLrWj6FTJA2YnC5S9ZKDEahMVTEYZ6mX9td35fMX2   (not initialized)
+Data length  352,376 bytes      Rent  2.45374104 SOL
+```
+
+Deployed with `--max-len` at exactly the binary size, because the default
+allocates 2x for upgrade headroom and costs 4.906 SOL. The consequence is real:
+**this deployment can only be upgraded to a binary of the same size or smaller.**
+To lift that, `solana program close` it (the rent is refunded) and redeploy
+without `--max-len` once you have ~5 SOL.
+
+**Whoever holds the upgrade authority is the only account that can initialize the
+config.** That falls out of the front-running fix in `initialize_config`: the
+signer must equal `program_data.upgrade_authority_address`. So before the admin
+can be a wallet you control, the upgrade authority has to be moved to it:
+
+```bash
+solana program set-upgrade-authority F2Uo5JUfGQtho8s9ZbwcpWBd8iJ4XvBqamUaqdjcrRxz \
+  --new-upgrade-authority <YOUR_WALLET> --url devnet
+```
+
+Then initialize the config once, **from the wallet that holds the upgrade
+authority** — the instruction requires the signer to be that account:
 
 ```bash
 solana-keygen new --no-bip39-passphrase -o verifier.json
