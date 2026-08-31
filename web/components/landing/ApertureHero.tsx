@@ -283,49 +283,6 @@ export function ApertureHero() {
         </div>
       </div>
 
-      {/* ---- LAYER 8: scroll cue ---- */}
-      <div
-        aria-hidden="true"
-        style={{
-          position: "absolute",
-          bottom: 28,
-          left: "50%",
-          transform: "translateX(-50%)",
-          zIndex: 2,
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-          gap: 10,
-          animation: "fadeUp 0.7s cubic-bezier(0.19,1,0.22,1) 2.4s both",
-        }}
-      >
-        <span
-          style={{
-            position: "relative",
-            width: 1,
-            height: 40,
-            background: "rgba(244,244,245,.14)",
-            overflow: "hidden",
-          }}
-        >
-          <span
-            style={{
-              position: "absolute",
-              inset: 0,
-              width: 1,
-              height: 16,
-              background: "var(--sol-green)",
-              animation: "scrollCue 2.4s ease-in-out infinite",
-            }}
-          />
-        </span>
-        <span
-          className="label"
-          style={{ color: "var(--d-faint)", letterSpacing: "0.18em" }}
-        >
-          Scroll
-        </span>
-      </div>
     </section>
   );
 }

@@ -33,8 +33,22 @@ export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="en" className={`${plexSans.variable} ${plexMono.variable}`}>
-      <body>{children}</body>
+    // suppressHydrationWarning is here for one specific reason: browser
+    // extensions (Bitdefender's `bis_skin_checked`, and others that stamp a
+    // `__processed_<uuid>__` attribute) mutate the DOM before React hydrates,
+    // so React finds attributes on <html>/<body> that are not in its tree and
+    // reports a hydration mismatch. That warning is caused by the visitor's
+    // browser, not by this app, and it is not actionable from here.
+    //
+    // It suppresses warnings only ONE level deep on these two elements, which
+    // is exactly where extensions inject. It does NOT hide a real mismatch in
+    // any component - those still surface normally.
+    <html
+      lang="en"
+      className={`${plexSans.variable} ${plexMono.variable}`}
+      suppressHydrationWarning
+    >
+      <body suppressHydrationWarning>{children}</body>
     </html>
   );
 }
