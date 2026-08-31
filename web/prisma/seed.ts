@@ -23,8 +23,13 @@ const prisma = new PrismaClient({
   adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL ?? "" }),
 });
 
-/** Obviously-fake addresses, so nobody mistakes a seed row for a real matter. */
-const CREATOR = "4kTkVfPqXn1s8pQx9hZmR3wJdG7bN2cY6vL5tA8wHK";
+/**
+ * Demo addresses. Nobody holds these keys, but they must still be VALID base58
+ * pubkeys: the task page derives the Task PDA from the creator address, and an
+ * unparseable one makes the derivation throw and the PDA render as "—". Derived
+ * from fixed seeds so re-seeding produces the same records.
+ */
+const CREATOR = "Co4QbmAUyMsRzLst4tMtMWzQZZQMf4japzh4zua2nMTh";
 const WORKER = "9fT2ZmQ7xR4nP1sV8cL3wY6bJ5dK2gN4hA7tX9pM3eS";
 const MINT = "4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU"; // devnet USDC
 const FAKE_TX = "5".repeat(87);
