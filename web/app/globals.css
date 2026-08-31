@@ -69,6 +69,14 @@ body {
   padding: 0;
   /* Never scroll horizontally, at any width. */
   overflow-x: hidden;
+
+  /* THE declaration that makes native browser UI match a dark theme.
+     Without it the browser keeps painting its own widgets in light mode: the
+     <select> dropdown list opens white, its options render near-white text on
+     white, and the scrollbar stays pale. Recolouring the closed <select> with
+     CSS does NOT fix the popup - that list is drawn by the OS, and
+     color-scheme is the only thing it listens to. */
+  color-scheme: dark;
 }
 
 body {
@@ -318,6 +326,31 @@ h3 {
   font-family: var(--font-mono);
   font-size: 28px;
   font-weight: 600;
+}
+
+/* <select> needs explicit colours in addition to color-scheme: the closed
+   control inherits `background: transparent` from .field, which reads as the
+   page behind it, and some platforms only honour option colours when they are
+   set on the option itself. */
+select.field {
+  background-color: var(--surface);
+  color: var(--text);
+  cursor: pointer;
+}
+
+select.field option {
+  background-color: var(--surface);
+  color: var(--text);
+}
+
+/* Chrome renders autofilled inputs with a hard-coded pale yellow that ignores
+   the theme. This keeps a filled field looking like the rest of the form. */
+.field:-webkit-autofill,
+.field:-webkit-autofill:hover,
+.field:-webkit-autofill:focus {
+  -webkit-text-fill-color: var(--text);
+  -webkit-box-shadow: 0 0 0 1000px var(--surface) inset;
+  caret-color: var(--text);
 }
 
 /* ---------------------------------------------------------------------------
