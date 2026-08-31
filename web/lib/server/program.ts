@@ -149,6 +149,8 @@ export function readOnlyProgram(): Program {
 export interface OnChainConfig {
   admin: PublicKey;
   verifierAuthority: PublicKey;
+  /** The single mint this deployment escrows in. Pinned by `create_task`. */
+  bountyMint: PublicKey;
   feeBps: number;
   feeDestination: PublicKey;
 }
@@ -161,6 +163,7 @@ export interface OnChainConfig {
 interface RawConfigAccount {
   admin: PublicKey;
   verifierAuthority: PublicKey;
+  bountyMint: PublicKey;
   feeBps: number;
   feeDestination: PublicKey;
 }
@@ -191,6 +194,7 @@ export async function fetchConfig(): Promise<OnChainConfig> {
   return {
     admin: account.admin,
     verifierAuthority: account.verifierAuthority,
+    bountyMint: account.bountyMint,
     feeBps: account.feeBps,
     feeDestination: account.feeDestination,
   };
