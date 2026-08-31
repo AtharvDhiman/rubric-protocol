@@ -1,0 +1,91 @@
+// Rubric's off-chain index.
+//
+// IMPORTANT: this database is a CACHE AND A CONTENT STORE, never a source of
+// truth about money. The chain owns task state, the escrow balance, and the
+// verdict. Postgres owns the things the chain deliberately does not store: the
+// clause prose behind `rubric_hash`, the submission text behind
+// `submission_hash`, and the verdict reasoning behind `reasoning_hash`.
+//
+// Any screen that shows a state or an amount reconciles against the chain. If
+// this table and the chain disagree, the chain is right and this row is stale.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+// Prisma 7 removed `url` from the schema. The connection string now lives in
+// prisma.config.ts (for CLI commands) and is passed to PrismaClient through a
+// driver adapter at runtime - see lib/db.ts.
+datasource db {
+  provider = "postgresql"
+}
+
+/// Mirrors the on-chain TaskState, plus two states that exist only off-chain.
+enum TaskState {
+  /// Row written, transaction not yet confirmed. Never shown on the docket.
+  PENDING
+  /// Sealed and funded on-chain, awaiting a worker.
+  OPEN
+  /// A worker submitted; the judge has not ruled yet.
+  SUBMITTED
+  /// Approved and paid. Terminal.
+  SETTLED
+  /// Rejected or reclaimed; the poster was refunded. Terminal.
+  REFUNDED
+  /// The judge ruled but confidence was below the threshold, or the ruling was
+  /// internally inconsistent. Money is untouched and a human must look at it.
+  /// This state has NO on-chain equivalent - on-chain the task is still
+  /// Submitted.
+  HELD
+}
+
+model Task {
+  id String @id @default(cuid())
+
+  /// The u64 task id used in the Task PDA seeds. Unique per creator, not
+  /// globally, which is why the compound index below is the real key.
+  onchainTaskId BigInt
+  creatorAddress String
+  workerAddress  String?
+
+  /// The clause prose. `rubricHash` is the SHA-256 of the canonical form of
+  /// { title, clauses } produced by lib/hash.ts. If these two ever disagree,
+  /// the task must not be judged - the sealed criteria are not what we hold.
+  title      String
+  clauses    String[]
+  rubricHash String
+
+  /// Bounty in the mint's base units (USDC has 6 decimals). BigInt because a
+  /// u64 does not fit in a JS number and rounding money is not acceptable.
+  bountyAmount BigInt
+  mint         String
+
+  deadline DateTime
+  category String
+  state    TaskState @default(PENDING)
+
+  /// Transaction signatures. `txCreate` is set once the seal is confirmed.
+  txCreate String?
+  txSubmit String?
+  txSettle String?
+
+  submissionContent String?
+  submissionHash    String?
+  submittedAt       DateTime?
+
+  /// The full published verdict, exactly as hashed into `reasoningHash`.
+  verdictJson          Json?
+  verdictReasoningHash String?
+  confidence           Int?
+  /// Set when state is HELD: the plain-English reason a human is needed.
+  heldReason           String?
+  decidedAt            DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  /// The real identity of a task on-chain is (creator, task_id).
+  @@unique([creatorAddress, onchainTaskId])
+  @@index([state, createdAt])
+  @@index([workerAddress])
+}

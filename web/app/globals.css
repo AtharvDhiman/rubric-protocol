@@ -1,0 +1,657 @@
+@import "tailwindcss";
+
+/* ===========================================================================
+   RUBRIC DESIGN SYSTEM
+   web/DESIGN.md is the authority. This file implements it.
+
+   Two surfaces: the app (light, document-like) and the landing page (dark).
+   Borders, never shadows. Radius 2px on inputs and buttons, 0 elsewhere.
+   Strict 8px spacing scale. Nothing rotates except the verdict stamp.
+   =========================================================================== */
+
+:root {
+  /* --- APP (light) --- */
+  --page: #f5f2ea;
+  --surface: #fbfaf6;
+  --raised: #ffffff;
+  --border-strong: #1c1917;
+  --border: #d6d1c4;
+  --hairline: #e5e1d6;
+  --text: #1c1917;
+  --text-2: #44403c;
+  --text-muted: #78716c;
+  --text-faint: #a8a29e;
+  --accent: #7c33d6;
+  --accent-strong: #9945ff;
+  --positive: #0b7d5a;
+  --negative: #b3234a;
+  --warning: #92400e;
+
+  /* --- LANDING (dark) --- */
+  --d-ground: #0a0a0c;
+  --d-section: #101014;
+  --d-panel: #16161b;
+  --d-panel-dark: #121216;
+  --d-border: #1f1f26;
+  --d-border-2: #26262f;
+  --d-text: #f4f4f5;
+  --d-muted: #a1a1aa;
+  --d-faint: #71717a;
+
+  --sol-purple: #9945ff;
+  --sol-green: #14f195;
+
+  --font-sans: var(--font-sans), "IBM Plex Sans", sans-serif;
+  --font-mono: var(--font-mono), "IBM Plex Mono", monospace;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  /* Never scroll horizontally, at any width. */
+  overflow-x: hidden;
+}
+
+body {
+  background: var(--page);
+  color: var(--text);
+  font-family: var(--font-sans);
+  font-size: 16px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Every interactive element gets the same visible focus ring. */
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible,
+[tabindex]:focus-visible {
+  outline: 2px solid var(--accent-strong);
+  outline-offset: 2px;
+}
+
+/* ---------------------------------------------------------------------------
+   TYPE PRIMITIVES
+   Rule that matters most: every number a person might compare, copy or verify
+   is mono. `.data` is that rule, made reusable.
+   --------------------------------------------------------------------------- */
+
+.data {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.label {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.label-11 {
+  font-size: 11px;
+}
+
+.label-accent {
+  color: var(--accent);
+}
+
+h1,
+h2,
+h3 {
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1.15;
+  margin: 0;
+}
+
+/* ---------------------------------------------------------------------------
+   THE CLAUSE MARK  (motif 1 of 2)
+   --------------------------------------------------------------------------- */
+
+.clause-mark {
+  font-family: var(--font-mono);
+  font-weight: 600;
+  color: var(--accent);
+  flex: 0 0 auto;
+}
+
+/* ---------------------------------------------------------------------------
+   THE VERDICT STAMP  (motif 2 of 2)
+   The only rotation in the product. 2px outline, no fill, -4deg.
+   --------------------------------------------------------------------------- */
+
+.stamp {
+  display: inline-block;
+  font-family: var(--font-mono);
+  font-weight: 600;
+  font-size: 11px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  padding: 5px 10px;
+  border: 2px solid currentColor;
+  border-radius: 0;
+  background: transparent;
+  transform: rotate(-4deg);
+  mix-blend-mode: multiply;
+  white-space: nowrap;
+}
+
+.stamp-sm {
+  font-size: 9px;
+  padding: 3px 7px;
+  border-width: 2px;
+}
+
+.stamp-approved,
+.stamp-paid {
+  color: var(--positive);
+}
+.stamp-rejected {
+  color: var(--negative);
+}
+.stamp-sealed,
+.stamp-open {
+  color: var(--accent);
+}
+.stamp-held,
+.stamp-inreview,
+.stamp-expired {
+  color: var(--warning);
+}
+
+/* On the dark landing surface, multiply would swallow the stamp. */
+.on-dark .stamp {
+  mix-blend-mode: normal;
+}
+
+/* ---------------------------------------------------------------------------
+   BUTTONS
+   The purple->green gradient appears exactly twice per screen: the Solana mark
+   and this button. Nowhere else.
+   --------------------------------------------------------------------------- */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 48px;
+  padding: 0 28px;
+  border-radius: 2px;
+  border: 1px solid var(--border-strong);
+  background: transparent;
+  color: var(--text);
+  font-family: var(--font-sans);
+  font-size: 15px;
+  font-weight: 500;
+  cursor: pointer;
+  text-decoration: none;
+  transition: background-color 120ms linear;
+}
+
+.btn:hover:not(:disabled) {
+  background: var(--page);
+}
+
+.btn-primary {
+  background: linear-gradient(90deg, var(--sol-purple), var(--sol-green));
+  color: #0a0a0c;
+  font-weight: 600;
+  border: none;
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: linear-gradient(90deg, var(--sol-purple), var(--sol-green));
+  filter: brightness(1.06);
+}
+
+.btn:disabled {
+  opacity: 0.42;
+  cursor: not-allowed;
+}
+
+.btn-text {
+  height: auto;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--accent);
+  font-size: 14px;
+}
+
+.btn-text:hover:not(:disabled) {
+  background: none;
+  text-decoration: underline;
+}
+
+/* Dark-surface variants for the landing page. */
+.on-dark .btn {
+  border-color: rgba(244, 244, 245, 0.24);
+  color: var(--d-text);
+}
+.on-dark .btn:hover:not(:disabled) {
+  background: rgba(244, 244, 245, 0.06);
+}
+.on-dark .btn-primary {
+  color: #0a0a0c;
+  border: none;
+}
+
+/* ---------------------------------------------------------------------------
+   FORM CONTROLS
+   No boxes. A transparent field on a rule; the rule thickens on focus.
+   --------------------------------------------------------------------------- */
+
+.field {
+  width: 100%;
+  border: none;
+  border-bottom: 1px solid var(--border-strong);
+  background: transparent;
+  color: var(--text);
+  font-family: var(--font-sans);
+  padding: 8px 0;
+  border-radius: 0;
+}
+
+.field:focus {
+  outline: none;
+  border-bottom-width: 2px;
+  padding-bottom: 7px;
+}
+
+.field:focus-visible {
+  outline: 2px solid var(--accent-strong);
+  outline-offset: 2px;
+}
+
+.field-title {
+  font-size: 20px;
+  font-weight: 500;
+}
+
+.field-clause {
+  border-bottom-color: var(--border);
+  font-size: 15px;
+  resize: none;
+  overflow: hidden;
+  line-height: 1.6;
+}
+
+.field-amount {
+  font-family: var(--font-mono);
+  font-size: 28px;
+  font-weight: 600;
+}
+
+/* ---------------------------------------------------------------------------
+   RULES AND RECORD ROWS
+   --------------------------------------------------------------------------- */
+
+.rule {
+  height: 1px;
+  background: var(--border-strong);
+  border: 0;
+  margin: 0;
+}
+
+.rule-hairline {
+  height: 1px;
+  background: var(--hairline);
+  border: 0;
+  margin: 0;
+}
+
+.record-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 16px 0;
+  border-bottom: 1px solid var(--hairline);
+  text-decoration: none;
+  color: inherit;
+}
+
+/* Hover changes the background and nothing else. No lift, no shadow, no scale. */
+.record-row:hover {
+  background: var(--page);
+}
+
+/* ---------------------------------------------------------------------------
+   LANDING PAGE
+   --------------------------------------------------------------------------- */
+
+.on-dark {
+  background: var(--d-ground);
+  color: var(--d-text);
+}
+
+.hero {
+  position: relative;
+  min-height: 780px;
+  height: 100vh;
+  overflow: hidden;
+  background: var(--d-ground);
+  display: flex;
+  flex-direction: column;
+}
+
+.hero-stage {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+}
+
+.aperture {
+  width: 1020px;
+  height: 1020px;
+  will-change: transform;
+  animation: apertureIn 1.5s cubic-bezier(0.19, 1, 0.22, 1) 0.15s both;
+}
+
+.ring-outer {
+  position: absolute;
+  width: 1160px;
+  height: 1160px;
+  opacity: 0.8;
+  will-change: transform;
+  animation: ringSpin 48s linear infinite;
+}
+
+.ring-inner {
+  position: absolute;
+  width: 960px;
+  height: 960px;
+  will-change: transform;
+  animation: ringSpinRev 34s linear infinite;
+}
+
+.core-glow {
+  position: absolute;
+  width: 320px;
+  height: 320px;
+  border-radius: 50%;
+  background: radial-gradient(
+    circle,
+    rgba(20, 241, 149, 0.45),
+    rgba(153, 69, 255, 0.18) 52%,
+    transparent 72%
+  );
+  filter: blur(6px);
+  animation: corePulse 6s ease-in-out infinite;
+}
+
+.core-mark {
+  position: absolute;
+  width: 128px;
+}
+
+/* The vignette is a legibility device, not decoration. Do not remove it - the
+   headline needs 4.5:1 against the glow. */
+.vignette {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(
+    ellipse at 50% 46%,
+    transparent 26%,
+    rgba(10, 10, 12, 0.74) 62%,
+    #0a0a0c 88%
+  );
+}
+
+.scanlines {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: repeating-linear-gradient(
+    0deg,
+    rgba(244, 244, 245, 0.022) 0 1px,
+    transparent 1px 4px
+  );
+}
+
+.line-mask {
+  overflow: hidden;
+  display: block;
+}
+
+.line-mask > span {
+  display: block;
+  animation: lineUp 1s cubic-bezier(0.19, 1, 0.22, 1) both;
+}
+
+.marquee {
+  overflow: hidden;
+  white-space: nowrap;
+  border-block: 1px solid var(--d-border);
+  padding: 14px 0;
+}
+
+.marquee-track {
+  display: inline-flex;
+  gap: 48px;
+  padding-right: 48px;
+  animation: marquee 28s linear infinite;
+  will-change: transform;
+}
+
+.reveal {
+  opacity: 0;
+  transform: translateY(16px);
+}
+
+.reveal.in {
+  animation: fadeUp 0.7s cubic-bezier(0.19, 1, 0.22, 1) both;
+}
+
+/* ---------------------------------------------------------------------------
+   KEYFRAMES - all of them, in one block, as DESIGN.md requires.
+   --------------------------------------------------------------------------- */
+
+@keyframes apertureIn {
+  from {
+    opacity: 0;
+    transform: scale(1.18) rotate(-12deg);
+    filter: blur(18px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) rotate(0deg);
+    filter: blur(0);
+  }
+}
+
+@keyframes ringSpin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes ringSpinRev {
+  from {
+    transform: rotate(360deg);
+  }
+  to {
+    transform: rotate(0deg);
+  }
+}
+
+@keyframes corePulse {
+  0%,
+  100% {
+    opacity: 0.5;
+    transform: scale(0.96);
+  }
+  50% {
+    opacity: 0.9;
+    transform: scale(1.04);
+  }
+}
+
+@keyframes barIn {
+  from {
+    opacity: 0;
+    transform: translateX(80px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes lineUp {
+  from {
+    opacity: 0;
+    transform: translateY(115%);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fadeUp {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes scrollCue {
+  0% {
+    transform: translateY(-16px);
+    opacity: 0;
+  }
+  40% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(40px);
+    opacity: 0;
+  }
+}
+
+@keyframes logIn {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes marquee {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   REDUCED MOTION
+   The page must be COMPLETE with zero motion: every element ends at its final
+   opacity and position, nothing transforms, nothing rotates, nothing loops.
+   --------------------------------------------------------------------------- */
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    animation-delay: 0ms !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  .aperture,
+  .ring-outer,
+  .ring-inner,
+  .core-glow,
+  .marquee-track,
+  .line-mask > span,
+  .reveal,
+  .reveal.in {
+    animation: none !important;
+    transform: none !important;
+    opacity: 1 !important;
+    filter: none !important;
+  }
+
+  /* The stamp's tilt is meaning-bearing but it is still a rotation. */
+  .stamp {
+    transform: none !important;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   RESPONSIVE
+   Below 900px everything stacks. The aperture bleeds off-screen at ~130vw
+   rather than shrinking, so it stays a machine and not a logo.
+   --------------------------------------------------------------------------- */
+
+@media (max-width: 900px) {
+  .aperture {
+    width: 130vw;
+    height: 130vw;
+  }
+  .ring-outer {
+    width: 148vw;
+    height: 148vw;
+  }
+  .ring-inner {
+    width: 122vw;
+    height: 122vw;
+  }
+  .cols,
+  .cols-3,
+  .cols-4 {
+    grid-template-columns: 1fr !important;
+  }
+  .cols-4 {
+    grid-template-columns: 1fr 1fr !important;
+  }
+  .divide-x > * + * {
+    border-left: 0 !important;
+    border-top: 1px solid var(--d-border);
+    padding-left: 0 !important;
+    padding-top: 32px;
+  }
+  .app-two-col {
+    grid-template-columns: 1fr !important;
+  }
+  .app-two-col > * + * {
+    border-left: 0 !important;
+    padding-left: 0 !important;
+    border-top: 1px solid var(--border);
+    padding-top: 32px;
+  }
+}
