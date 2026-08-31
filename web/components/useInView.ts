@@ -33,9 +33,11 @@ export function useInView<T extends HTMLElement = HTMLDivElement>(
     // Environments without IntersectionObserver (older browsers, some test
     // runners) get the content immediately rather than never.
     if (typeof IntersectionObserver === "undefined") {
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- a one-shot
-      // capability fallback, not derived state. It runs at most once per mount
-      // and cannot cascade: nothing this sets feeds back into the effect.
+      // A one-shot capability fallback, not derived state: it runs at most once
+      // per mount and cannot cascade, because nothing it sets feeds back into
+      // this effect. The directive must stay on a single line - if the
+      // justification wraps, it attaches to the comment instead of the call.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setInView(true);
       return;
     }
