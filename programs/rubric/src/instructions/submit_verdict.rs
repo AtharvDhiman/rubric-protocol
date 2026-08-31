@@ -109,9 +109,16 @@ pub struct SubmitVerdict<'info> {
     )]
     pub worker_token_account: Account<'info, TokenAccount>,
 
-    /// CHECK: Not read or written - the authority the creator's token account is
-    /// derived from. Pinned to `task.creator` by the `has_one = creator`
-    /// constraint on the task account above.
+    /// CHECK: The authority the creator's token account is derived from, pinned
+    /// to `task.creator` by the `has_one = creator` constraint on the task
+    /// account above.
+    ///
+    /// `mut` is REQUIRED, and not for the reason it usually is: this account
+    /// receives the escrow token account's rent lamports when the escrow is
+    /// closed at the end of this instruction. An account whose lamports change
+    /// must be writable, and without `mut` Anchor marks it read-only in the
+    /// account metas, so the close would fail and every settlement would revert.
+    #[account(mut)]
     pub creator: UncheckedAccount<'info>,
 
     /// Where a rejected bounty is refunded, and where the escrow account's rent
