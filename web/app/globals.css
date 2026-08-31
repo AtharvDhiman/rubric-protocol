@@ -455,6 +455,16 @@ h3 {
   animation: fadeUp 0.7s cubic-bezier(0.19, 1, 0.22, 1) both;
 }
 
+/* Scroll reveals are driven by IntersectionObserver, so with JavaScript off
+   nothing would ever add `.in` and half the page would stay invisible. The
+   content matters more than the animation. */
+@media (scripting: none) {
+  .reveal {
+    opacity: 1;
+    transform: none;
+  }
+}
+
 /* ---------------------------------------------------------------------------
    KEYFRAMES - all of them, in one block, as DESIGN.md requires.
    --------------------------------------------------------------------------- */

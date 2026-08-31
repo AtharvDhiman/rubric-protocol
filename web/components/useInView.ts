@@ -9,24 +9,36 @@ import { useEffect, useRef, useState } from "react";
  * scroll. Firing everything at mount makes the whole page twitch at once and
  * then sit dead - this is what stops that.
  *
- * The "no IntersectionObserver" fallback is handled in the initial state rather
- * than by calling setState inside the effect, which would trigger a second
- * render pass on every mount.
+ * The initial state is `false` on BOTH server and client, deliberately. An
+ * earlier version used a lazy initializer that checked for IntersectionObserver,
+ * which is absent on the server and present in the browser - so the server sent
+ * `class="reveal in"` and the client hydrated `class="reveal"`, and React
+ * reported a hydration mismatch on every load. Any state that differs between
+ * server and client is a hydration bug, however reasonable it looks.
+ *
+ * Without JavaScript nothing here runs at all, so `globals.css` has a `noscript`
+ * rule that forces every `.reveal` element visible. The page is readable with
+ * JS disabled and readable with motion disabled.
  */
 export function useInView<T extends HTMLElement = HTMLDivElement>(
   threshold = 0.2
 ) {
   const ref = useRef<T | null>(null);
-
-  // Lazy initializer: in an environment without IntersectionObserver (older
-  // browsers, some test runners) everything is simply visible from the start.
-  const [inView, setInView] = useState(
-    () => typeof IntersectionObserver === "undefined"
-  );
+  const [inView, setInView] = useState(false);
 
   useEffect(() => {
     const node = ref.current;
-    if (!node || typeof IntersectionObserver === "undefined") return;
+    if (!node) return;
+
+    // Environments without IntersectionObserver (older browsers, some test
+    // runners) get the content immediately rather than never.
+    if (typeof IntersectionObserver === "undefined") {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- a one-shot
+      // capability fallback, not derived state. It runs at most once per mount
+      // and cannot cascade: nothing this sets feeds back into the effect.
+      setInView(true);
+      return;
+    }
 
     const observer = new IntersectionObserver(
       (entries) => {
