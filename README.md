@@ -24,11 +24,11 @@ the reasoning is public and its hash is on-chain.
 | --- | --- |
 | Anchor program (5 instructions + admin rotation) | **Compiles clean** on Anchor 1.1.2 — no warnings |
 | 19 integration tests (14 attack cases) | **All 19 pass** against a local validator |
-| Judge (`web/lib/verifier.ts`) | Working. 12 guard tests pass; 7 live judge tests are opt-in |
+| Judge (`web/lib/verifier.ts`) | Working. **19/19 pass**, including all 7 live tests against the real API |
 | Canonical hashing | Working. 25 tests pass, including a pinned golden digest |
 | API routes + Prisma schema | Written; compile and typecheck clean |
 | Frontend (4 screens) | Built. `next build` passes |
-| Devnet deploy | **Live** at `F2Uo5JUfGQtho8s9ZbwcpWBd8iJ4XvBqamUaqdjcrRxz` (config not yet initialized) |
+| Devnet deploy | **Live** at `F2Uo5JUfGQtho8s9ZbwcpWBd8iJ4XvBqamUaqdjcrRxz`, config initialized |
 
 **Verified by running it:**
 
@@ -42,9 +42,16 @@ All four screens render against a real Postgres, and the Task PDA shown on
 `/task/[id]` was checked against an independent derivation — the TypeScript and
 the Rust seeds agree.
 
-**What is still unverified:** the devnet deploy. The judge's live
-prompt-injection tests are opt-in and cost money — run them with
-`RUN_JUDGE_TESTS=1`.
+The judge's live tests are opt-in because they consume API quota, not because
+they cost money — the default provider is Gemini's free tier. Run them with:
+
+```bash
+RUN_JUDGE_TESTS=1 npx vitest run lib/verifier.test.ts
+```
+
+**What is still unverified:** a full submit → verdict → settle round trip on
+devnet with a real wallet. Every piece has been exercised on its own; the whole
+sequence has not been run end to end.
 
 ### The program keypair
 
@@ -269,45 +276,62 @@ Two things bound the damage:
 
 Neither of these makes it decentralized. They make it survivable.
 
-**2. The program is unaudited and has never been compiled.** See Status above.
+**2. The program is unaudited.** It compiles clean and passes 19 integration
+tests including 14 attack cases, and it is deployed to devnet — but no third
+party has reviewed it. Tests prove the failures I thought to write down. They
+say nothing about the ones I did not. Do not put real money on this.
 
 **3. The judge can be wrong.** It is a language model reading prose. The confidence
 gate (default 70) routes uncertain rulings to a human instead of settling them, and
 the code refuses to settle on any internal contradiction — but a confidently wrong
 verdict will pay or refund the wrong party. There is no appeal mechanism on-chain.
 
-**4. No dispute or arbitration path.** Out of scope for the MVP. A rejected worker's
+**4. The judge's free tier is rate limited, and a limited judge holds tasks.**
+Gemini's free tier allows roughly 20 requests per minute. Past that the API
+returns 429, and `runVerdict` correctly refuses to guess: the task is held for
+manual review rather than settled either way. That is the safe failure, but
+during a busy demo it looks like the judge has stopped working. Two consequences
+worth knowing before you show this to anyone:
+
+- Pick the model deliberately. The newest `gemini-3.x` flash models have the
+  tightest free allowance; `gemini-2.5-flash` is the default here because its
+  free quota is far larger and it answers this workload in about 1.5s.
+- The live test suite paces itself at 4s between calls for the same reason. A
+  quota failure in those tests is reported as a skip, not a failure, because a
+  429 says nothing about whether the judge rules correctly.
+
+**5. No dispute or arbitration path.** Out of scope for the MVP. A rejected worker's
 only recourse is the public reasoning.
 
-**5. The clock is the validator's.** `Clock::get()` is not a precise wall clock;
+**6. The clock is the validator's.** `Clock::get()` is not a precise wall clock;
 deadlines are accurate to within a slot or so, which is fine at hour granularity.
 
-**6. A closed destination token account delays settlement.** `submit_verdict`
+**7. A closed destination token account delays settlement.** `submit_verdict`
 requires the worker's, the poster's, and the fee destination's token accounts to
 exist, on both the approve and reject paths. If one is closed, the verdict
 transaction fails. The verifier recreates any missing account idempotently in the
 same transaction, which closes the race — but a determined party could still hold
 up their own settlement, and the grace-period reclaim is the backstop.
 
-**7. Dust sent to a settled task's escrow address is unrecoverable.** Once a task
+**8. Dust sent to a settled task's escrow address is unrecoverable.** Once a task
 settles, its escrow account is closed and the task is terminal. ATA creation is
 permissionless, so anyone can recreate that address and send tokens to it, and no
 instruction will ever sign for it again. Do not retry a deposit against a settled
 task.
 
-**8. Task ids are sequential per creator, so a specific id can be blocked.** The
+**9. Task ids are sequential per creator, so a specific id can be blocked.** The
 escrow uses `init`, which fails if the account already exists. Someone who
 predicts `(creator, task_id)` can pre-create the escrow ATA and make that one id
 unusable. The cost is theirs (rent per blocked id), the poster simply gets the
 next id, and no funds are at risk — but it is a cheap nuisance.
 
-**9. `initialize_config` must be run by the program's upgrade authority.** This is
+**10. `initialize_config` must be run by the program's upgrade authority.** This is
 enforced on-chain, and it is what stops a bystander from front-running the setup
 transaction and installing themselves as admin and verifier. The consequence: do
 not make the program immutable before initializing the config, or the deployment
 is unusable.
 
-**10. Landing-page figures are targets, not measurements.** They are labelled as
+**11. Landing-page figures are targets, not measurements.** They are labelled as
 such in the UI and live in `web/lib/constants.ts`.
 
 ---

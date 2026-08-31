@@ -38,7 +38,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
-import { AnchorProvider, Program, BN, type Idl } from "@anchor-lang/core";
+import { AnchorProvider, Program, type Idl } from "@anchor-lang/core";
 import {
   Connection,
   Keypair,
