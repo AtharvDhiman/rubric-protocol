@@ -29,6 +29,58 @@ export const metadata: Metadata = {
     "Rubric locks the acceptance criteria on-chain before work begins. An AI judge checks each submission against those sealed clauses, and Solana releases the payment the moment it passes.",
 };
 
+/**
+ * Strips attributes that browser extensions stamp onto the DOM, so they are
+ * gone before React hydrates and there is nothing left to mismatch.
+ *
+ * Why this exists: `suppressHydrationWarning` only reaches elements we render.
+ * Bitdefender writes `bis_skin_checked` onto Next's OWN internal elements,
+ * which we cannot annotate, so the dev overlay sat permanently red for a
+ * problem that is not in this codebase.
+ *
+ * Three deliberate constraints:
+ *
+ *  - DEVELOPMENT ONLY. It is injected only when NODE_ENV is development, so no
+ *    visitor ever downloads or runs it. Production ships no overlay anyway, so
+ *    there is nothing to fix there and no reason to run DOM-scrubbing code for
+ *    real users.
+ *  - IT DISCONNECTS. The observer stops after 5 seconds. An extension that
+ *    re-adds an attribute every time we remove it would otherwise become an
+ *    infinite tug-of-war burning CPU. Hydration is long over by then.
+ *  - IT ONLY TOUCHES KNOWN MARKERS. An explicit prefix list, never a blanket
+ *    attribute sweep, so nothing functional can be removed by accident.
+ */
+const STRIP_EXTENSION_ATTRS = `
+(function () {
+  var RE = /^(bis_skin_checked$|__processed_|bis_register$|bis_size$)/;
+  function scrub(el) {
+    if (!el || !el.attributes) return;
+    for (var i = el.attributes.length - 1; i >= 0; i--) {
+      var n = el.attributes[i].name;
+      if (RE.test(n)) el.removeAttribute(n);
+    }
+  }
+  function scrubAll() {
+    scrub(document.documentElement);
+    var all = document.getElementsByTagName('*');
+    for (var i = 0; i < all.length; i++) scrub(all[i]);
+  }
+  scrubAll();
+  var mo = new MutationObserver(function (muts) {
+    for (var i = 0; i < muts.length; i++) {
+      var m = muts[i];
+      if (m.type === 'attributes' && m.attributeName && RE.test(m.attributeName)) {
+        m.target.removeAttribute(m.attributeName);
+      } else if (m.type === 'childList') {
+        for (var j = 0; j < m.addedNodes.length; j++) scrub(m.addedNodes[j]);
+      }
+    }
+  });
+  mo.observe(document.documentElement, { attributes: true, subtree: true, childList: true });
+  setTimeout(function () { mo.disconnect(); }, 5000);
+})();
+`;
+
 export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
@@ -48,7 +100,14 @@ export default function RootLayout({
       className={`${plexSans.variable} ${plexMono.variable}`}
       suppressHydrationWarning
     >
-      <body suppressHydrationWarning>{children}</body>
+      <body suppressHydrationWarning>
+        {/* First child of <body> so it runs during HTML parsing, before React's
+            bundle executes and hydrates. Dev only - see the constant above. */}
+        {process.env.NODE_ENV === "development" && (
+          <script dangerouslySetInnerHTML={{ __html: STRIP_EXTENSION_ATTRS }} />
+        )}
+        {children}
+      </body>
     </html>
   );
 }
