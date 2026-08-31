@@ -24,7 +24,7 @@ the reasoning is public and its hash is on-chain.
 | --- | --- |
 | Anchor program (5 instructions + admin rotation) | **Compiles clean** on Anchor 1.1.2 — no warnings |
 | 19 integration tests (14 attack cases) | **All 19 pass** against a local validator |
-| Judge (`web/lib/verifier.ts`) | Working. **19/19 pass**, including all 7 live tests against the real API |
+| Judge (`web/lib/verifier.ts`) | Working. **19/19 pass** against the real API (see the note on which model) |
 | Canonical hashing | Working. 25 tests pass, including a pinned golden digest |
 | API routes + Prisma schema | Written; compile and typecheck clean |
 | Frontend (4 screens) | Built. `next build` passes |
@@ -49,9 +49,26 @@ they cost money — the default provider is Gemini's free tier. Run them with:
 RUN_JUDGE_TESTS=1 npx vitest run lib/verifier.test.ts
 ```
 
-**What is still unverified:** a full submit → verdict → settle round trip on
-devnet with a real wallet. Every piece has been exercised on its own; the whole
-sequence has not been run end to end.
+All 19 passed against the live API on `gemini-3.1-flash-lite`, including the five
+prompt-injection cases. That run used flash-lite rather than the default
+`gemini-2.5-flash` only because the default's free quota was exhausted at the
+time; the prompt, the schema and every guard are provider-independent, and a
+weaker model clearing the adversarial cases is the stronger result. Re-run it on
+the default once quota resets to confirm — quota exhaustion is reported as a
+skip, not a failure, so a green run with skips means "rate limited", not "passed".
+
+Checked against live devnet: the config PDA is initialized (admin, 2% fee,
+Circle's devnet USDC as the bounty mint), and the keypair in `VERIFIER_SECRET_KEY`
+resolves to the same pubkey as the on-chain `config.verifier_authority` — so this
+server is the only account whose verdicts the program will accept.
+
+**What is still unverified:** a full seal → submit → verdict → settle round trip
+on devnet. Every piece has been exercised on its own, and the whole sequence is
+covered against a local validator by the 19 Anchor tests using a mock mint. What
+has not been run is that sequence on devnet with real transfers, and it is
+blocked on supply rather than on code: `config.bounty_mint` is Circle's devnet
+USDC and the deploying wallet holds none. Fund it from Circle's devnet faucet
+(and top up devnet SOL, currently ~0.04) before attempting it.
 
 ### The program keypair
 
