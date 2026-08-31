@@ -77,7 +77,7 @@ pub struct ReclaimExpired<'info> {
     pub token_program: Program<'info, Token>,
 }
 
-pub fn handler(ctx: Context<ReclaimExpired>) -> Result<()> {
+pub fn reclaim_expired_handler(ctx: Context<ReclaimExpired>) -> Result<()> {
     let now = Clock::get()?.unix_timestamp;
     let deadline = ctx.accounts.task.deadline;
 

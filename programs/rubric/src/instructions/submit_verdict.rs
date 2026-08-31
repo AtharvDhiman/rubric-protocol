@@ -24,6 +24,14 @@ use crate::constants::{BPS_DENOMINATOR, CONFIG_SEED, TASK_SEED, ZERO_HASH};
 use crate::errors::RubricError;
 use crate::state::{Config, Task, TaskState, VerdictRecord};
 
+/// NOTE ON `Box`: every deserialized account in this struct is boxed.
+///
+/// Solana caps a BPF stack frame at 4KB. This instruction takes twelve
+/// accounts, and deserializing them inline overflowed that frame by 776 bytes -
+/// which the toolchain reports as "may cause undefined behavior during
+/// execution". Boxing moves the account data to the heap and leaves only a
+/// pointer on the stack. It is not an optimization; without it this instruction
+/// is unsound, and it is the one instruction that moves escrowed money.
 #[derive(Accounts)]
 pub struct SubmitVerdict<'info> {
     /// The verifier. Must be exactly `config.verifier_authority`.
@@ -45,7 +53,7 @@ pub struct SubmitVerdict<'info> {
         bump = config.bump,
         constraint = config.verifier_authority == verifier.key() @ RubricError::NotVerifierAuthority
     )]
-    pub config: Account<'info, Config>,
+    pub config: Box<Account<'info, Config>>,
 
     /// The task being ruled on.
     ///
@@ -59,7 +67,7 @@ pub struct SubmitVerdict<'info> {
         bump = task.bump,
         has_one = creator @ RubricError::CreatorMismatch
     )]
-    pub task: Account<'info, Task>,
+    pub task: Box<Account<'info, Task>>,
 
     /// The mint recorded on the task.
     ///
@@ -68,7 +76,7 @@ pub struct SubmitVerdict<'info> {
     /// derived for that mint instead - paying the worker in fake tokens while the
     /// real USDC stayed in escrow.
     #[account(address = task.mint @ RubricError::MintMismatch)]
-    pub mint: Account<'info, Mint>,
+    pub mint: Box<Account<'info, Mint>>,
 
     /// THE ESCROW. Derived from (task, mint), never accepted from the caller.
     ///
@@ -80,7 +88,7 @@ pub struct SubmitVerdict<'info> {
         associated_token::mint = mint,
         associated_token::authority = task,
     )]
-    pub escrow: Account<'info, TokenAccount>,
+    pub escrow: Box<Account<'info, TokenAccount>>,
 
     /// CHECK: Not read or written - it exists only as the authority that the
     /// worker's token account is derived from. It is pinned to the worker
@@ -107,7 +115,7 @@ pub struct SubmitVerdict<'info> {
         associated_token::mint = mint,
         associated_token::authority = worker,
     )]
-    pub worker_token_account: Account<'info, TokenAccount>,
+    pub worker_token_account: Box<Account<'info, TokenAccount>>,
 
     /// CHECK: The authority the creator's token account is derived from, pinned
     /// to `task.creator` by the `has_one = creator` constraint on the task
@@ -132,7 +140,7 @@ pub struct SubmitVerdict<'info> {
         associated_token::mint = mint,
         associated_token::authority = creator,
     )]
-    pub creator_token_account: Account<'info, TokenAccount>,
+    pub creator_token_account: Box<Account<'info, TokenAccount>>,
 
     /// CHECK: Not read or written - the authority the fee token account is
     /// derived from. Pinned to `config.fee_destination` so fees cannot be
@@ -152,14 +160,14 @@ pub struct SubmitVerdict<'info> {
         associated_token::mint = mint,
         associated_token::authority = fee_destination,
     )]
-    pub fee_destination_token_account: Account<'info, TokenAccount>,
+    pub fee_destination_token_account: Box<Account<'info, TokenAccount>>,
 
     /// Anchor verifies this is the genuine SPL Token program, so a counterfeit
     /// program cannot be passed to fake the transfers.
     pub token_program: Program<'info, Token>,
 }
 
-pub fn handler(
+pub fn submit_verdict_handler(
     ctx: Context<SubmitVerdict>,
     approved: bool,
     confidence: u8,

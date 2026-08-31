@@ -131,6 +131,28 @@ describe("rubric", () => {
     );
   }
 
+  /**
+   * Assert a transaction fails, without pinning the error name.
+   *
+   * Used only where the defence sits BELOW Anchor's custom-error layer - for
+   * example when an account address is derived by the framework, so a
+   * substituted account is rejected during account resolution and never reaches
+   * a constraint. The security assertion in those tests is the balance/state
+   * check that follows, not the error string.
+   */
+  async function expectFailure(promise: Promise<unknown>): Promise<string> {
+    try {
+      await promise;
+    } catch (err: any) {
+      const code =
+        err?.error?.errorCode?.code ??
+        (String(err?.message ?? err).match(/Error Code: (\w+)/)?.[1] as string) ??
+        String(err?.message ?? err).slice(0, 90);
+      return code;
+    }
+    assert.fail("expected the transaction to fail, but it succeeded");
+  }
+
   /** Fund a keypair with SOL so it can pay rent and fees. */
   async function airdrop(to: PublicKey, sol = 2) {
     const sig = await connection.requestAirdrop(to, sol * LAMPORTS_PER_SOL);
@@ -442,7 +464,25 @@ describe("rubric", () => {
     await verdictCall(task, true, 91).rpc();
 
     // Second ruling on a Settled task. Settled is terminal.
-    await expectError(verdictCall(task, true, 91).rpc(), "InvalidState");
+    //
+    // Note which error actually fires: settling CLOSES the escrow token
+    // account, so the second attempt fails at account validation
+    // (AccountNotInitialized) before the handler's state check is reached.
+    // That is a stronger guarantee than InvalidState, not a weaker one - there
+    // is no escrow account left to drain. The state check stays as defence in
+    // depth. Both outcomes are acceptable; silently settling twice is not.
+    await expectError(verdictCall(task, true, 91).rpc(), [
+      "InvalidState",
+      "AccountNotInitialized",
+    ]);
+
+    // The property that actually matters.
+    const account = await program.account.task.fetch(task);
+    assert.deepEqual(Object.keys(account.state), ["settled"]);
+    assert.isNull(
+      await connection.getAccountInfo(escrowFor(task)),
+      "escrow must stay closed"
+    );
   });
 
   it("8. submit_work on an already-Submitted task -> InvalidState", async () => {
@@ -534,8 +574,14 @@ describe("rubric", () => {
         })
         .signers([creator])
         .rpc(),
-      "InvalidState"
+      // As in test 7: the escrow was closed when the task settled, so account
+      // validation rejects this before the state check. Either error means the
+      // creator cannot claw back an already-settled bounty.
+      ["InvalidState", "AccountNotInitialized"]
     );
+
+    const account = await program.account.task.fetch(task);
+    assert.deepEqual(Object.keys(account.state), ["settled"]);
   });
 
   it("14. an attacker cannot pass their own token account as the escrow", async () => {
@@ -554,7 +600,14 @@ describe("rubric", () => {
       Keypair.generate()
     );
 
-    await expectError(
+    // The substitution cannot even be expressed. Anchor DERIVES the escrow
+    // address from (task, mint) rather than trusting what the client sends, so
+    // the program looks for the canonical ATA, does not find it among the
+    // supplied accounts, and aborts during account resolution - it never gets
+    // as far as a named constraint error. Observed:
+    //   "Instruction references an unknown account <derived ATA>"
+    // so this asserts the failure and then the property that matters.
+    const code = await expectFailure(
       program.methods
         .createTask(taskId, RUBRIC_HASH, new BN(ONE_USDC), new BN(now + 3600))
         .accounts({
@@ -569,15 +622,16 @@ describe("rubric", () => {
           systemProgram: SystemProgram.programId,
         })
         .signers([creator])
-        .rpc(),
-      // Anchor rejects this when it re-derives the associated token address and
-      // finds the supplied account is not it. The exact code depends on which
-      // check fires first; all of these mean "the derivation did not match".
-      ["ConstraintAssociated", "ConstraintSeeds", "ConstraintTokenOwner", "AccountNotAssociatedTokenAccount"]
+        .rpc()
     );
+    assert.isString(code);
 
-    // The attacker's account never received anything.
-    assert.equal(await balanceOf(fakeEscrow), 0);
+    // THE SECURITY ASSERTIONS: the attacker got nothing, and no task exists.
+    assert.equal(await balanceOf(fakeEscrow), 0, "attacker account must stay empty");
+    assert.isNull(
+      await connection.getAccountInfo(task),
+      "no task account may have been created"
+    );
   });
 
   // =========================================================================

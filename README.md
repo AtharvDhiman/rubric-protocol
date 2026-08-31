@@ -22,21 +22,33 @@ the reasoning is public and its hash is on-chain.
 
 | Part | State |
 | --- | --- |
-| Anchor program (5 instructions + admin rotation) | Written, **not yet compiled** — no Rust toolchain on this machine |
-| 19 integration tests (14 attack cases) | Written, **not yet run** — needs a local validator |
+| Anchor program (5 instructions + admin rotation) | **Compiles clean** on Anchor 1.1.2 — no warnings |
+| 19 integration tests (14 attack cases) | **All 19 pass** against a local validator |
 | Judge (`web/lib/verifier.ts`) | Working. 12 guard tests pass; 7 live judge tests are opt-in |
 | Canonical hashing | Working. 25 tests pass, including a pinned golden digest |
 | API routes + Prisma schema | Written; compile and typecheck clean |
 | Frontend (4 screens) | Built. `next build` passes |
 | Devnet deploy | Not done — needs the toolchain first |
 
-**What has actually been verified on this machine:** `next build` passes, `tsc
---noEmit` is clean, `eslint` is clean, 37 tests pass, and `.next/static` contains
-no reference to `VERIFIER_SECRET_KEY` or `ANTHROPIC_API_KEY`.
+**Verified by running it:**
 
-**What has not:** every line of Rust. It has never been through `cargo`. Expect to
-fix compile errors on the first `anchor build` — Anchor's macros are version
-sensitive and this code targets 1.1.2 without having been run against it.
+- `anchor build` — clean, zero warnings, on anchor-cli 1.1.2 / Solana 3.1.10 / Rust 1.89.0
+- `anchor test` — **19/19 passing** against `solana-test-validator`, including all
+  14 attack cases
+- `next build`, `tsc --noEmit` and `eslint` all clean; 37 web tests pass
+- `.next/static` contains no reference to `VERIFIER_SECRET_KEY` or `ANTHROPIC_API_KEY`
+
+**What is still unverified:** the devnet deploy, and the `/task/[id]` screen (it
+needs a Postgres connection). The judge's live prompt-injection tests are opt-in
+and cost money — run them with `RUN_JUDGE_TESTS=1`.
+
+### The program keypair
+
+`target/deploy/rubric-keypair.json` **is** the program's identity, and it is
+gitignored because it is a private key. It currently exists in exactly one place.
+Back it up. Losing it means you can never upgrade a program deployed under
+`F2Uo5JUfGQtho8s9ZbwcpWBd8iJ4XvBqamUaqdjcrRxz`; you would redeploy at a new
+address, and every task PDA would move with it.
 
 ---
 

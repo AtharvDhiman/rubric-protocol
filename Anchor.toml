@@ -10,12 +10,13 @@ resolution = true
 skip-lint = false
 
 [programs.localnet]
-# PLACEHOLDER. Run `anchor keys sync` after the first build - it generates the
-# program keypair, then rewrites this line and `declare_id!` in lib.rs to match.
-rubric = "Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS"
+# Set by `anchor keys sync`. The matching keypair lives at
+# target/deploy/rubric-keypair.json and is gitignored - BACK IT UP, because
+# losing it means you can never upgrade a program deployed under this id.
+rubric = "F2Uo5JUfGQtho8s9ZbwcpWBd8iJ4XvBqamUaqdjcrRxz"
 
 [programs.devnet]
-rubric = "Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS"
+rubric = "F2Uo5JUfGQtho8s9ZbwcpWBd8iJ4XvBqamUaqdjcrRxz"
 
 [provider]
 cluster = "Localnet"

@@ -95,7 +95,7 @@ pub struct CreateTask<'info> {
     pub system_program: Program<'info, System>,
 }
 
-pub fn handler(
+pub fn create_task_handler(
     ctx: Context<CreateTask>,
     task_id: u64,
     rubric_hash: [u8; 32],

@@ -55,7 +55,7 @@ pub struct SubmitWork<'info> {
     pub worker_token_account: Account<'info, TokenAccount>,
 }
 
-pub fn handler(ctx: Context<SubmitWork>, submission_hash: [u8; 32]) -> Result<()> {
+pub fn submit_work_handler(ctx: Context<SubmitWork>, submission_hash: [u8; 32]) -> Result<()> {
     let task = &mut ctx.accounts.task;
 
     // Only an Open task accepts work. This single check rejects:

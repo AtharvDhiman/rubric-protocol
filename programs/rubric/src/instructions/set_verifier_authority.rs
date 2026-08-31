@@ -33,7 +33,7 @@ pub struct SetVerifierAuthority<'info> {
     pub config: Account<'info, Config>,
 }
 
-pub fn handler(ctx: Context<SetVerifierAuthority>, new_verifier_authority: Pubkey) -> Result<()> {
+pub fn set_verifier_authority_handler(ctx: Context<SetVerifierAuthority>, new_verifier_authority: Pubkey) -> Result<()> {
     let config = &mut ctx.accounts.config;
     let previous = config.verifier_authority;
     config.verifier_authority = new_verifier_authority;
