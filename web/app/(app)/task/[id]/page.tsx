@@ -263,6 +263,7 @@ export default async function TaskPage({
                 <dt style={{ color: "var(--text-muted)" }}>FUNDING TX</dt>
                 <dd style={{ margin: 0 }}>
                   <a
+                    className="tx-link"
                     href={explorerTxUrl(task.txCreate)}
                     target="_blank"
                     rel="noreferrer"
@@ -509,7 +510,7 @@ export default async function TaskPage({
                     </div>
                     {task.txSettle && (
                       <a
-                        className="data"
+                        className="data tx-link"
                         href={explorerTxUrl(task.txSettle)}
                         target="_blank"
                         rel="noreferrer"

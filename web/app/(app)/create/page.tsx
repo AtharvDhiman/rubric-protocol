@@ -305,7 +305,7 @@ export default function CreatePage() {
                 className="field"
                 value={windowSeconds}
                 onChange={(e) => setWindowSeconds(Number(e.target.value))}
-                style={{ marginTop: 8, fontSize: 15 }}
+                style={{ marginTop: 8 }}
               >
                 {WORK_WINDOWS.map((w) => (
                   <option key={w.seconds} value={w.seconds}>
@@ -324,7 +324,7 @@ export default function CreatePage() {
                 className="field"
                 value={category}
                 onChange={(e) => setCategory(e.target.value)}
-                style={{ marginTop: 8, fontSize: 15 }}
+                style={{ marginTop: 8 }}
               >
                 {CATEGORIES.map((c) => (
                   <option key={c} value={c}>

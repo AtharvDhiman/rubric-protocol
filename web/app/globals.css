@@ -426,6 +426,12 @@ h3 {
   background: transparent;
   color: var(--text);
   font-family: var(--font-sans);
+  /* Stated rather than inherited. A bare <select> otherwise falls back to the
+     browser's own control font - about 13px in Chrome - which is both smaller
+     than everything around it and different between browsers. The two category
+     selects on /create used to carry this inline; the mobile rule could not
+     reach them past an inline style, so it lives here now. */
+  font-size: 15px;
   padding: 8px 0;
   border-radius: 0;
 }
@@ -1362,17 +1368,63 @@ select.field option {
 
 /* ---------------------------------------------------------------------------
    TOUCH TARGETS
-   Everything interactive clears 44px on a phone. Applied here rather than per
-   component so a new control cannot quietly ship below the floor.
+   Standalone controls clear 44px on a phone.
+
+   This was written as a whitelist, with a comment claiming a new control could
+   not ship below the floor. A whitelist is precisely what lets one: the verdict
+   sheet's copy buttons (20px) and its explorer links (14px and 19px) were not
+   named here, so they inherited nothing and shipped untappable on the page that
+   is the whole demo. The list is still explicit - a blanket rule over every
+   anchor would slug 44px of height onto links inside sentences - but the small
+   standalone controls are now on it by name, and the comment no longer claims
+   coverage it does not have.
+
+   Links inside running prose are deliberately excluded. WCAG 2.5.8 exempts them
+   for a reason: a 44px slab behind a word in a paragraph overlaps its
+   neighbours, and overlapping hit areas make a tap LESS accurate, not more.
    --------------------------------------------------------------------------- */
 
-@media (max-width: 760px) {
+/* The condition is deliberately NOT width alone.
+
+   An iPad in portrait reports innerWidth 768 - and a media query is evaluated
+   against innerWidth - so it sat just outside a 760px breakpoint and got the
+   desktop treatment: 21px nav links on a device that has no pointer at all.
+   Width was always a proxy for "is this being touched", and a poor one.
+   (pointer: coarse) asks the real question, and covers the tablet in landscape
+   at 1024 too. The width clause stays for the narrow-window-on-a-mouse case. */
+@media (max-width: 760px), (pointer: coarse) {
   .app-header-inner a,
   .app-header-inner button,
   .record-row,
   .btn,
   .nav-pill {
     min-height: 44px;
+  }
+
+  /* The landing's own nav. It lives outside .app-header-inner, so it was not
+     covered by anything above and was the worst offender on a tablet. */
+  .fence-nav-links a:not(.btn),
+  .nameplate {
+    min-height: 44px;
+    display: inline-flex;
+    align-items: center;
+  }
+
+  /* Copy and the explorer links are how someone verifies a claim themselves,
+     which is the entire premise of the app. They are standalone controls, not
+     words in a sentence, so they take a real target. inline-flex because
+     min-height does nothing to an inline box - which is why the block-level
+     ones measured 20px and the inline one measured 14px. */
+  .copy-btn,
+  .tx-link {
+    min-height: 44px;
+    display: inline-flex;
+    align-items: center;
+  }
+  /* Negative margin keeps the taller box from opening a gap in the line it
+     sits on: the target grows, the layout does not move. */
+  .tx-link {
+    margin-block: -12px;
   }
 
   .app-header-inner a,
@@ -1394,12 +1446,17 @@ select.field option {
    16px is not a style choice: iOS Safari zooms the whole page in when a field
    under 16px takes focus, and it does not zoom back out. Every field is set at
    16 for that reason alone, and cleared to the 44px touch floor. */
-@media (max-width: 760px) {
+@media (max-width: 760px), (pointer: coarse) {
   input,
   textarea,
-  select {
+  select,
+  .field,
+  .field-clause,
+  .field-title,
+  .field-amount {
     font-size: 16px;
     min-height: 44px;
   }
+  .field-clause,
   textarea { min-height: 120px; }
 }
