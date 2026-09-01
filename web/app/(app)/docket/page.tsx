@@ -9,6 +9,7 @@
 
 import Link from "next/link";
 import { prisma } from "@/lib/db";
+import { DEMO_MODE, demoTasks } from "@/lib/demo";
 import { MetaRow } from "@/components/MetaRow";
 import { Stamp, stampForState } from "@/components/Stamp";
 import { formatUsdc } from "@/lib/task-view";
@@ -40,6 +41,26 @@ export default async function DocketPage({
   let medianSeconds: number | null = null;
   let dbReachable = true;
 
+  if (DEMO_MODE) {
+    // No database configured at all. Serve the sample docket rather than an
+    // error page, and say so above the table. See lib/demo.ts for why this is
+    // gated on "not configured" and not on "unreachable".
+    const all = demoTasks().filter(
+      (task) => !active || task.category === active
+    );
+    tasks = all;
+    totalEscrow = all
+      .filter((task) => ["OPEN", "SUBMITTED", "HELD"].includes(task.state))
+      .reduce((sum, task) => sum + task.bountyAmount, 0n);
+    verdictsToday = all.filter((task) => task.state === "SETTLED" || task.state === "REFUNDED").length;
+    const durations = all
+      .filter((task) => task.decidedAt && task.submittedAt)
+      .map((task) => (task.decidedAt!.getTime() - task.submittedAt!.getTime()) / 1000)
+      .sort((a, b) => a - b);
+    medianSeconds = durations.length
+      ? Math.round(durations[Math.floor(durations.length / 2)])
+      : null;
+  } else
   try {
     const where = {
       state: { not: "PENDING" as const },

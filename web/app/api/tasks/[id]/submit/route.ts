@@ -8,6 +8,7 @@
  */
 
 import { NextResponse } from "next/server";
+import { DEMO_MODE, DEMO_WRITE_MESSAGE } from "@/lib/demo";
 import { PublicKey } from "@solana/web3.js";
 import { prisma } from "@/lib/db";
 import { hashSubmissionHex } from "@/lib/hash";
@@ -23,6 +24,12 @@ export async function POST(
   request: Request,
   context: { params: Promise<{ id: string }> }
 ) {
+  // No database, so there is nothing to write to. Say so plainly rather than
+  // failing with a connection error, or worse, appearing to succeed.
+  if (DEMO_MODE) {
+    return NextResponse.json({ error: DEMO_WRITE_MESSAGE }, { status: 503 });
+  }
+
   const { id } = await context.params;
 
   let body: Record<string, unknown>;

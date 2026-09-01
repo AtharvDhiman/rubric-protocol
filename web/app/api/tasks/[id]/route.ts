@@ -7,6 +7,7 @@
  */
 
 import { NextResponse } from "next/server";
+import { DEMO_MODE, demoTaskById } from "@/lib/demo";
 import { prisma, serializeBigInts } from "@/lib/db";
 
 export const runtime = "nodejs";
@@ -17,7 +18,9 @@ export async function GET(
 ) {
   const { id } = await context.params;
 
-  const task = await prisma.task.findUnique({ where: { id } });
+  const task = DEMO_MODE
+    ? demoTaskById(id)
+    : await prisma.task.findUnique({ where: { id } });
   if (!task || task.state === "PENDING") {
     // A PENDING task has no confirmed on-chain existence, so as far as the
     // public is concerned it does not exist.

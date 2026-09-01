@@ -9,6 +9,7 @@
 
 import Link from "next/link";
 import { prisma } from "@/lib/db";
+import { DEMO_MODE, demoTaskById } from "@/lib/demo";
 import { ClauseList } from "@/components/ClauseList";
 import { MetaRow } from "@/components/MetaRow";
 import { Stamp } from "@/components/Stamp";
@@ -89,7 +90,10 @@ export default async function TaskPage({
   let task = null;
   let dbReachable = true;
   try {
-    task = await prisma.task.findUnique({ where: { id } });
+    // With no database configured, serve the sample record instead of erroring.
+    task = DEMO_MODE
+      ? demoTaskById(id)
+      : await prisma.task.findUnique({ where: { id } });
   } catch (error) {
     console.error("[task page] database unreachable:", error);
     dbReachable = false;

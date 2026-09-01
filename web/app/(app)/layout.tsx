@@ -1,5 +1,6 @@
 import { WalletProvider } from "@/components/WalletProvider";
 import { AppShell } from "@/components/AppShell";
+import { DEMO_MODE } from "@/lib/demo";
 
 /**
  * Layout for the three app screens. The landing page deliberately sits outside
@@ -13,7 +14,7 @@ export default function AppLayout({
 }) {
   return (
     <WalletProvider>
-      <AppShell>{children}</AppShell>
+      <AppShell demoMode={DEMO_MODE}>{children}</AppShell>
     </WalletProvider>
   );
 }

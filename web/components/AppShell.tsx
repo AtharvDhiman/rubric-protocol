@@ -91,10 +91,37 @@ export function AppHeader() {
   );
 }
 
-export function AppShell({ children }: { children: React.ReactNode }) {
+export function AppShell({
+  children,
+  demoMode = false,
+}: {
+  children: React.ReactNode;
+  /** Set by the layout. Server-side env is not readable from a client component. */
+  demoMode?: boolean;
+}) {
   return (
     <div style={{ minHeight: "100vh", background: "var(--page)" }}>
       <AppHeader />
+
+      {/* Sample records must never be mistakable for real ones. This protocol
+          exists so that what you see is what was sealed; a demo that blurred
+          that line would undercut the whole point. */}
+      {demoMode && (
+        <div
+          role="status"
+          style={{
+            borderBottom: "1px solid var(--border-strong)",
+            background: "var(--surface)",
+            padding: "10px 32px",
+            textAlign: "center",
+          }}
+        >
+          <span className="label" style={{ color: "var(--warning)" }}>
+            DEMO DATA · no database attached · nothing here is a real task and no
+            escrow exists
+          </span>
+        </div>
+      )}
       <main
         className="app-main"
         style={{

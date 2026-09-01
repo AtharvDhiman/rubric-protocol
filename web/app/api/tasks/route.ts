@@ -8,6 +8,7 @@
  */
 
 import { NextResponse } from "next/server";
+import { DEMO_MODE, DEMO_WRITE_MESSAGE, demoTasks } from "@/lib/demo";
 import { prisma } from "@/lib/db";
 import { serializeBigInts } from "@/lib/db";
 import { hashRubricHex, validateRubric } from "@/lib/hash";
@@ -31,6 +32,12 @@ function isValidAddress(value: unknown): value is string {
 }
 
 export async function POST(request: Request) {
+  // No database, so there is nothing to write to. Say so plainly rather than
+  // failing with a connection error, or worse, appearing to succeed.
+  if (DEMO_MODE) {
+    return NextResponse.json({ error: DEMO_WRITE_MESSAGE }, { status: 503 });
+  }
+
   let body: Record<string, unknown>;
   try {
     body = await request.json();
@@ -131,6 +138,27 @@ export async function POST(request: Request) {
 }
 
 export async function GET(request: Request) {
+  if (DEMO_MODE) {
+    // The sample docket, in the same envelope the real query returns.
+    const all = demoTasks();
+    return NextResponse.json(
+      serializeBigInts({
+        tasks: all.map((task) => ({
+          ...task,
+          clauseCount: task.clauses.length,
+          clauses: undefined,
+        })),
+        page: 1,
+        perPage: all.length,
+        total: all.length,
+        totalEscrow: all
+          .filter((task) => ["OPEN", "SUBMITTED", "HELD"].includes(task.state))
+          .reduce((sum, task) => sum + task.bountyAmount, 0n)
+          .toString(),
+      })
+    );
+  }
+
   const url = new URL(request.url);
   const page = Math.max(1, Number(url.searchParams.get("page") ?? 1) || 1);
   const perPage = Math.min(
