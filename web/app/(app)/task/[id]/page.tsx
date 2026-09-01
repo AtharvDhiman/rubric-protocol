@@ -14,6 +14,7 @@ import { MetaRow } from "@/components/MetaRow";
 import { Stamp } from "@/components/Stamp";
 import { CopyButton } from "@/components/CopyButton";
 import { SubmitWorkPanel } from "./SubmitWorkPanel";
+import { ReclaimPanel } from "./ReclaimPanel";
 import { explorerTxUrl } from "@/lib/env";
 import {
   formatUsdc,
@@ -32,6 +33,23 @@ export const dynamic = "force-dynamic";
  */
 function windowHasClosed(deadline: Date): boolean {
   return deadline.getTime() <= Date.now();
+}
+
+/**
+ * When the program will actually accept a reclaim. Mirrored here only so the
+ * screen does not offer a button the chain would reject - the on-chain check is
+ * the one that counts.
+ *
+ * An OPEN task with nothing submitted opens up as soon as the window closes. A
+ * SUBMITTED one waits a further seven days, so a poster cannot watch good work
+ * land and grab the bounty back before the judge has ruled. Module scope for
+ * the same reason as `windowHasClosed`: reading the clock in a component body
+ * is flagged impure, and this resolves once per request.
+ */
+const VERDICT_GRACE_MS = 7 * 24 * 60 * 60 * 1000;
+
+function graceHasElapsed(deadline: Date): boolean {
+  return Date.now() > deadline.getTime() + VERDICT_GRACE_MS;
 }
 
 function formatDate(date: Date): string {
@@ -109,6 +127,13 @@ export default async function TaskPage({
   const held = task.state === "HELD";
   const decided = settled || refunded;
   const windowClosed = windowHasClosed(task.deadline);
+
+  const awaitingVerdict = task.state === "SUBMITTED" || task.state === "HELD";
+  const reclaimable =
+    !decided &&
+    (awaitingVerdict
+      ? graceHasElapsed(task.deadline)
+      : task.state === "OPEN" && windowClosed);
 
   return (
     <article>
@@ -283,6 +308,15 @@ export default async function TaskPage({
               closed={windowClosed}
             />
           )}
+
+          {/* The poster's escape hatch. Renders nothing unless the connected
+              wallet is the one that posted this task. */}
+          <ReclaimPanel
+            taskId={task.id}
+            creatorAddress={task.creatorAddress}
+            reclaimable={reclaimable}
+            awaitingVerdict={awaitingVerdict}
+          />
 
           {/* ---- The verdict ---- */}
           {task.state === "SUBMITTED" && (

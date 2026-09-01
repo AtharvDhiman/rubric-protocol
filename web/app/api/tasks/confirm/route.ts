@@ -34,7 +34,8 @@ export async function POST(request: Request) {
       { status: 400 }
     );
   }
-  const step: "create" | "submit" = kind === "submit" ? "submit" : "create";
+  const step: "create" | "submit" | "reclaim" =
+    kind === "submit" ? "submit" : kind === "reclaim" ? "reclaim" : "create";
 
   const task = await prisma.task.findUnique({ where: { id } });
   if (!task) {
@@ -102,6 +103,30 @@ export async function POST(request: Request) {
     const updated = await prisma.task.update({
       where: { id },
       data: { state: "OPEN", txCreate: signature },
+    });
+    return NextResponse.json({ id: updated.id, state: updated.state });
+  }
+
+  if (step === "reclaim") {
+    // The poster took the escrow back after the window closed. Trust the chain,
+    // not the caller: `reclaim_expired` is the only way a task reaches Refunded
+    // this way, and it is terminal, so if the chain does not say Refunded then
+    // whatever this signature did, it was not that.
+    if (onChain.state !== "refunded") {
+      return NextResponse.json(
+        { error: `Task is ${onChain.state} on-chain, not refunded.` },
+        { status: 409 }
+      );
+    }
+    const updated = await prisma.task.update({
+      where: { id },
+      data: {
+        state: "REFUNDED",
+        // Cleared because the escrow account is closed and the money is back
+        // with the poster. Leaving a stale hold reason would read as though a
+        // human still owed this task a decision.
+        heldReason: null,
+      },
     });
     return NextResponse.json({ id: updated.id, state: updated.state });
   }
