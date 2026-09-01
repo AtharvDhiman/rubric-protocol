@@ -6,18 +6,20 @@ any UI. If a screen drifts from this, the screen is wrong, not this file.
 ## The concept
 
 Rubric is an escrow protocol where acceptance criteria are sealed on-chain and an
-AI judge rules against them. The interface is black, precise, and lit from a
-single source — surfaces read as machined metal and glass rather than as paper.
-Nothing glows for decoration; light marks the things you can act on.
+AI judge rules against them. The interface is light, precise, and lit from above
+— surfaces read as machined metal and glass on paper. Nothing is decorated for
+its own sake; light marks the things you can act on.
 
 ONE visual system across the whole product. The landing page and the app share
 the same ground, type, borders and button language. The landing has exactly one
 extra thing: the animated aperture in its hero. A visitor moving from the landing
 into the app should not feel a seam.
 
-> **This replaces the previous system.** Rubric shipped twice before: an
-> "Examiner's Desk" light/paper direction, then an IBM Plex record-ledger
-> direction on `#0a0a0c`. Both are dead. If a stale instruction anywhere asks for
+> **This replaces the previous systems.** Rubric shipped three before: an
+> "Examiner's Desk" light/paper direction, an IBM Plex record-ledger on
+> `#0a0a0c`, and a pure-black Vesper direction. All three are dead. The current
+> system keeps the black system's *language* — lit metal, glass, one sweep — and
+> inverts its *ground*. If a stale instruction anywhere asks for
 > IBM Plex, a monospace family, `§` clause marks, 2px radii, paper texture or
 > "borders, never shadows", it is out of date — follow this file.
 
@@ -27,8 +29,7 @@ into the app should not feel a seam.
 - No rounded-2xl card grids floating on a light background.
 - No purple→blue SaaS gradient heroes.
 - No emoji anywhere in the UI.
-- No second accent colour. The palette is black, white, grey, and one cool
-  highlight that is really just the light in the metal.
+- No second accent colour. The palette is paper, ink, grey, and one cool blue.
 - If a screen starts resembling a Tailwind starter template, stop and re-read
   this file.
 
@@ -73,33 +74,38 @@ Rules:
 
 | Role          | Value                      | Used for                                    |
 | ------------- | -------------------------- | ------------------------------------------- |
-| Ground        | `#000000`                  | page background everywhere                  |
-| Section       | `#0a0a0a`                  | the barely-raised band                      |
-| Panel         | `#101010`                  | log panels, hash previews, receipts         |
-| Border        | `rgba(255,255,255,0.16)`   | dividers, record rows, section rules        |
-| Hairline      | `rgba(255,255,255,0.12)`   | the quieter divider                         |
-| Input rule    | `rgba(255,255,255,0.28)`   | the underline beneath a form field          |
-| Row hover     | `rgba(255,255,255,0.04)`   | the record-row wash                         |
-| Text          | `#ffffff`                  |                                             |
-| Text body     | `#d8d8d8`                  | clause prose and other long-form reading    |
-| Text muted    | `#9a9a9a`                  | ledes, secondary lines, the accent phrase   |
-| Text faint    | `#7a7a7a`                  | labels, timestamps, units                   |
-| Accent        | `#bad0ff`                  | clause numbers, active nav, focus rings     |
-| Green         | `#14F195`                  | approved, paid, live                        |
-| Red           | `#ff4d6d`                  | rejected                                    |
-| Amber         | `#f59e0b`                  | held for review                             |
+| Ground        | `#fbfbfd`                  | page background everywhere                  |
+| Section       | `#f4f5f8`                  | the alternating band                        |
+| Panel         | `#eef0f4`                  | log panels, hash previews, receipts         |
+| Border        | `rgba(16,18,27,0.14)`      | dividers, record rows, section rules        |
+| Hairline      | `rgba(16,18,27,0.09)`      | the quieter divider                         |
+| Input rule    | `rgba(16,18,27,0.28)`      | the underline beneath a form field          |
+| Row hover     | `rgba(16,18,27,0.035)`     | the record-row wash                         |
+| Text          | `#0e1016`                  |                                             |
+| Text body     | `#34363f`                  | clause prose and other long-form reading    |
+| Text muted    | `#63656f`                  | ledes, secondary lines, the accent phrase   |
+| Text faint    | `#86887f`                  | labels, timestamps, units                   |
+| Accent        | `#2f4bd8`                  | clause numbers, active nav, focus rings     |
+| Green         | `#0a7f4f`                  | approved, paid, live                        |
+| Red           | `#c62740`                  | rejected                                    |
+| Amber         | `#a56a09`                  | held for review                             |
 
-**There is no light theme. Do not introduce white or cream surfaces anywhere.**
+**There is no dark theme. Do not introduce black or near-black surfaces
+anywhere**, other than the primary button and the type itself.
 
-The accent is deliberately barely a colour: it is the same cool white the buttons
-throw when they glow, so the accent and the light in the metal are demonstrably
-the same thing. Status colours stay chromatic because they carry meaning — and
-every one of them is paired with a word in the markup, never colour alone.
+The ground is `#fbfbfd`, not `#ffffff`: a white with a faint cool bias, chosen to
+sit under the blue accent rather than fight it. Pure white next to `#2f4bd8`
+reads as unconsidered.
 
-> Implementation note. `color-scheme: dark` is set on `html`/`body`. Without it
-> the browser paints its own widgets in light mode: a `<select>` popup opens white
-> with near-white option text, and the scrollbar stays pale. That popup is drawn
-> by the OS and ignores CSS colours — `color-scheme` is the only thing it obeys.
+Status colours stay chromatic because they carry meaning, and each is darkened
+from its dark-theme value — the old `#14F195` and `#ff4d6d` were tuned to glow on
+black and are unreadable on paper. Every one is paired with a word in the markup,
+never colour alone.
+
+> Implementation note. `color-scheme: light` is set on `html`/`body` so the
+> browser paints its own widgets to match: the `<select>` popup, the scrollbar,
+> form controls. Recolouring a `<select>` with CSS does NOT fix its popup — that
+> list is drawn by the OS, and `color-scheme` is the only thing it obeys.
 
 ## Surfaces and light
 
@@ -120,12 +126,14 @@ every one of them is paired with a word in the markup, never colour alone.
    glyph to be removed from the site. Do not reintroduce it.)*
 
 2. **THE VERDICT STAMP.** A rounded outline containing a single uppercase word at
-   `0.14em` tracking: APPROVED (`#14F195`), REJECTED (`#ff4d6d`), SEALED,
-   HELD (`#f59e0b`), IN REVIEW. 1.5px border, faint inner light, rotated exactly
-   `-4deg`. The large APPROVED stamp on the verdict screen gets a soft green
-   glow; small row stamps get none. **No `mix-blend-mode`** — `multiply` was
-   right for ink on a light page; on black it drives the stamp toward black and
-   erases it. The rotation is the ONE permitted tilt in the product.
+   `0.14em` tracking: APPROVED (`#0a7f4f`), REJECTED (`#c62740`), SEALED,
+   HELD (`#a56a09`), IN REVIEW. 1.5px border, a white inner light and a 1px lift,
+   rotated exactly `-4deg`. **No `mix-blend-mode`.** It is tempting again now
+   that the ground is paper — `multiply` is the classic ink-on-paper trick — but
+   it was removed for a reason and the reason still applies: the stamp sits over
+   panels and row washes, not only over the ground, and `multiply` darkens it
+   unpredictably against each one. The rotation is the ONE permitted tilt in the
+   product.
 
 3. **THE SWEEP.** Every button and nav pill carries a specular highlight that
    crosses it on hover — a pseudo-element translating from `-130%` to `130%` over
@@ -136,17 +144,24 @@ every one of them is paired with a word in the markup, never colour alone.
 
 Two, and only two.
 
-- **Primary** — white metal. `linear-gradient(180deg,#fff,#e7e7e7 48%,#cfcfcf)`,
-  `#111` label, white border, inset top highlight. Hover shifts cool and glows
-  `rgba(186,208,255,0.4)`. **One per screen.**
-- **Default** — liquid glass. A dark diagonal gradient with a cool cast, a
-  `rgba(198,198,198,0.45)` border and a faint inset highlight. Hover brightens
-  the cast, warms the border toward `rgba(220,230,255,0.75)` and glows.
+- **Primary** — graphite metal. `linear-gradient(180deg,#2c2f39,#17191f 48%,#0c0d12)`,
+  white label, inset top highlight. It is the only near-black object on the page,
+  which is exactly the inversion of the dark system where it was the only white
+  one: the primary action is the single solid, opaque thing on screen.
+  **One per screen.**
+- **Default** — light glass. A near-white diagonal gradient, a
+  `rgba(16,18,27,0.16)` border, an inset white highlight and a 1px lift. Hover
+  brightens it and turns the border toward the accent.
 
-Nav pills are a third surface, not a third button: a harder metal ramp
-(`105deg, #050505 → #2a2a2a 48% → #4a4a4a`) used for navigation only, so the
-pill shape always means "somewhere you can go". The current page keeps its glow
-on permanently instead of adding an underline — one signal, always on.
+The sweep inverts with them: it is a *dark* streak crossing light glass, and a
+*light* streak crossing the dark primary. A white sweep on white glass is
+invisible, which is how you can tell whether someone checked.
+
+Nav pills are a third surface, not a third button: a light metal ramp
+(`105deg, #ffffff → #f0f2f6 48% → #dfe4ed`) used for navigation only, so the pill
+shape always means "somewhere you can go". The current page keeps its lift and
+accent border on permanently instead of adding an underline — one signal, always
+on.
 
 ## Solana brand mark
 
@@ -167,6 +182,36 @@ being quoted, not designed.
 - `@media (prefers-reduced-motion: reduce)` disables every transform and rotation,
   leaving elements at final opacity. **The page must be complete with zero motion.**
 - All keyframes live in one block in `globals.css`.
+
+## Entrance motion
+
+One orchestrated page-load sequence, not scattered effects.
+
+Elements carry `.appear` plus a modifier — `--scale`, `--soft`, `--mask`,
+`--pop`, `--btn`, `--side`, `--stat` — and a `--d` delay that stages them:
+logo `0.08s`, then the nav pills every `0.12s`, then the hero badge, the headline
+lines, the lede, and the buttons last. Duration `1.05s`,
+`cubic-bezier(0.16, 1, 0.3, 1)`.
+
+Two rules that are not decoration:
+
+- **`.appear` rests at opacity 1.** If animations never run — a failed
+  stylesheet, an old engine, reduced motion — the page is fully visible rather
+  than a blank screen waiting for a keyframe that is not coming.
+  `animation-fill-mode: both` supplies the 0% frame during the delay, so when
+  animations *do* run the elements still hide and then arrive.
+- **Each element retires its own animation** on `animationend`, gaining `.is-in`
+  which clears the animation entirely. Without it a finished animation's fill
+  state keeps holding a transform, and anything transforming later — a hover
+  lift, the stamp's rotation — fights it.
+
+`components/AppearMotion.tsx` wires both, plus a fallback: if nothing is running
+after two frames, it forces `.is-in` on everything. That covers the case
+`opacity: 1` cannot — an animation that is *declared* but never *starts* would
+otherwise strand elements at opacity 0 forever.
+
+Below the fold, sections use `.reveal` with `useInView` (IntersectionObserver,
+threshold 0.2, triggerOnce) instead. Load sequence above, scroll reveal below.
 
 ## Accessibility
 

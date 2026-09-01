@@ -61,14 +61,14 @@ export function ApertureHero() {
         <svg className="aperture" viewBox="0 0 800 800" fill="none">
           <defs>
             <radialGradient id="haze">
-              <stop offset="0%" stopColor="#9945FF" stopOpacity="0.26" />
-              <stop offset="55%" stopColor="#9945FF" stopOpacity="0.06" />
+              <stop offset="0%" stopColor="#9945FF" stopOpacity="0.14" />
+              <stop offset="55%" stopColor="#9945FF" stopOpacity="0.04" />
               <stop offset="100%" stopColor="#9945FF" stopOpacity="0" />
             </radialGradient>
             <linearGradient id="bladeFace" x1="0" y1="0" x2="100%" y2="100%">
-              <stop offset="0%" stopColor="#23232b" />
-              <stop offset="48%" stopColor="#17171d" />
-              <stop offset="100%" stopColor="#0e0e12" />
+              <stop offset="0%" stopColor="#ffffff" />
+              <stop offset="48%" stopColor="#f1f3f8" />
+              <stop offset="100%" stopColor="#e2e6f0" />
             </linearGradient>
             <linearGradient id="bladeEdge" x1="0" y1="0" x2="100%" y2="0">
               <stop offset="0%" stopColor="#9945FF" stopOpacity="0.8" />
@@ -261,7 +261,7 @@ export function ApertureHero() {
             lineHeight: 1.12,
             letterSpacing: "-0.045em",
             fontWeight: 500,
-            color: "var(--d-text)",
+            color: "var(--text)",
             margin: "22px 0 0",
           }}
         >

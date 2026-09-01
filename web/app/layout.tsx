@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { AppearMotion } from "@/components/AppearMotion";
 import { Inter, Instrument_Serif } from "next/font/google";
 import "./globals.css";
 
@@ -108,6 +109,9 @@ export default function RootLayout({
       suppressHydrationWarning
     >
       <body suppressHydrationWarning>
+        {/* Wires the entrance sequence: retires each animation when it ends,
+            and reveals everything if the animations never ran at all. */}
+        <AppearMotion />
         {/* First child of <body> so it runs during HTML parsing, before React's
             bundle executes and hydrates. Dev only - see the constant above. */}
         {process.env.NODE_ENV === "development" && (

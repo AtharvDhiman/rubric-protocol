@@ -46,7 +46,9 @@ export function AppHeader() {
       >
         <Link
           href="/"
+          className="appear appear--scale"
           style={{
+            ["--d" as string]: "0.08s",
             display: "flex",
             alignItems: "center",
             gap: 10,
@@ -62,14 +64,15 @@ export function AppHeader() {
         </Link>
 
         <nav style={{ display: "flex", gap: 24, flex: 1 }}>
-          {NAV.map((item) => {
+          {NAV.map((item, i) => {
             const active = pathname?.startsWith(item.href);
             return (
               <Link
                 key={item.href}
                 href={item.href}
                 aria-current={active ? "page" : undefined}
-                className={`nav-pill${active ? " nav-pill--active" : ""}`}
+                className={`nav-pill appear ${i % 2 === 0 ? "appear--scale" : "appear--soft"}${active ? " nav-pill--active" : ""}`}
+                style={{ ["--d" as string]: `${0.16 + i * 0.12}s` }}
               >
                 {item.label}
               </Link>
