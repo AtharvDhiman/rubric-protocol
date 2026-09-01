@@ -25,6 +25,7 @@ import { BN } from "@anchor-lang/core";
 import { MetaRow } from "@/components/MetaRow";
 import { Stamp } from "@/components/Stamp";
 import { TxFlow, useTxFlow } from "@/components/TxFlow";
+import { WalletPreflight } from "@/components/WalletPreflight";
 import { useRubricProgram } from "@/lib/useRubricProgram";
 import { methodsOf } from "@/lib/anchor-methods";
 import {
@@ -415,6 +416,8 @@ export default function CreatePage() {
               {problem}
             </p>
           )}
+
+          <WalletPreflight needsUsdc />
 
           <TxFlow state={state} onDismiss={reset} />
         </section>

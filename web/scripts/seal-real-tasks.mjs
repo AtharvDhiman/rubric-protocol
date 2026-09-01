@@ -155,6 +155,12 @@ const TASKS = [
   },
 ];
 
+// Sealing costs real rent - about 0.0052 SOL per task for the Task PDA and its
+// escrow account - so allow a run to be capped rather than failing halfway
+// through a sequence that moves money.
+const LIMIT = Number(process.env.LIMIT ?? TASKS.length);
+TASKS.length = Math.min(TASKS.length, Math.max(1, LIMIT));
+
 const { configPda, bountyMint } = await readConfig();
 const signerAta = getAssociatedTokenAddressSync(bountyMint, signer.publicKey);
 

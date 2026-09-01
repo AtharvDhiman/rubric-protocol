@@ -24,6 +24,7 @@ import {
 } from "@solana/spl-token";
 import { useRubricProgram } from "@/lib/useRubricProgram";
 import { TxFlow, useTxFlow } from "@/components/TxFlow";
+import { WalletPreflight } from "@/components/WalletPreflight";
 import { fromHex, hashSubmissionHex } from "@/lib/hash";
 import { workerAuthMessage } from "@/lib/worker-auth";
 import bs58 from "bs58";
@@ -223,6 +224,8 @@ export function SubmitWorkPanel({
       >
         {busy ? "Working…" : "Submit work"}
       </button>
+
+      <WalletPreflight />
 
       <TxFlow state={state} onDismiss={reset} />
 

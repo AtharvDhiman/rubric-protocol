@@ -24,7 +24,7 @@ the reasoning is public and its hash is on-chain.
 | --- | --- |
 | Anchor program (5 instructions + admin rotation) | **Compiles clean** on Anchor 1.1.2 — no warnings |
 | 19 integration tests (14 attack cases) | **All 19 pass** against a local validator |
-| Judge (`web/lib/verifier.ts`) | Working. **19/19 pass** — 12 offline guard tests, 7 against the real API |
+| Judge (`web/lib/verifier.ts`) | Working, in production. **19/19 pass**, and it has ruled on a real devnet task and released escrow |
 | Canonical hashing | Working. 25 tests pass, including a pinned golden digest |
 | API routes + Prisma schema | Written; compile and typecheck clean |
 | Frontend (4 screens) | Built. `next build` passes |
@@ -106,9 +106,105 @@ clicking through the real UI:
 | Transaction | signed, broadcast, confirmed; task became `SUBMITTED` |
 | Judge and payout | `SETTLED`, and **5.88 USDC** — a 6.00 bounty less the 2% fee — arrived in the browser wallet |
 
-**What is still unverified:** the same sequence on devnet with Circle's USDC, and
-a genuine Phantom or Solflare extension build. The mock satisfies the adapter's
-interface, not a real extension's quirks.
+### And then it ran for real
+
+Everything above used a local validator and a mock wallet. The same sequence has
+now run on **devnet, through the deployed site, signed by a real Phantom
+extension** — which was the last untested thing in the project.
+
+A poster sealed *"Label 200 warehouse shelf photos"* with a 1 USDC bounty. A
+worker on a different wallet submitted through https://rubric-protocol.vercel.app,
+approving the worker-auth message and the transaction in Phantom. The deployed
+judge ruled on all three sealed clauses and cited the submission for each one:
+
+| Clause | Ruling | What the judge cited |
+| --- | --- | --- |
+| Every barcode legible and in focus | PASS | *"Every barcode was checked at full resolution…"* |
+| Blurred images excluded, not guessed at | PASS | *"9 frames were too blurred to read — those are excluded…"* |
+| Exactly one label per image | PASS | *"verified with a uniqueness check on image_id"* |
+
+Approved at confidence 95. **0.98 USDC** — the bounty less the 2% protocol fee —
+left the escrow PDA and arrived in the worker's wallet.
+
+Two transactions, seven seconds apart: `VM3AMpJg…` was `submit_work`, `3uHXGToS…`
+was the verifier settling. Both are on devnet and open in Explorer.
+
+**What is still unverified:** a Solflare build. Only Phantom has been exercised
+by a real extension.
+
+### One operational fact that is not obvious
+
+**The verifier wallet needs its own SOL**, separately from any user's. It signs
+`submit_verdict`, and a transaction costs a fee whoever sends it.
+
+This is worth stating plainly because of how it fails. When that wallet empties,
+the judge keeps working and keeps ruling correctly — every task simply comes back
+`HELD` with "the settlement transaction did not land". It reads as a broken AI,
+and it is an empty wallet. It cost a debugging cycle to find the first time, and
+nothing in the interface will tell you.
+
+Fees are ~0.000005 SOL, so a small balance lasts a very long time — but it is not
+infinite, and there is no alarm.
+
+## Using it
+
+Live at **https://rubric-protocol.vercel.app**. It runs on Solana **devnet**, so
+everything it moves is test money — but the program, the escrow and the judge are
+all real.
+
+**Before anything else**, in Phantom: Settings → Developer Settings → Testnet
+Mode → **Solana Devnet**. Nothing works otherwise, and the failure is confusing
+rather than obvious — a devnet address looks identical to a mainnet one, so the
+wallet shows a zero balance and no warning at all.
+
+Then fund the wallet:
+
+- **devnet SOL** from https://faucet.solana.com — a fraction of a SOL is plenty;
+  it pays transaction fees and account rent
+- **devnet USDC** from https://faucet.circle.com (Solana Devnet) — only if you
+  intend to post work. A worker needs no USDC.
+
+### If you are posting work
+
+1. **Create** → write the acceptance criteria as numbered clauses. Be specific.
+   The judge rules on exactly these words and nothing else, so a vague clause is
+   a vague ruling — and you cannot fix it afterwards.
+2. Set a bounty and a work window, then **Seal**. The confirmation shows the
+   exact canonical text and its SHA-256 before you sign; check it, because this
+   is the last moment anything can change.
+3. Approve in your wallet. The clause hash and the money are now committed
+   on-chain. **Neither you nor the protocol can edit the criteria after this** —
+   that is the entire point of the thing.
+4. When a worker submits, the judge rules automatically and the escrow settles
+   itself. You do not approve the payment; the sealed clauses already did.
+5. If nobody submits and the window closes, **Reclaim escrow** returns your
+   bounty in full, with no fee on a refund.
+
+### If you are doing the work
+
+1. Open a task from **the docket** and read the sealed clauses. That is the whole
+   contract — there is no other spec, and nothing hidden.
+2. Deliver against them and paste your work into the submission box. The judge
+   cannot open files or follow links, so what you write is what it rules on:
+   specific counts, named methods and honest caveats are evidence, and a bare
+   "done, all good" is not.
+3. **Submit work.** Your wallet prompts twice: first a message signature proving
+   the submission is yours (it moves nothing), then the transaction that commits
+   its hash on-chain.
+4. The verdict usually lands within seconds, clause by clause with the reasoning
+   quoted. If every clause passes, the escrow releases to you immediately, less
+   the 2% protocol fee.
+5. If it is rejected, the reasoning is public and cites the specific clause that
+   failed. If the judge is not confident enough, the task is **held** and no
+   money moves in either direction until a human looks at it.
+
+### A warning your wallet will show
+
+Phantom flags the site as a possible risk. That is a **domain reputation** check,
+not an analysis of the transaction: the domain is new and `*.vercel.app` is
+heavily abused for phishing, so anything new in that namespace is treated with
+suspicion. Before approving anyway, check the simulated balance change — a
+submission should move nothing but a fraction of a cent in SOL.
 
 ### The program keypair
 
