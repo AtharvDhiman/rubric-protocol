@@ -155,8 +155,10 @@ export function SubmitWorkPanel({
   if (closed) {
     return (
       <p style={{ fontSize: 15, color: "var(--text-muted)" }}>
-        The work window for this matter has closed. The poster can reclaim the
-        escrow.
+        The work window for this matter has closed. The escrow is returnable to
+        the poster through the program&rsquo;s <span className="data">reclaim_expired</span>{" "}
+        instruction, which this interface does not yet offer — it has to be
+        called against the program directly.
       </p>
     );
   }

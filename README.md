@@ -331,38 +331,46 @@ ruled on. What remains is a griefing vector against an honest worker. Closing it
 means having the client sign a message with its wallet and verifying that
 signature server-side, which adds a signing prompt before the transaction.
 
-**6. No dispute or arbitration path.** Out of scope for the MVP. A rejected worker's
+**6. `reclaim_expired` has no UI.** The instruction exists, is covered by the
+Anchor tests, and is the poster's way out of an expired or abandoned task — but
+nothing in the web app calls it, so a poster has to invoke it against the program
+directly to get their escrow back. It is deliberately not wired up here rather
+than shipped untested: exercising a money-moving flow needs devnet USDC this
+wallet does not have (see "What is still unverified"). It is the first thing to
+build once the wallet is funded.
+
+**7. No dispute or arbitration path.** Out of scope for the MVP. A rejected worker's
 only recourse is the public reasoning.
 
-**7. The clock is the validator's.** `Clock::get()` is not a precise wall clock;
+**8. The clock is the validator's.** `Clock::get()` is not a precise wall clock;
 deadlines are accurate to within a slot or so, which is fine at hour granularity.
 
-**8. A closed destination token account delays settlement.** `submit_verdict`
+**9. A closed destination token account delays settlement.** `submit_verdict`
 requires the worker's, the poster's, and the fee destination's token accounts to
 exist, on both the approve and reject paths. If one is closed, the verdict
 transaction fails. The verifier recreates any missing account idempotently in the
 same transaction, which closes the race — but a determined party could still hold
 up their own settlement, and the grace-period reclaim is the backstop.
 
-**9. Dust sent to a settled task's escrow address is unrecoverable.** Once a task
+**10. Dust sent to a settled task's escrow address is unrecoverable.** Once a task
 settles, its escrow account is closed and the task is terminal. ATA creation is
 permissionless, so anyone can recreate that address and send tokens to it, and no
 instruction will ever sign for it again. Do not retry a deposit against a settled
 task.
 
-**10. Task ids are sequential per creator, so a specific id can be blocked.** The
+**11. Task ids are sequential per creator, so a specific id can be blocked.** The
 escrow uses `init`, which fails if the account already exists. Someone who
 predicts `(creator, task_id)` can pre-create the escrow ATA and make that one id
 unusable. The cost is theirs (rent per blocked id), the poster simply gets the
 next id, and no funds are at risk — but it is a cheap nuisance.
 
-**11. `initialize_config` must be run by the program's upgrade authority.** This is
+**12. `initialize_config` must be run by the program's upgrade authority.** This is
 enforced on-chain, and it is what stops a bystander from front-running the setup
 transaction and installing themselves as admin and verifier. The consequence: do
 not make the program immutable before initializing the config, or the deployment
 is unusable.
 
-**12. Landing-page figures are targets, not measurements.** They are labelled as
+**13. Landing-page figures are targets, not measurements.** They are labelled as
 such in the UI and live in `web/lib/constants.ts`.
 
 ---

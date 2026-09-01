@@ -206,6 +206,134 @@ describe("applyVerdictGuards", () => {
 // LAYER 2 - the live judge. Opt-in: costs money.
 // ===========================================================================
 
+
+/**
+ * runVerdict itself, with the provider faked.
+ *
+ * These never touch the network, so unlike the live suite below they run on
+ * every `npm test` - which matters, because the property they pin down is the
+ * one CLAUDE.md Part 3 is most insistent about: a judge that fails must hold the
+ * task, and NO failure path may ever end in `approved`. Until these existed that
+ * rule was only exercised by tests that are skipped by default and skipped again
+ * whenever the API is rate limited.
+ */
+describe("runVerdict (provider faked, always runs)", () => {
+  const RUBRIC_2 = {
+    title: "Two clauses",
+    clauses: ["The submission mentions blue.", "The submission mentions green."],
+  };
+  const SUB = {
+    workerAddress: "4kTkVfPqXn1s8pQx9hZmR3wJdG7bN2cY6vL5tA8wHK",
+    content: "blue and green",
+  };
+
+  /** A stand-in for the Anthropic client, scripted one reply per attempt. */
+  function fakeClient(replies: Array<unknown | Error>) {
+    let call = 0;
+    return {
+      messages: {
+        parse: async () => {
+          const reply = replies[Math.min(call++, replies.length - 1)];
+          if (reply instanceof Error) throw reply;
+          return reply;
+        },
+      },
+    } as unknown as NonNullable<Parameters<typeof runVerdict>[2]>["client"];
+  }
+
+  const bothPass = {
+    stop_reason: "end_turn",
+    parsed_output: {
+      approved: true,
+      confidence: 95,
+      summary: "Both clauses are satisfied.",
+      clauses: [
+        { index: 0, passed: true, reason: "It says blue." },
+        { index: 1, passed: true, reason: "It says green." },
+      ],
+    },
+  };
+
+  const run = (replies: Array<unknown | Error>) =>
+    runVerdict(RUBRIC_2, SUB, {
+      provider: "anthropic",
+      client: fakeClient(replies),
+    });
+
+  it("approves when the fake judge passes every clause", async () => {
+    const result = await run([bothPass]);
+    expect(result.outcome).toBe("approved");
+    expect(result.approved).toBe(true);
+  });
+
+  it("holds, never approves, when the response never matches the schema", async () => {
+    const result = await run([
+      { stop_reason: "end_turn", parsed_output: null },
+      { stop_reason: "end_turn", parsed_output: null },
+    ]);
+    expect(result.outcome).toBe("needs_manual_review");
+    expect(result.approved).toBe(false);
+  });
+
+  it("retries exactly once and accepts a good second answer", async () => {
+    const result = await run([
+      { stop_reason: "end_turn", parsed_output: null },
+      bothPass,
+    ]);
+    expect(result.outcome).toBe("approved");
+  });
+
+  it("holds when the judge refuses to rule", async () => {
+    const result = await run([{ stop_reason: "refusal", parsed_output: null }]);
+    expect(result.outcome).toBe("needs_manual_review");
+    expect(result.approved).toBe(false);
+  });
+
+  it("holds when the provider throws on every attempt", async () => {
+    const result = await run([new Error("socket hang up"), new Error("socket hang up")]);
+    expect(result.outcome).toBe("needs_manual_review");
+    expect(result.approved).toBe(false);
+  });
+
+  it("refuses to approve when the model says approved but a clause failed", async () => {
+    const result = await run([
+      {
+        stop_reason: "end_turn",
+        parsed_output: {
+          approved: true,
+          confidence: 99,
+          summary: "Contradicts itself on purpose.",
+          clauses: [
+            { index: 0, passed: true, reason: "It says blue." },
+            { index: 1, passed: false, reason: "No mention of green." },
+          ],
+        },
+      },
+    ]);
+    expect(result.approved).toBe(false);
+    expect(result.outcome).not.toBe("approved");
+  });
+
+  it("does not settle on high confidence alone when a clause failed", async () => {
+    const result = await run([
+      {
+        stop_reason: "end_turn",
+        parsed_output: {
+          approved: false,
+          confidence: 100,
+          summary: "One clause missed.",
+          clauses: [
+            { index: 0, passed: true, reason: "It says blue." },
+            { index: 1, passed: false, reason: "No mention of green." },
+          ],
+        },
+      },
+    ]);
+    expect(result.approved).toBe(false);
+    expect(result.outcome).toBe("rejected");
+  });
+});
+
 const LIVE = process.env.RUN_JUDGE_TESTS === "1";
 const describeLive = LIVE ? describe : describe.skip;
 
