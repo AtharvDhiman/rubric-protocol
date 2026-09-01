@@ -1,4 +1,4 @@
-import { ApertureHero } from "@/components/landing/ApertureHero";
+import { FenceHero } from "@/components/landing/FenceHero";
 import {
   Figures,
   FinalCta,
@@ -15,7 +15,7 @@ import {
 export default function LandingPage() {
   return (
     <div className="on-dark" style={{ background: "var(--d-ground)" }}>
-      <ApertureHero />
+      <FenceHero />
       <Marquee />
       <HowItWorks />
       <VerdictLog />

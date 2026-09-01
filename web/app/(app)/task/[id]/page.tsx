@@ -16,6 +16,7 @@ import { Stamp } from "@/components/Stamp";
 import { CopyButton } from "@/components/CopyButton";
 import { SubmitWorkPanel } from "./SubmitWorkPanel";
 import { ReclaimPanel } from "./ReclaimPanel";
+import { LockMechanism, type TumblerState } from "@/components/LockMechanism";
 import { explorerTxUrl } from "@/lib/env";
 import {
   formatUsdc,
@@ -401,6 +402,22 @@ export default async function TaskPage({
                     {verdict.confidence}
                   </div>
                 </div>
+              </div>
+
+              {/* The same mechanism the landing runs, here on the real ruling.
+                  You can read the verdict before reading a word: either every
+                  gate meets the fence line, or one of them does not - and the
+                  one that does not IS the citation. */}
+              <div style={{ margin: "4px 0 28px" }}>
+                <LockMechanism
+                  hash={task.rubricHash}
+                  states={verdict.clauses.map((r): TumblerState =>
+                    r.passed ? "pass" : held ? "undetermined" : "fail"
+                  )}
+                  partLabel={`FENCE / ${verdict.clauses.length} TUMBLER${
+                    verdict.clauses.length === 1 ? "" : "S"
+                  } / ${task.state}`}
+                />
               </div>
 
               <table

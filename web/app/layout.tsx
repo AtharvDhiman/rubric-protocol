@@ -1,33 +1,34 @@
 import type { Metadata } from "next";
 import { AppearMotion } from "@/components/AppearMotion";
-import { Inter, Instrument_Serif } from "next/font/google";
+import { Archivo, Azeret_Mono } from "next/font/google";
 import "./globals.css";
 
 /**
- * The entire type system. Inter for everything, Instrument Serif italic for a
- * single accented phrase in the headline and nowhere else.
+ * Two families, each with a jurisdiction.
  *
- * Inter is the interface: one variable family covering 100-900, so weight is a
- * free axis rather than another download. Instrument Serif appears italic only,
- * at one size, on one phrase - it is a punctuation mark on the page, not a
- * second voice.
+ * Archivo is the language of the product. It carries a width axis, and the
+ * nameplate uses it expanded and heavy - an expanded grotesk at weight 700
+ * reads as lettering stamped into a metal faceplate, which is the whole tone.
+ * If the width axis fails to load nothing breaks: no layout depends on it, the
+ * type simply sets at normal width.
  *
- * There is no monospace family any more. Figures that need to line up use
- * `font-variant-numeric: tabular-nums`, which Inter supports, so columns stay
- * aligned without loading a face purely to align digits.
+ * Azeret Mono is mandatory for every figure a person might compare, copy or
+ * verify - amounts, confidences, clause numbers, addresses, hashes, durations.
+ * Its squared drawing-office figures are what make a hash read as a measured
+ * part number rather than as a string, and the visual split between a wide
+ * grotesk and a squared mono is doing that work deliberately.
  */
-const inter = Inter({
+const archivo = Archivo({
   subsets: ["latin"],
-  weight: ["300", "400", "500", "600", "700"],
-  variable: "--font-inter",
+  axes: ["wdth"],
+  variable: "--font-archivo",
   display: "swap",
 });
 
-const instrumentSerif = Instrument_Serif({
+const azeret = Azeret_Mono({
   subsets: ["latin"],
-  weight: "400",
-  style: "italic",
-  variable: "--font-instrument",
+  weight: ["400", "500"],
+  variable: "--font-azeret",
   display: "swap",
 });
 
@@ -105,7 +106,7 @@ export default function RootLayout({
     // any component - those still surface normally.
     <html
       lang="en"
-      className={`${inter.variable} ${instrumentSerif.variable}`}
+      className={`${archivo.variable} ${azeret.variable}`}
       suppressHydrationWarning
     >
       <body suppressHydrationWarning>

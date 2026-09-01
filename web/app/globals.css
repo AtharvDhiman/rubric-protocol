@@ -11,73 +11,82 @@
    =========================================================================== */
 
 :root {
-  /* ===== ONE SYSTEM. Landing and app share every token below. =====
-     A light system now: paper-white ground, graphite type, and the same
-     lit-surface language inverted - light comes from above onto metal rather
-     than out of it. The names are unchanged on purpose. Twenty components read
-     these, so remapping VALUES moves the whole product at once. */
+  /* ===== FENCE LINE =====
+     Rubric is a lever-tumbler lock. Each clause is a tumbler, the rubric hash
+     is the key's bitting, and the money only moves when every gate lines up on
+     one brass fence. The interface is that mechanism drawn at engineering
+     scale, so the palette is a machine's: zinc deck, cold-rolled plate,
+     graphite ink, and brass on the parts that move.
 
-  --page: #fbfbfd;            /* Ground - a white with a faint cool bias, to  */
-  --surface: #f4f5f8;         /* sit under the blue accent rather than fight  */
-  --raised: #eef0f4;          /* it. Pure #fff reads as unconsidered here.    */
-  --border: rgba(16, 18, 27, 0.14);
-  --hairline: rgba(16, 18, 27, 0.09);
-  --border-strong: rgba(16, 18, 27, 0.18);
-  --input-rule: rgba(16, 18, 27, 0.28);
-  --row-hover: rgba(16, 18, 27, 0.035);
+     Token NAMES are unchanged from every previous system. Twenty components
+     read them, so remapping values moves the product at once. */
 
-  --text: #0e1016;
-  --text-2: #34363f;          /* long-form reading: clause prose             */
-  --text-muted: #63656f;      /* ledes, secondary lines, the accent phrase   */
-  --text-faint: #86887f;      /* labels, timestamps, units                   */
+  --page: #aeb3b6;        /* Deck - machined zinc. Not a document, not an app. */
+  --surface: #e6e8e8;     /* Plate - cold-rolled; every content surface        */
+  /* Ground - surface-ground plate, reserved for state COMMITTED on-chain:
+     sealed clause sets, the verdict sheet, settled rows. Only Ground plates get
+     bolts, so a bolt means "this is on the chain" rather than "this is a box". */
+  --raised: #f0f2f2;
+  --sunk: #dcdfdf;        /* wells sunk into a plate: textareas, code blocks   */
+  /* Solid, never alpha: a machined edge is an edge, not a shadow of one. */
+  --border: #14171a;
+  --hairline: #c4c9c9;
+  --border-strong: #14171a;
+  --input-rule: #14171a;
+  --row-hover: #dcdfdf;
 
-  /* Still "the light in the metal", but a light ground needs the accent to
-     carry weight rather than glow. Same cool family as the dark system's
-     #bad0ff, dropped to a value that holds 4.5:1 on the ground. */
-  --accent: #2f4bd8;
-  --accent-strong: #2f4bd8;
+  --text: #14171a;        /* Graphite - all type, all rules, the bolt body     */
+  --text-2: #232a2e;
+  --text-muted: #383e42;  /* faceplate callout text                            */
+  --text-faint: #5a6166;
 
-  /* Status stays chromatic and carries meaning - approved, rejected, held.
-     Darkened from the dark-theme variants, which were tuned to glow on black
-     and are unreadable on paper. Each is paired with a word in the markup. */
-  --positive: #0a7f4f;
-  --negative: #c62740;
-  --warning: #a56a09;
+  /* Brass governs the whole colour rule: it marks the part that MOVES. The
+     fence, the active tick, the focus ring. Nothing decorative is ever brass.
+     It is 2.85:1 on Deck - below even the 3:1 non-text floor - so brass NEVER
+     appears on Deck, as type or as graphic. Plate and Ground only. */
+  --accent: #7d5e12;
+  --accent-strong: #7d5e12;
 
-  --rule-strong: rgba(16, 18, 27, 0.18);
-  --overlay: rgba(20, 22, 30, 0.38);
+  /* The three terminal states of a bolt, and only these. */
+  --positive: #1c6b45;    /* Thrown - released, APPROVED, settled              */
+  --negative: #96121e;    /* Arrest - the stop. REJECTED, and the blocking clause */
+  /* A lever lock is binary, but Rubric is not: a held task is neither thrown
+     nor arrested. Steel, deliberately outside the brass/green/red family, for
+     a fence that stopped partway against a tumbler at an indeterminate height. */
+  --warning: #26406e;
 
-  /* --- LANDING --- */
-  --d-ground: #fbfbfd;
-  --d-section: #f4f5f8;
-  --d-panel: #eef0f4;
-  --d-panel-dark: #e7e9ef;
-  --d-border: rgba(16, 18, 27, 0.14);
-  --d-border-2: rgba(16, 18, 27, 0.09);
-  --d-text: #0e1016;
-  --d-muted: #63656f;
-  --d-faint: #86887f;
+  --rule-strong: #14171a;
+  --overlay: rgba(20, 23, 26, 0.55);
+
+  /* --- LANDING - same deck, same plate. There is no separate landing skin. */
+  --d-ground: #aeb3b6;
+  --d-section: #e6e8e8;
+  --d-panel: #f0f2f2;
+  --d-panel-dark: #d2d6d6;
+  --d-border: #14171a;
+  --d-border-2: #c4c9c9;
+  --d-text: #14171a;
+  --d-muted: #383e42;
+  --d-faint: #5a6166;
 
   --sol-purple: #9945ff;
   --sol-green: #14f195;
 
-  /* Sourced from next/font under a DIFFERENT name (--font-inter,
-     --font-instrument). If both sides used --font-sans this line would
+  /* Sourced from next/font under DIFFERENT names (--font-archivo,
+     --font-azeret). If both sides used --font-sans the declaration would
      reference itself, because :root IS the html element - the same element
      next/font sets its variable on. That cycle is invalid at computed-value
      time, the variable resolves to nothing, and every font silently falls back
      to the system stack. That shipped once and was invisible until someone
      read the computed style. */
-  --font-sans: var(--font-inter), "Inter", system-ui, -apple-system,
-    BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-sans: var(--font-archivo), "Archivo", system-ui, -apple-system, sans-serif;
 
-  /* No monospace family. `--font-mono` is an alias so existing call sites keep
-     resolving; alignment comes from tabular-nums on `.data`. */
-  --font-mono: var(--font-sans);
-
-  /* Italic only, one phrase, one size. A punctuation mark, not a second voice. */
-  --font-serif: var(--font-instrument), "Instrument Serif", "Times New Roman",
-    Times, serif;
+  /* Mono is mandatory again, and it is doing real work: every figure a person
+     might compare, copy or verify. Azeret's squared figures make a hash read as
+     a measured part number rather than a string. */
+  --font-mono: var(--font-azeret), "Azeret Mono", ui-monospace, SFMono-Regular,
+    Menlo, monospace;
+  --font-serif: var(--font-sans);
 }
 
 * {
@@ -530,88 +539,15 @@ select.field option {
   flex-direction: column;
 }
 
-.hero-stage {
-  position: absolute;
-  inset: 0;
-  display: grid;
-  place-items: center;
-  pointer-events: none;
-}
 
-.aperture {
-  width: 1020px;
-  height: 1020px;
-  will-change: transform;
-  /* Two animations, in sequence. The load-in settles at scale(1) rotate(0), and
-     the drift picks up from exactly there, so the handover is invisible. The
-     blades used to stop dead once the entrance finished, which left the busiest
-     part of the hero looking like a still image. */
-  animation:
-    apertureIn 1.5s cubic-bezier(0.19, 1, 0.22, 1) 0.15s both,
-    apertureDrift 72s linear 1.7s infinite;
-}
 
-.ring-outer {
-  position: absolute;
-  width: 1160px;
-  height: 1160px;
-  opacity: 0.8;
-  will-change: transform;
-  animation: ringSpin 26s linear infinite;
-}
 
-.ring-inner {
-  position: absolute;
-  width: 960px;
-  height: 960px;
-  will-change: transform;
-  animation: ringSpin 18s linear infinite;
-}
 
-.core-glow {
-  position: absolute;
-  width: 320px;
-  height: 320px;
-  border-radius: 50%;
-  background: radial-gradient(
-    circle,
-    rgba(20, 241, 149, 0.28),
-    rgba(153, 69, 255, 0.12) 52%,
-    transparent 72%
-  );
-  filter: blur(6px);
-  animation: corePulse 6s ease-in-out infinite;
-}
 
-.core-mark {
-  position: absolute;
-  width: 128px;
-}
 
 /* The vignette is a legibility device, not decoration. Do not remove it - the
    headline needs 4.5:1 against the glow. */
-.vignette {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  background: radial-gradient(
-    ellipse at 50% 46%,
-    transparent 26%,
-    rgba(251, 251, 253, 0.74) 62%,
-    #fbfbfd 88%
-  );
-}
 
-.scanlines {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  background: repeating-linear-gradient(
-    0deg,
-    rgba(244, 244, 245, 0.022) 0 1px,
-    transparent 1px 4px
-  );
-}
 
 .line-mask {
   overflow: hidden;
@@ -661,66 +597,14 @@ select.field option {
    KEYFRAMES - all of them, in one block, as DESIGN.md requires.
    --------------------------------------------------------------------------- */
 
-@keyframes apertureIn {
-  from {
-    opacity: 0;
-    transform: scale(1.18) rotate(-12deg);
-    filter: blur(18px);
-  }
-  to {
-    opacity: 1;
-    transform: scale(1) rotate(0deg);
-    filter: blur(0);
-  }
-}
 
-@keyframes ringSpin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
-}
 
 /* The blades turn clockwise, continuously, with a slight swell halfway round so
    it breathes rather than just spins. Slower than either ring: the three layers
    all go the same way now, and the speed difference is what keeps them reading
    as separate depths instead of one flat disc. */
-@keyframes apertureDrift {
-  0% {
-    transform: rotate(0deg) scale(1);
-  }
-  50% {
-    transform: rotate(180deg) scale(1.03);
-  }
-  100% {
-    transform: rotate(360deg) scale(1);
-  }
-}
 
-@keyframes corePulse {
-  0%,
-  100% {
-    opacity: 0.5;
-    transform: scale(0.96);
-  }
-  50% {
-    opacity: 0.9;
-    transform: scale(1.04);
-  }
-}
 
-@keyframes barIn {
-  from {
-    opacity: 0;
-    transform: translateX(80px);
-  }
-  to {
-    opacity: 1;
-    transform: translateX(0);
-  }
-}
 
 @keyframes lineUp {
   from {
@@ -787,10 +671,6 @@ select.field option {
     scroll-behavior: auto !important;
   }
 
-  .aperture,
-  .ring-outer,
-  .ring-inner,
-  .core-glow,
   .marquee-track,
   .line-mask > span,
   .reveal,
@@ -809,23 +689,11 @@ select.field option {
 
 /* ---------------------------------------------------------------------------
    RESPONSIVE
-   Below 900px everything stacks. The aperture bleeds off-screen at ~130vw
-   rather than shrinking, so it stays a machine and not a logo.
+   Below 900px everything stacks. The mechanism bleeds off the right edge at
+   130vw rather than shrinking, so it stays a drawing and not a logo.
    --------------------------------------------------------------------------- */
 
 @media (max-width: 900px) {
-  .aperture {
-    width: 130vw;
-    height: 130vw;
-  }
-  .ring-outer {
-    width: 148vw;
-    height: 148vw;
-  }
-  .ring-inner {
-    width: 122vw;
-    height: 122vw;
-  }
   .cols,
   .cols-3,
   .cols-4 {
@@ -1075,5 +943,197 @@ select.field option {
     transform: none;
     clip-path: none;
     filter: none;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   THE LOCK
+   Three movements: the hash cuts the bitting, the tumblers lift to their ruled
+   heights, the fence travels. Only transform, opacity and stroke-dashoffset
+   animate, so the whole thing stays on the compositor.
+   --------------------------------------------------------------------------- */
+
+.lock { margin: 0; display: block; }
+
+.lock-num {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.01em;
+}
+
+.lock-label {
+  margin-top: 14px;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+/* SEAL — the hash draws itself as the key's cut. */
+.lock-bitting {
+  stroke-dasharray: 1400;
+  stroke-dashoffset: 1400;
+  animation: bitting-cut 1.1s cubic-bezier(0.2, 0.9, 0.25, 1) 0.1s forwards;
+}
+@keyframes bitting-cut {
+  to { stroke-dashoffset: 0; }
+}
+
+/* RULE — each tumbler drops onto the profile, then settles at its ruled height.
+   The overshoot at 92% is a single frame of metal bounce; without it the stack
+   settles like software easing rather than like a part seating. */
+.lock-tumbler {
+  transform: translateY(calc(var(--lift) - 26px));
+  opacity: 0;
+  animation: tumbler-seat 0.62s cubic-bezier(0.2, 0.9, 0.25, 1) forwards;
+  animation-delay: calc(0.65s + var(--i) * 60ms);
+}
+@keyframes tumbler-seat {
+  0% { opacity: 0; transform: translateY(calc(var(--lift) - 26px)); }
+  60% { opacity: 1; }
+  92% { transform: translateY(calc(var(--lift) + 2px)); }
+  100% { opacity: 1; transform: translateY(var(--lift)); }
+}
+
+/* THROW — the fence travels. A clean throw runs all the way out. An arrest
+   stops dead with a 2px recoil, on a curve that decelerates like metal hitting
+   metal rather than easing out like software. */
+.lock-fence {
+  transform: translateX(0);
+  animation: fence-throw 1.15s cubic-bezier(0.9, 0, 1, 1) forwards;
+  animation-delay: calc(1.5s + var(--i, 0) * 0ms);
+}
+@keyframes fence-throw {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(var(--arrest-x)); }
+}
+
+.lock[data-arrested="true"] .lock-fence {
+  animation-name: fence-arrest;
+}
+@keyframes fence-arrest {
+  0% { transform: translateX(0); }
+  62% { transform: translateX(var(--arrest-x)); }
+  68% { transform: translateX(calc(var(--arrest-x) - 2px)); }
+  74% { transform: translateX(var(--arrest-x)); }
+  100% { transform: translateX(var(--arrest-x)); }
+}
+
+/* The still frame is the design, not a degraded version of it: every part sits
+   at its terminal state and the drawing reads as a complete state diagram. */
+@media (prefers-reduced-motion: reduce) {
+  .lock-bitting { stroke-dashoffset: 0; animation: none; }
+  .lock-tumbler { opacity: 1; transform: translateY(var(--lift)); animation: none; }
+  .lock-fence { transform: translateX(var(--arrest-x)); animation: none; }
+}
+
+/* ---------------------------------------------------------------------------
+   PLATES AND THE DATUM EDGE
+   Content sits on cold-rolled plate visibly bolted to the zinc deck. Hard
+   corners everywhere; the only radius in the product is 3px on inputs and
+   buttons. Sections are separated by a graphite rule carrying a brass datum
+   segment at its left end - a machined reference edge running the whole site.
+   --------------------------------------------------------------------------- */
+
+.plate,
+.plate--sealed {
+  position: relative;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 0;
+}
+
+.plate--sealed { background: var(--raised); }
+
+/* Four slotted bolt heads, inset 12px. Drawn rather than imaged. */
+/* Bolts are a state indicator, not trim. A plate is bolted only when what it
+   carries is committed on-chain - which is why `.plate` alone has none, and
+   `.plate--sealed` does. Uniform decorative bolt heads would indicate nothing,
+   which is exactly the tell to avoid. */
+.plate--sealed::before,
+.plate--sealed::after {
+  content: "";
+  position: absolute;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background:
+    linear-gradient(var(--text) 0 100%) center / 5px 1px no-repeat,
+    var(--raised);
+  box-shadow: inset 0 0 0 1px var(--border-strong);
+}
+.plate--sealed::before { top: 12px; left: 12px; }
+.plate--sealed::after { top: 12px; right: 12px; }
+
+.rule-datum {
+  position: relative;
+  height: 3px;
+  background: var(--text);
+  border: 0;
+}
+.rule-datum::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 24px;
+  height: 3px;
+  background: var(--accent);
+}
+
+/* ---------------------------------------------------------------------------
+   THE FACEPLATE
+   Two columns, nothing centred: a rail carrying the language, and the mechanism
+   itself at drawing scale beside it.
+   --------------------------------------------------------------------------- */
+
+/* The nameplate is the one place the width axis is used hard: an expanded
+   grotesk at 700 reads as lettering stamped into metal, which is the tone. */
+.nameplate {
+  font-family: var(--font-sans);
+  font-variation-settings: "wdth" 118;
+  font-weight: 700;
+  font-size: 19px;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--text);
+}
+
+.fence-hero {
+  display: grid;
+  grid-template-columns: 400px 1fr;
+  gap: 56px;
+  align-items: center;
+  padding: 64px 40px 72px;
+}
+
+.fence-rail h1 {
+  font-size: clamp(34px, 3.6vw, 52px);
+  font-weight: 700;
+  font-variation-settings: "wdth" 108;
+  letter-spacing: -0.02em;
+  line-height: 1.06;
+  color: var(--text);
+}
+
+.fence-stage {
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  padding: 28px 32px;
+  min-width: 0;
+}
+
+@media (max-width: 900px) {
+  .fence-hero {
+    grid-template-columns: 1fr;
+    gap: 32px;
+    padding: 40px 20px 48px;
+  }
+  /* The mechanism bleeds off the right edge rather than shrinking to a logo. */
+  .fence-stage {
+    width: 130vw;
+    max-width: none;
+    margin-right: -20px;
   }
 }
