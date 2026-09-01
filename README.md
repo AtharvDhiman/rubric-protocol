@@ -89,10 +89,26 @@ This was blocked for a long time on devnet USDC, which needs Circle's faucet. A
 local validator with a mint we control removes that dependency, and the program,
 the routes and the judge are all the real ones.
 
+**The browser wallet path is verified too**, in a real browser against the same
+local validator. Driving a real Phantom install in an automated test is not an
+option — it needs a password to unlock, and a test should not be typing passwords
+into a wallet — so `scripts/mock-wallet.js` implements the surface
+`PhantomWalletAdapter` actually calls. The app's wallet-adapter code runs
+unmodified and detects it exactly as it detects an extension. What that exercised,
+clicking through the real UI:
+
+| Step | Result |
+| --- | --- |
+| Wallet detection | picker shows **Phantom DETECTED**, Solflare NOT INSTALLED |
+| Connect | chip shows the connected address |
+| **Declined signature** | "SIGNATURE DECLINED — Nothing was sent and nothing was charged", and **zero** transactions signed |
+| `signMessage` prompt | signed the real worker-auth message, "This signs your work onto a task. It does not move any funds." |
+| Transaction | signed, broadcast, confirmed; task became `SUBMITTED` |
+| Judge and payout | `SETTLED`, and **5.88 USDC** — a 6.00 bounty less the 2% fee — arrived in the browser wallet |
+
 **What is still unverified:** the same sequence on devnet with Circle's USDC, and
-the browser wallet path. The script signs with a keypair where Phantom would, so
-wallet-adapter integration — the popup, the rejection path, the `signMessage`
-prompt — has not been exercised by a real extension.
+a genuine Phantom or Solflare extension build. The mock satisfies the adapter's
+interface, not a real extension's quirks.
 
 ### The program keypair
 
