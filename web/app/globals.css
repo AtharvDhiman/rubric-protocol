@@ -439,7 +439,13 @@ select.field option {
   width: 1020px;
   height: 1020px;
   will-change: transform;
-  animation: apertureIn 1.5s cubic-bezier(0.19, 1, 0.22, 1) 0.15s both;
+  /* Two animations, in sequence. The load-in settles at scale(1) rotate(0), and
+     the drift picks up from exactly there, so the handover is invisible. The
+     blades used to stop dead once the entrance finished, which left the busiest
+     part of the hero looking like a still image. */
+  animation:
+    apertureIn 1.5s cubic-bezier(0.19, 1, 0.22, 1) 0.15s both,
+    apertureDrift 72s linear 1.7s infinite;
 }
 
 .ring-outer {
@@ -448,7 +454,7 @@ select.field option {
   height: 1160px;
   opacity: 0.8;
   will-change: transform;
-  animation: ringSpin 48s linear infinite;
+  animation: ringSpin 26s linear infinite;
 }
 
 .ring-inner {
@@ -456,7 +462,7 @@ select.field option {
   width: 960px;
   height: 960px;
   will-change: transform;
-  animation: ringSpinRev 34s linear infinite;
+  animation: ringSpin 18s linear infinite;
 }
 
 .core-glow {
@@ -574,12 +580,19 @@ select.field option {
   }
 }
 
-@keyframes ringSpinRev {
-  from {
-    transform: rotate(360deg);
+/* The blades turn clockwise, continuously, with a slight swell halfway round so
+   it breathes rather than just spins. Slower than either ring: the three layers
+   all go the same way now, and the speed difference is what keeps them reading
+   as separate depths instead of one flat disc. */
+@keyframes apertureDrift {
+  0% {
+    transform: rotate(0deg) scale(1);
   }
-  to {
-    transform: rotate(0deg);
+  50% {
+    transform: rotate(180deg) scale(1.03);
+  }
+  100% {
+    transform: rotate(360deg) scale(1);
   }
 }
 
