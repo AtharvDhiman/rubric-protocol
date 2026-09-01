@@ -327,7 +327,16 @@ export default async function TaskPage({
                   marginBottom: 20,
                 }}
               >
-                <Stamp variant={verdict.approved ? "approved" : "rejected"} large />
+                <Stamp
+                  variant={
+                    // A held task is not a rejected one. `approved` is false in
+                    // both cases, so reading it alone stamps REJECTED across a
+                    // task that is only waiting for a human - and no escrow has
+                    // moved either way.
+                    held ? "held" : verdict.approved ? "approved" : "rejected"
+                  }
+                  large
+                />
                 <div>
                   <div className="label">CONFIDENCE</div>
                   <div
@@ -463,7 +472,13 @@ export default async function TaskPage({
       </div>
 
       <MetaRow
-        footnote="Verdict final unless appealed within 24 hours."
+        footnote={
+          held
+            ? "Held for human review. No escrow has moved."
+            : decided
+              ? "This verdict is final. Rubric has no appeal process; the reasoning above is the record."
+              : "No verdict yet. Escrow is untouched."
+        }
         record={`RECORD ${recordNumber} · VERDICT`}
       />
     </article>

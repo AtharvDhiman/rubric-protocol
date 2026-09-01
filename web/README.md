@@ -21,7 +21,8 @@ npm run db:push      # push the Prisma schema
 npm run db:seed      # demo records, so the UI renders without a deployed program
 ```
 
-The live judge tests call the real Anthropic API and cost money. They are gated:
+The live judge tests call the real judge API. The default provider is Gemini's
+free tier, so they consume quota rather than money. They are gated:
 
 ```bash
 RUN_JUDGE_TESTS=1 npx vitest run lib/verifier.test.ts

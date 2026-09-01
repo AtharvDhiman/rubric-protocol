@@ -43,6 +43,10 @@ export function SubmitWorkPanel({
   const { publicKey, connected } = useWallet();
   const { program, usdcMint, error: idlError } = useRubricProgram();
   const { state, run, reset, busy } = useTxFlow();
+  // The judge runs after the transaction is already done, so it cannot be a
+  // TxFlow state - TxFlow describes one signature's journey, and this is a
+  // separate server-side phase that happens once the chain says "Submitted".
+  const [judging, setJudging] = useState(false);
 
   const [content, setContent] = useState("");
   const [problem, setProblem] = useState<string | null>(null);
@@ -126,7 +130,24 @@ export function SubmitWorkPanel({
         return;
       }
 
-      tx.done(signature, "Your submission is sealed on-chain and queued for the judge.");
+      tx.done(signature, "Your submission is sealed on-chain. Sending it to the judge.");
+
+      // Step 3 - RUN THE JUDGE. Nothing else in the app calls this, and the
+      // whole product is "submit, get judged, get paid": without this the task
+      // sits in `Submitted` until the poster reclaims it after the grace period.
+      // Deliberately not awaited inside the transaction's own error handling -
+      // the money-moving part already succeeded, and a judge failure must not be
+      // reported as a failed transaction. The route is idempotent and the
+      // verdict can always be re-run.
+      setJudging(true);
+      try {
+        await fetch(`/api/tasks/${taskId}/verify`, { method: "POST" });
+      } catch {
+        // Swallowed on purpose. The submission is safe on-chain either way, and
+        // the page below will show the task as still awaiting a verdict.
+      } finally {
+        setJudging(false);
+      }
       router.refresh();
     });
   }
@@ -177,6 +198,19 @@ export function SubmitWorkPanel({
       </button>
 
       <TxFlow state={state} onDismiss={reset} />
+
+      {/* The judge runs after the transaction has already succeeded. Saying so
+          explicitly beats a silent pause on the one screen where the person is
+          waiting to find out whether they get paid. */}
+      {judging && (
+        <p
+          role="status"
+          className="label"
+          style={{ marginTop: 12, color: "var(--text-muted)" }}
+        >
+          The judge is reading your submission against the sealed clauses.
+        </p>
+      )}
     </div>
   );
 }

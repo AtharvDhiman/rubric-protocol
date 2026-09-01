@@ -65,7 +65,8 @@ Rules:
 | Section       | `#101014` | alternating band, and the active/hover row wash                 |
 | Panel         | `#121216` | log panels, hash previews, settlement records                   |
 | Border        | `#1f1f26` | hairline dividers, record rows, section rules                   |
-| Border strong | `#26262f` | table header rules, panel borders                               |
+| Border strong | `#26262f` | panel borders and record-row hairlines                          |
+| Rule strong   | `#f4f4f5` | the bright rule under the app header and the docket table head  |
 | Input rule    | `#3f3f46` | the underline beneath a form field                              |
 | Text          | `#f4f4f5` |                                                                 |
 | Text body     | `#d4d4d8` | clause text and other long-form reading                         |
@@ -77,6 +78,13 @@ Rules:
 | Amber         | `#f59e0b` | held for review                                                 |
 
 **There is no light theme. Do not introduce white or cream surfaces anywhere.**
+
+> Why two "strong" values. The source brief uses one name for two jobs: `#26262f`
+> where it describes a panel's edge, and `#f4f4f5` where it describes the rule
+> under a header or a table head. Painting both at `#26262f` loses the structural
+> break; painting both at `#f4f4f5` outlines every panel in near-white. They are
+> split here so each keeps its job. `--rule-strong` is for a horizontal break the
+> eye should land on, never for an outline.
 
 > Implementation note. `color-scheme: dark` is set on `html`/`body`. Without it the
 > browser paints its own widgets in light mode: a `<select>` popup opens white with

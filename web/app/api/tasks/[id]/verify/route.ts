@@ -22,7 +22,12 @@ import { NextResponse } from "next/server";
 import { PublicKey } from "@solana/web3.js";
 import type { Prisma } from "@prisma/client";
 import { prisma, serializeBigInts } from "@/lib/db";
-import { hashRubricHex, hashVerdict, hashVerdictHex } from "@/lib/hash";
+import {
+  hashRubricHex,
+  hashSubmissionHex,
+  hashVerdict,
+  hashVerdictHex,
+} from "@/lib/hash";
 import { runVerdict } from "@/lib/verifier";
 import {
   fetchConfig,
@@ -135,6 +140,39 @@ export async function POST(
       { error: "Could not read the protocol config from the chain." },
       { status: 503 }
     );
+  }
+
+  // --- 3b. ...and so must the submission ----------------------------------
+  //
+  // The clause check above exists because nobody should be able to move the
+  // goalposts after work starts. The same argument runs the other way: the
+  // worker committed `submission_hash` on-chain when they called `submit_work`,
+  // so if what we are about to hand the judge does not hash to that, the
+  // deliverable in this database is not the one they committed to. Judging it
+  // would settle real money against content the worker never signed for.
+  // Whether that came from tampering or a bug does not matter here - either way
+  // it is not automatically judgeable.
+  if (onChain.submissionHashHex && task.submissionContent) {
+    const submissionDigest = hashSubmissionHex(task.submissionContent);
+    if (submissionDigest !== onChain.submissionHashHex) {
+      console.error(
+        `[verify] REFUSING TO JUDGE task ${task.id}: stored submission hashes ` +
+          `to ${submissionDigest} but the chain sealed ${onChain.submissionHashHex}.`
+      );
+      await prisma.task.update({
+        where: { id },
+        data: {
+          state: "HELD",
+          heldReason:
+            "The submission on record does not match the one sealed on-chain, " +
+            "so this task cannot be judged automatically.",
+        },
+      });
+      return NextResponse.json(
+        { error: "Submission mismatch. The task has been held for review." },
+        { status: 409 }
+      );
+    }
   }
 
   // --- 4. Judge ------------------------------------------------------------

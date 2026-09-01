@@ -44,6 +44,35 @@ export interface TxHandle {
 }
 
 /** Heuristic for "the user closed the wallet popup" across adapters. */
+/**
+ * Did this transaction get broadcast and then fail to confirm in time?
+ *
+ * This is the single most dangerous error to get wrong. web3.js throws when it
+ * stops waiting, but the transaction is already on the wire and may well land a
+ * moment later. Reporting that as a generic failure tells the person nothing was
+ * sent, and the natural response - try again - double-submits and can cost them
+ * a second bounty. Returns the signature when it can be recovered, an empty
+ * string when we know it was a timeout but cannot name the signature, and null
+ * when this is an ordinary error that really did stop before sending.
+ */
+function confirmationTimeoutSignature(error: unknown): string | null {
+  const carried = (error as { signature?: unknown })?.signature;
+  if (typeof carried === "string" && carried.length >= 64) return carried;
+
+  const message = error instanceof Error ? error.message : String(error);
+  // "Transaction was not confirmed in 30.00 seconds... Check signature <sig>"
+  const named = message.match(/signature\s+([1-9A-HJ-NP-Za-km-z]{64,88})/);
+  if (named) return named[1];
+  if (
+    /was not confirmed|TransactionExpired|block height exceeded|timed? ?out/i.test(
+      message
+    )
+  ) {
+    return "";
+  }
+  return null;
+}
+
 function isUserRejection(error: unknown): boolean {
   const message = String(
     (error as { message?: string })?.message ?? error ?? ""
@@ -79,6 +108,14 @@ export function useTxFlow() {
         }
         // Raw errors and RPC codes go to the console, never to the user.
         console.error("[tx]", error);
+        // Before calling this a failure, check whether it is really a
+        // confirmation timeout. Saying "nothing was sent" about a transaction
+        // that is already on the wire is how people pay twice.
+        const pending = confirmationTimeoutSignature(error);
+        if (pending !== null) {
+          setState({ kind: "unconfirmed", signature: pending });
+          return;
+        }
         setState({
           kind: "error",
           message:
@@ -198,8 +235,10 @@ export function TxFlow({
       return strip(
         "var(--warning)",
         "Not confirmed",
-        "We stopped waiting before the network confirmed. This transaction MAY still have landed — check Explorer before trying again, or you risk doing it twice.",
         state.signature
+          ? "We stopped waiting before the network confirmed. This transaction MAY still have landed — check Explorer before trying again, or you risk doing it twice."
+          : "We stopped waiting before the network confirmed, and could not recover the signature. This transaction MAY still have landed — check your wallet's recent activity before trying again, or you risk doing it twice.",
+        state.signature || undefined
       );
     case "error":
       return strip("var(--negative)", "Failed", state.message);

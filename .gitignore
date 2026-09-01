@@ -33,6 +33,9 @@ yarn-error.log*
 
 # ---- Next.js ----
 web/.next/
+# ...and a stray build anywhere else. Running `next build` from the repo root
+# instead of web/ drops a .next/ here full of trace files; it is never wanted.
+.next/
 web/out/
 web/build/
 web/.vercel/

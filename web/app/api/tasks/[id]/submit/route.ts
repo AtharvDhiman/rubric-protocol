@@ -76,6 +76,23 @@ export async function POST(
     );
   }
 
+  // KNOWN GAP - see "Known limitations" in the README.
+  //
+  // Nothing here proves the caller controls `workerAddress`; it is taken from
+  // the request body. While the task is OPEN, anyone can therefore overwrite the
+  // staged submission of a worker who has not yet sealed on-chain.
+  //
+  // What that does and does not buy an attacker: it CANNOT redirect the bounty,
+  // because `submit_work` is signed by the worker's own wallet and the escrow
+  // pays whoever the chain records. It CAN grief - overwrite the content a
+  // worker staged so that the hash they go on to sign no longer matches what is
+  // stored, at which point the verify route refuses to judge and holds the task.
+  // Annoying and worth closing; not a path to anyone else's money.
+  //
+  // The real fix is to make the client sign a short message with its wallet and
+  // verify that signature against `workerAddress` here. That adds a signing
+  // prompt before the transaction, which is a product decision, so it is written
+  // down rather than done quietly.
   const submissionHash = hashSubmissionHex(content);
 
   await prisma.task.update({

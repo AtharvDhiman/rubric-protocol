@@ -24,7 +24,7 @@ the reasoning is public and its hash is on-chain.
 | --- | --- |
 | Anchor program (5 instructions + admin rotation) | **Compiles clean** on Anchor 1.1.2 — no warnings |
 | 19 integration tests (14 attack cases) | **All 19 pass** against a local validator |
-| Judge (`web/lib/verifier.ts`) | Working. **19/19 pass** against the real API (see the note on which model) |
+| Judge (`web/lib/verifier.ts`) | Working. **19/19 pass** — 12 offline guard tests, 7 against the real API |
 | Canonical hashing | Working. 25 tests pass, including a pinned golden digest |
 | API routes + Prisma schema | Written; compile and typecheck clean |
 | Frontend (4 screens) | Built. `next build` passes |
@@ -49,8 +49,11 @@ they cost money — the default provider is Gemini's free tier. Run them with:
 RUN_JUDGE_TESTS=1 npx vitest run lib/verifier.test.ts
 ```
 
-All 19 passed against the live API on `gemini-3.1-flash-lite`, including the five
-prompt-injection cases. That run used flash-lite rather than the default
+All 19 passed on `gemini-3.1-flash-lite`. Be precise about what that covers: 12
+of the 19 are offline guard tests that never touch the network, and 7 call the
+real API — 3 prompt-injection fixtures plus 4 that check the judge approves
+compliant work, rejects non-compliant work, refuses an empty submission, and
+does not invent criteria no clause covers. That run used flash-lite rather than the default
 `gemini-2.5-flash` only because the default's free quota was exhausted at the
 time; the prompt, the schema and every guard are provider-independent, and a
 weaker model clearing the adversarial cases is the stronger result. Re-run it on
@@ -229,7 +232,7 @@ reload will silently not work**.
 anchor build
 anchor keys sync    # rewrites declare_id! and Anchor.toml with the real program id
 anchor build        # again, so the id is baked in
-anchor test         # runs the 18 integration tests on a local validator
+anchor test         # runs the 19 integration tests on a local validator
 ```
 
 ### 3. A database for local development
@@ -317,38 +320,49 @@ worth knowing before you show this to anyone:
   quota failure in those tests is reported as a skip, not a failure, because a
   429 says nothing about whether the judge rules correctly.
 
-**5. No dispute or arbitration path.** Out of scope for the MVP. A rejected worker's
+**5. The submit endpoint does not authenticate the worker.** `POST /api/tasks/[id]/submit`
+takes `workerAddress` from the request body and does not verify the caller controls
+it, so while a task is OPEN anyone can overwrite a submission that has been staged
+but not yet sealed on-chain. This cannot redirect a bounty — `submit_work` is signed
+by the worker's own wallet and the escrow pays whoever the chain records — and the
+verify route now refuses to judge any submission that does not hash to the
+`submission_hash` sealed on-chain, so a tampered submission is held rather than
+ruled on. What remains is a griefing vector against an honest worker. Closing it
+means having the client sign a message with its wallet and verifying that
+signature server-side, which adds a signing prompt before the transaction.
+
+**6. No dispute or arbitration path.** Out of scope for the MVP. A rejected worker's
 only recourse is the public reasoning.
 
-**6. The clock is the validator's.** `Clock::get()` is not a precise wall clock;
+**7. The clock is the validator's.** `Clock::get()` is not a precise wall clock;
 deadlines are accurate to within a slot or so, which is fine at hour granularity.
 
-**7. A closed destination token account delays settlement.** `submit_verdict`
+**8. A closed destination token account delays settlement.** `submit_verdict`
 requires the worker's, the poster's, and the fee destination's token accounts to
 exist, on both the approve and reject paths. If one is closed, the verdict
 transaction fails. The verifier recreates any missing account idempotently in the
 same transaction, which closes the race — but a determined party could still hold
 up their own settlement, and the grace-period reclaim is the backstop.
 
-**8. Dust sent to a settled task's escrow address is unrecoverable.** Once a task
+**9. Dust sent to a settled task's escrow address is unrecoverable.** Once a task
 settles, its escrow account is closed and the task is terminal. ATA creation is
 permissionless, so anyone can recreate that address and send tokens to it, and no
 instruction will ever sign for it again. Do not retry a deposit against a settled
 task.
 
-**9. Task ids are sequential per creator, so a specific id can be blocked.** The
+**10. Task ids are sequential per creator, so a specific id can be blocked.** The
 escrow uses `init`, which fails if the account already exists. Someone who
 predicts `(creator, task_id)` can pre-create the escrow ATA and make that one id
 unusable. The cost is theirs (rent per blocked id), the poster simply gets the
 next id, and no funds are at risk — but it is a cheap nuisance.
 
-**10. `initialize_config` must be run by the program's upgrade authority.** This is
+**11. `initialize_config` must be run by the program's upgrade authority.** This is
 enforced on-chain, and it is what stops a bystander from front-running the setup
 transaction and installing themselves as admin and verifier. The consequence: do
 not make the program immutable before initializing the config, or the deployment
 is unusable.
 
-**11. Landing-page figures are targets, not measurements.** They are labelled as
+**12. Landing-page figures are targets, not measurements.** They are labelled as
 such in the UI and live in `web/lib/constants.ts`.
 
 ---
@@ -367,7 +381,7 @@ anchor deploy --provider.cluster devnet
 ```
 Program Id   F2Uo5JUfGQtho8s9ZbwcpWBd8iJ4XvBqamUaqdjcrRxz
 ProgramData  5fhXV18Qs7U5dtfaRL2neoa2sAMezKr6Pjuuxmc23QiH
-Config PDA   4q6XLrWj6FTJA2YnC5S9ZKDEahMVTEYZ6mX9td35fMX2   (not initialized)
+Config PDA   4q6XLrWj6FTJA2YnC5S9ZKDEahMVTEYZ6mX9td35fMX2   (initialized)
 Data length  352,376 bytes      Rent  2.45374104 SOL
 ```
 
