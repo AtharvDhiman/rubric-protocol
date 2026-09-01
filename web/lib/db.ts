@@ -29,8 +29,16 @@ function createClient(): PrismaClient {
       "DATABASE_URL is not set. Copy web/.env.example to web/.env.local and fill it in."
     );
   }
+  // Keep this deployment's tables in their own Postgres schema.
+  //
+  // The hosted database is shared with another project, so writing into `public`
+  // would put Rubric's tables next to an unrelated app's. `DATABASE_SCHEMA`
+  // isolates them. It defaults to `public` so a local dev database, which is not
+  // shared with anything, behaves exactly as before.
+  const schema = process.env.DATABASE_SCHEMA || "public";
+
   return new PrismaClient({
-    adapter: new PrismaPg({ connectionString }),
+    adapter: new PrismaPg({ connectionString }, { schema }),
     log: process.env.NODE_ENV === "development" ? ["warn", "error"] : ["error"],
   });
 }

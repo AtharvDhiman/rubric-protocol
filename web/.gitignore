@@ -44,3 +44,9 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Added by the Vercel CLI. Deduplicated, and the .env.example negation is
+# repeated after it: `.env*` here would otherwise re-ignore the template, which
+# is the one env file that must stay in the repo.
+.env*
+!.env.example
