@@ -220,42 +220,69 @@ export function ApertureHero() {
           padding: "0 24px",
         }}
       >
-        <p
-          className="label label-11"
+        {/* The badge is a lit chip, not a label: a left-to-right metal ramp
+            with a sparkle that snaps in ahead of the headline. */}
+        <span
           style={{
-            color: "var(--d-muted)",
-            letterSpacing: "0.18em",
-            margin: 0,
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 8,
+            padding: "9px 15px",
+            border: 0,
+            borderRadius: 5,
+            background:
+              "linear-gradient(90deg, #7d7d7d 0%, #2a2a2a 52%, #0a0a0a 100%)",
+            color: "#f2f2f2",
+            fontSize: 12.5,
+            fontWeight: 400,
+            letterSpacing: "-0.01em",
             animation: "fadeUp 0.7s cubic-bezier(0.19,1,0.22,1) 1.4s both",
           }}
         >
-          AI-JUDGED ESCROW ON SOLANA
-        </p>
+          <svg
+            width="18"
+            height="20"
+            viewBox="0 0 24 24"
+            fill="#ffffff"
+            aria-hidden="true"
+            style={{
+              filter: "drop-shadow(0 0 3px rgba(255,255,255,0.45))",
+              flex: "none",
+            }}
+          >
+            <path d="M12 2.6C12.55 2.6 12.88 3.15 13.08 4.7c.62 4.7 1.52 5.6 6.22 6.22 1.55.2 2.1.53 2.1 1.08s-.55.88-2.1 1.08c-4.7.62-5.6 1.52-6.22 6.22-.2 1.55-.53 2.1-1.08 2.1s-.88-.55-1.08-2.1c-.62-4.7-1.52-5.6-6.22-6.22C3.15 12.88 2.6 12.55 2.6 12s.55-.88 2.1-1.08c4.7-.62 5.6-1.52 6.22-6.22C11.12 3.15 11.45 2.6 12 2.6Z" />
+          </svg>
+          AI-judged escrow on Solana
+        </span>
 
         <h1
           style={{
-            fontSize: "clamp(48px, 7.5vw, 96px)",
-            lineHeight: 1.02,
-            letterSpacing: "-0.03em",
-            fontWeight: 700,
+            fontSize: "clamp(44px, 7vw, 88px)",
+            lineHeight: 1.12,
+            letterSpacing: "-0.045em",
+            fontWeight: 500,
             color: "var(--d-text)",
-            margin: "24px 0 0",
+            margin: "22px 0 0",
           }}
         >
           <span className="line-mask">
             <span style={{ animationDelay: "1.5s" }}>Pay on proof,</span>
           </span>
           <span className="line-mask">
-            <span style={{ animationDelay: "1.62s" }}>not on trust.</span>
+            <span style={{ animationDelay: "1.62s" }}>
+              not on <em className="accent-phrase">trust</em>.
+            </span>
           </span>
         </h1>
 
         <p
           style={{
-            maxWidth: 620,
-            fontSize: 18,
+            maxWidth: 560,
+            fontSize: 17,
+            lineHeight: 1.55,
+            letterSpacing: "-0.015em",
             color: "var(--d-muted)",
-            margin: "24px 0 0",
+            margin: "20px 0 0",
             animation: "fadeUp 0.7s cubic-bezier(0.19,1,0.22,1) 1.95s both",
           }}
         >
@@ -267,8 +294,8 @@ export function ApertureHero() {
         <div
           style={{
             display: "flex",
-            gap: 16,
-            marginTop: 32,
+            gap: 10,
+            marginTop: 28,
             flexWrap: "wrap",
             justifyContent: "center",
             animation: "fadeUp 0.7s cubic-bezier(0.19,1,0.22,1) 2.1s both",
@@ -277,7 +304,7 @@ export function ApertureHero() {
           <Link href="/docket" className="btn btn-primary">
             Open the docket
           </Link>
-          <a href="#how-it-works" className="btn" style={{ padding: "0 26px" }}>
+          <a href="#how-it-works" className="btn">
             Read the docs
           </a>
         </div>

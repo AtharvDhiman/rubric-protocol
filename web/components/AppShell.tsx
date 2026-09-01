@@ -29,7 +29,7 @@ export function AppHeader() {
         top: 0,
         zIndex: 20,
         background: "var(--page)",
-        borderBottom: "1px solid var(--rule-strong)",
+        borderBottom: "1px solid var(--hairline)",
       }}
     >
       <div
@@ -69,15 +69,7 @@ export function AppHeader() {
                 key={item.href}
                 href={item.href}
                 aria-current={active ? "page" : undefined}
-                style={{
-                  fontSize: 14,
-                  textDecoration: "none",
-                  color: active ? "var(--text)" : "var(--text-muted)",
-                  paddingBottom: 4,
-                  borderBottom: active
-                    ? "2px solid var(--accent)"
-                    : "2px solid transparent",
-                }}
+                className={`nav-pill${active ? " nav-pill--active" : ""}`}
               >
                 {item.label}
               </Link>

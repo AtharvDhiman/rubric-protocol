@@ -1,25 +1,32 @@
 import type { Metadata } from "next";
-import { IBM_Plex_Sans, IBM_Plex_Mono } from "next/font/google";
+import { Inter, Instrument_Serif } from "next/font/google";
 import "./globals.css";
 
 /**
- * The entire type system. IBM Plex Sans and IBM Plex Mono, nothing else.
+ * The entire type system. Inter for everything, Instrument Serif italic for a
+ * single accented phrase in the headline and nowhere else.
  *
- * Plex reads as engineering infrastructure rather than as a startup landing
- * page, which is the correct register for an escrow protocol. Deliberately not
- * Inter, Roboto or system-ui - see web/DESIGN.md.
+ * Inter is the interface: one variable family covering 100-900, so weight is a
+ * free axis rather than another download. Instrument Serif appears italic only,
+ * at one size, on one phrase - it is a punctuation mark on the page, not a
+ * second voice.
+ *
+ * There is no monospace family any more. Figures that need to line up use
+ * `font-variant-numeric: tabular-nums`, which Inter supports, so columns stay
+ * aligned without loading a face purely to align digits.
  */
-const plexSans = IBM_Plex_Sans({
+const inter = Inter({
   subsets: ["latin"],
-  weight: ["400", "500", "600", "700"],
-  variable: "--font-plex-sans",
+  weight: ["300", "400", "500", "600", "700"],
+  variable: "--font-inter",
   display: "swap",
 });
 
-const plexMono = IBM_Plex_Mono({
+const instrumentSerif = Instrument_Serif({
   subsets: ["latin"],
-  weight: ["400", "500", "600"],
-  variable: "--font-plex-mono",
+  weight: "400",
+  style: "italic",
+  variable: "--font-instrument",
   display: "swap",
 });
 
@@ -97,7 +104,7 @@ export default function RootLayout({
     // any component - those still surface normally.
     <html
       lang="en"
-      className={`${plexSans.variable} ${plexMono.variable}`}
+      className={`${inter.variable} ${instrumentSerif.variable}`}
       suppressHydrationWarning
     >
       <body suppressHydrationWarning>
