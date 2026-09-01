@@ -71,7 +71,7 @@ export function AppHeader() {
                 key={item.href}
                 href={item.href}
                 aria-current={active ? "page" : undefined}
-                className={`nav-pill appear ${i % 2 === 0 ? "appear--scale" : "appear--soft"}${active ? " nav-pill--active" : ""}`}
+                className={`nav-pill appear appear--soft${active ? " nav-pill--active" : ""}`}
                 style={{ ["--d" as string]: `${0.16 + i * 0.12}s` }}
               >
                 {item.label}

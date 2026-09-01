@@ -19,13 +19,13 @@ export function Marquee() {
   // Duplicated once so the -50% translate loops seamlessly.
   const items = [...MARQUEE_ITEMS, ...MARQUEE_ITEMS];
   return (
-    <div className="marquee on-dark" aria-hidden="true">
+    <div className="marquee" aria-hidden="true">
       <div className="marquee-track">
         {items.map((item, i) => (
           <span
             key={i}
             className="label label-11"
-            style={{ color: "var(--d-faint)", letterSpacing: "0.18em" }}
+            style={{ color: "var(--text-faint)", letterSpacing: "0.18em" }}
           >
             {item}
             <span style={{ color: "var(--text-faint)", marginLeft: 48 }}>◆</span>
@@ -65,13 +65,13 @@ export function HowItWorks() {
     <section
       id="how-it-works"
       ref={ref}
-      className="on-dark"
-      style={{ background: "var(--d-section)", padding: "96px 56px" }}
+      className="plate-section"
+      style={{ background: "var(--surface)", padding: "96px 56px" }}
     >
-      <h2 style={{ fontSize: 36, letterSpacing: "-0.02em", color: "var(--d-text)" }}>
+      <h2 style={{ fontSize: 36, letterSpacing: "-0.02em", color: "var(--text)" }}>
         How it works
       </h2>
-      <p style={{ color: "var(--d-muted)", fontSize: 15, margin: "12px 0 56px" }}>
+      <p style={{ color: "var(--text-muted)", fontSize: 15, margin: "12px 0 56px" }}>
         Three steps. One of them is yours.
       </p>
 
@@ -85,7 +85,7 @@ export function HowItWorks() {
             className={`reveal ${inView ? "in" : ""}`}
             style={{
               animationDelay: `${0.1 * (i + 1)}s`,
-              borderLeft: i === 0 ? "none" : "1px solid var(--d-border)",
+              borderLeft: i === 0 ? "none" : "1px solid var(--border)",
               paddingLeft: i === 0 ? 0 : 48,
             }}
           >
@@ -105,7 +105,7 @@ export function HowItWorks() {
               >
                 {step.n}
               </span>
-              <h3 style={{ fontSize: 20, color: "var(--d-text)", margin: 0 }}>
+              <h3 style={{ fontSize: 20, color: "var(--text)", margin: 0 }}>
                 {step.title}
               </h3>
             </div>
@@ -113,7 +113,7 @@ export function HowItWorks() {
               style={{
                 fontSize: 15,
                 lineHeight: 1.65,
-                color: "var(--d-muted)",
+                color: "var(--text-muted)",
                 marginTop: 16,
               }}
             >
@@ -146,22 +146,22 @@ export function VerdictLog() {
     <section
       id="verdict-log"
       ref={ref}
-      className="on-dark"
-      style={{ background: "var(--d-ground)", padding: "96px 56px" }}
+      className="plate-section"
+      style={{ background: "var(--page)", padding: "96px 56px" }}
     >
       <div
         className="cols"
         style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 64, alignItems: "start" }}
       >
         <div className={`reveal ${inView ? "in" : ""}`}>
-          <h2 style={{ fontSize: 36, letterSpacing: "-0.02em", color: "var(--d-text)" }}>
+          <h2 style={{ fontSize: 36, letterSpacing: "-0.02em", color: "var(--text)" }}>
             Every verdict cites a clause
           </h2>
           <p
             style={{
               fontSize: 15,
               lineHeight: 1.65,
-              color: "var(--d-muted)",
+              color: "var(--text-muted)",
               marginTop: 20,
               maxWidth: 460,
             }}
@@ -176,8 +176,8 @@ export function VerdictLog() {
           className={`reveal ${inView ? "in" : ""}`}
           style={{
             animationDelay: "0.15s",
-            background: "var(--d-panel-dark)",
-            border: "1px solid var(--d-border-2)",
+            background: "var(--sunk)",
+            border: "1px solid var(--hairline)",
             borderRadius: 2,
             padding: "20px 24px",
             fontFamily: "var(--font-mono)",
@@ -192,14 +192,14 @@ export function VerdictLog() {
               alignItems: "center",
               gap: 10,
               paddingBottom: 12,
-              borderBottom: "1px solid var(--d-border)",
+              borderBottom: "1px solid var(--border)",
               marginBottom: 12,
             }}
           >
             <SolanaMark size={14} />
             <span
               className="label"
-              style={{ color: "var(--d-faint)", letterSpacing: "0.16em" }}
+              style={{ color: "var(--text-faint)", letterSpacing: "0.16em" }}
             >
               MATTER 0042
             </span>
@@ -223,7 +223,7 @@ export function VerdictLog() {
               />
               <span
                 className="label"
-                style={{ color: "var(--d-faint)", letterSpacing: "0.16em" }}
+                style={{ color: "var(--text-faint)", letterSpacing: "0.16em" }}
               >
                 LIVE
               </span>
@@ -248,8 +248,8 @@ export function VerdictLog() {
                   marginTop: isFinal ? 8 : undefined,
                 }}
               >
-                <span style={{ color: "var(--d-faint)" }}>{line.time}</span>
-                <span style={{ color: "var(--d-muted)", flex: 1 }}>{line.body}</span>
+                <span style={{ color: "var(--text-faint)" }}>{line.time}</span>
+                <span style={{ color: "var(--text-muted)", flex: 1 }}>{line.body}</span>
                 {line.verdict && (
                   <span style={{ color: "var(--positive)", fontWeight: 500 }}>{line.verdict}</span>
                 )}
@@ -272,8 +272,8 @@ export function Figures() {
   return (
     <section
       ref={ref}
-      className="on-dark"
-      style={{ background: "var(--d-section)", padding: "72px 56px" }}
+      className="plate-section"
+      style={{ background: "var(--surface)", padding: "72px 56px" }}
     >
       <div
         className="cols-4"
@@ -285,17 +285,17 @@ export function Figures() {
             className={`reveal ${inView ? "in" : ""}`}
             style={{
               animationDelay: `${0.08 * i}s`,
-              borderLeft: i === 0 ? "none" : "1px solid var(--d-border)",
+              borderLeft: i === 0 ? "none" : "1px solid var(--border)",
               paddingLeft: i === 0 ? 0 : 40,
             }}
           >
             <div
               className="data"
-              style={{ fontSize: 30, fontWeight: 600, color: "var(--d-text)" }}
+              style={{ fontSize: 30, fontWeight: 600, color: "var(--text)" }}
             >
               {figure.value}
             </div>
-            <div style={{ fontSize: 14, color: "var(--d-muted)", marginTop: 8 }}>
+            <div style={{ fontSize: 14, color: "var(--text-muted)", marginTop: 8 }}>
               {figure.label}
             </div>
           </div>
@@ -306,7 +306,7 @@ export function Figures() {
           whose entire pitch is verifiable claims. */}
       <p
         className="label"
-        style={{ color: "var(--d-faint)", marginTop: 40, letterSpacing: "0.16em" }}
+        style={{ color: "var(--text-faint)", marginTop: 40, letterSpacing: "0.16em" }}
       >
         {FIGURES_NOTE}
       </p>
@@ -324,18 +324,18 @@ export function FinalCta() {
   return (
     <section
       ref={ref}
-      className="on-dark"
+      className="plate-section"
       style={{
-        background: "var(--d-ground)",
+        background: "var(--page)",
         padding: "112px 56px",
         textAlign: "center",
       }}
     >
       <div className={`reveal ${inView ? "in" : ""}`}>
-        <h2 style={{ fontSize: 34, letterSpacing: "-0.02em", color: "var(--d-text)" }}>
+        <h2 style={{ fontSize: 34, letterSpacing: "-0.02em", color: "var(--text)" }}>
           Post your first rubric
         </h2>
-        <p style={{ color: "var(--d-muted)", fontSize: 15, margin: "12px 0 32px" }}>
+        <p style={{ color: "var(--text-muted)", fontSize: 15, margin: "12px 0 32px" }}>
           Three clauses, about two minutes.
         </p>
         <Link href="/create" className="btn btn-primary">
@@ -349,10 +349,10 @@ export function FinalCta() {
 export function SiteFooter() {
   return (
     <footer
-      className="on-dark"
+      className="plate-section"
       style={{
-        background: "var(--d-ground)",
-        borderTop: "1px solid var(--d-border)",
+        background: "var(--page)",
+        borderTop: "1px solid var(--border)",
         padding: "28px 56px",
         display: "flex",
         justifyContent: "space-between",
@@ -365,14 +365,14 @@ export function SiteFooter() {
         <SolanaMark size={14} />
         <span
           className="label label-11"
-          style={{ color: "var(--d-faint)", letterSpacing: "0.16em" }}
+          style={{ color: "var(--text-faint)", letterSpacing: "0.16em" }}
         >
           BUILT ON SOLANA · USDC ESCROW
         </span>
       </span>
       <span
         className="label label-11"
-        style={{ color: "var(--d-faint)", letterSpacing: "0.16em" }}
+        style={{ color: "var(--text-faint)", letterSpacing: "0.16em" }}
       >
         RUBRIC PROTOCOL
       </span>

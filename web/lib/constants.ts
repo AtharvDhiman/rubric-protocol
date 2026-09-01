@@ -9,6 +9,25 @@
 export const PROTOCOL_NAME = "Rubric";
 export const TAGLINE = "Pay on proof, not on trust.";
 
+/**
+ * The documented default for `CONFIDENCE_THRESHOLD`, and the ONLY place the
+ * number is written down in the web app.
+ *
+ * It lives here rather than in `lib/verifier.ts` because the UI has to print it
+ * (`CONF 94 / THRESHOLD 70 / Δ +24`) and `lib/verifier.ts` pulls in the
+ * Anthropic and Google SDKs, which must never be dragged into a screen's
+ * bundle. `confidenceThreshold()` in the verifier imports this constant for its
+ * fallback, so the number a screen prints and the number the judge actually
+ * gates on cannot drift apart.
+ *
+ * Deliberately NOT re-derived from a `NEXT_PUBLIC_` twin of the env var: two
+ * variables that are meant to agree eventually disagree, and a screen stating a
+ * threshold the judge did not apply is exactly the fabricated fact this product
+ * exists to rule out. Server components read the real value with
+ * `confidenceThreshold()` and pass it down as a prop.
+ */
+export const DEFAULT_CONFIDENCE_THRESHOLD = 70;
+
 /** Protocol fee in basis points. Mirrors `Config.fee_bps` on-chain. */
 export const FEE_BPS = 200;
 export const FEE_PERCENT_LABEL = "2%";

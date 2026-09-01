@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { AppearMotion } from "@/components/AppearMotion";
-import { Archivo, Azeret_Mono } from "next/font/google";
+import { Archivo, Martian_Mono } from "next/font/google";
 import "./globals.css";
 
 /**
@@ -8,15 +8,32 @@ import "./globals.css";
  *
  * Archivo is the language of the product. It carries a width axis, and the
  * nameplate uses it expanded and heavy - an expanded grotesk at weight 700
- * reads as lettering stamped into a metal faceplate, which is the whole tone.
- * If the width axis fails to load nothing breaks: no layout depends on it, the
- * type simply sets at normal width.
+ * reads as lettering stamped into a faceplate, which is the whole tone. If the
+ * width axis fails to load nothing breaks: no layout depends on it, the type
+ * simply sets at normal width.
  *
- * Azeret Mono is mandatory for every figure a person might compare, copy or
- * verify - amounts, confidences, clause numbers, addresses, hashes, durations.
- * Its squared drawing-office figures are what make a hash read as a measured
- * part number rather than as a string, and the visual split between a wide
- * grotesk and a squared mono is doing that work deliberately.
+ * Martian Mono replaces Azeret Mono, and the reason is functional rather than
+ * aesthetic: Azeret has no width axis. A Solana address is 44 base58
+ * characters, and at 375px there is no setting of a fixed-width mono that fits
+ * one on a single line. Martian condenses to wdth 75, which does - so the
+ * address stays one selectable, copyable string instead of wrapping mid-token
+ * or being truncated behind an ellipsis.
+ *
+ * The jurisdiction rule is enforceable rather than aspirational:
+ *
+ *   If a human wrote it as a sentence, it is Archivo. Everything else is mono.
+ *
+ * Because the prose face only ever lands on paragraphs, a figure CANNOT leak
+ * into it. That is what makes "every verifiable figure is monospace" a
+ * structural property of the stylesheet rather than a discipline someone has
+ * to remember. Mono therefore carries most of the visible glyphs: every label,
+ * column head, status word, unit, amount, confidence, address, hash, joint
+ * angle and timestamp.
+ *
+ * Note on the API: `weight` must NOT be passed alongside `axes` (next/font
+ * rejects the combination), and `wght` must not be listed IN `axes` - it is
+ * filtered out of the definable set and throws. Both faces expose wght
+ * automatically as variable fonts.
  */
 const archivo = Archivo({
   subsets: ["latin"],
@@ -25,10 +42,10 @@ const archivo = Archivo({
   display: "swap",
 });
 
-const azeret = Azeret_Mono({
+const martian = Martian_Mono({
   subsets: ["latin"],
-  weight: ["400", "500"],
-  variable: "--font-azeret",
+  axes: ["wdth"],
+  variable: "--font-martian",
   display: "swap",
 });
 
@@ -106,7 +123,7 @@ export default function RootLayout({
     // any component - those still surface normally.
     <html
       lang="en"
-      className={`${archivo.variable} ${azeret.variable}`}
+      className={`${archivo.variable} ${martian.variable}`}
       suppressHydrationWarning
     >
       <body suppressHydrationWarning>

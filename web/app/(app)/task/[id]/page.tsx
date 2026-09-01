@@ -10,13 +10,16 @@
 import Link from "next/link";
 import { prisma } from "@/lib/db";
 import { DEMO_MODE, demoTaskById, isSampleTask } from "@/lib/demo";
+import { confidenceThreshold } from "@/lib/verifier";
 import { ClauseList } from "@/components/ClauseList";
 import { MetaRow } from "@/components/MetaRow";
 import { Stamp } from "@/components/Stamp";
 import { CopyButton } from "@/components/CopyButton";
 import { SubmitWorkPanel } from "./SubmitWorkPanel";
 import { ReclaimPanel } from "./ReclaimPanel";
-import { LockMechanism, type TumblerState } from "@/components/LockMechanism";
+import { InspectionArm, type ArmRecordState } from "@/components/rig/InspectionArm";
+import { InspectionTable } from "@/components/InspectionTable";
+import { SolveBlock } from "@/components/SolveBlock";
 import { explorerTxUrl } from "@/lib/env";
 import {
   formatUsdc,
@@ -231,7 +234,20 @@ export default async function TaskPage({
             <Stamp variant="sealed" small />
           </div>
 
-          <ClauseList clauses={task.clauses} />
+          {/* The gutter the arm travels. It is a bounded dark viewport - a volume -
+              which is the ONLY context the rig inks are legible in, and the
+              .volume class is what makes them resolve at all. */}
+          <div className="clause-station">
+            <div className="volume clause-gutter" aria-hidden="true">
+              <InspectionArm
+                listId="sealed-clauses"
+                clauseCount={task.clauses.length}
+                rulings={verdict?.clauses ?? null}
+                state={task.state as ArmRecordState}
+              />
+            </div>
+            <ClauseList clauses={task.clauses} listId="sealed-clauses" />
+          </div>
 
           <dl
             style={{
@@ -376,12 +392,23 @@ export default async function TaskPage({
 
           {verdict && (
             <div style={{ marginTop: 32 }}>
+              {/* The solve. Confidence IS the residual, and the threshold it was
+                  gated on is read from the server rather than written here, so
+                  the number on screen cannot drift from the number that decided
+                  the matter. */}
+              <SolveBlock
+                confidence={verdict.confidence}
+                threshold={confidenceThreshold()}
+                escrowReleased={settled}
+                held={held}
+              />
+
               <div
                 style={{
                   display: "flex",
                   alignItems: "center",
-                  gap: 24,
-                  marginBottom: 20,
+                  gap: 20,
+                  margin: "24px 0 20px",
                 }}
               >
                 <Stamp
@@ -394,86 +421,18 @@ export default async function TaskPage({
                   }
                   large
                 />
-                <div>
-                  <div className="label">CONFIDENCE</div>
-                  <div
-                    className="data"
-                    style={{ fontSize: 24, fontWeight: 600, lineHeight: 1.2 }}
-                  >
-                    {verdict.confidence}
-                  </div>
-                </div>
               </div>
 
-              {/* The same mechanism the landing runs, here on the real ruling.
-                  You can read the verdict before reading a word: either every
-                  gate meets the fence line, or one of them does not - and the
-                  one that does not IS the citation. */}
-              <div style={{ margin: "4px 0 28px" }}>
-                <LockMechanism
-                  hash={task.rubricHash}
-                  states={verdict.clauses.map((r): TumblerState =>
-                    r.passed ? "pass" : held ? "undetermined" : "fail"
-                  )}
-                  partLabel={`FENCE / ${verdict.clauses.length} TUMBLER${
-                    verdict.clauses.length === 1 ? "" : "S"
-                  } / ${task.state}`}
-                />
-              </div>
-
-              <table
-                style={{
-                  width: "100%",
-                  borderCollapse: "collapse",
-                  fontSize: 14,
-                }}
-              >
-                <caption className="sr-only">Per-clause ruling</caption>
-                <tbody>
-                  {verdict.clauses.map((ruling) => (
-                    <tr
-                      key={ruling.index}
-                      style={{ borderBottom: "1px solid var(--hairline)" }}
-                    >
-                      <td
-                        className="clause-mark"
-                        style={{
-                          padding: "12px 12px 12px 0",
-                          verticalAlign: "top",
-                          width: 34,
-                          fontSize: 13,
-                        }}
-                      >
-                        {ruling.index + 1}
-                      </td>
-                      <td
-                        style={{
-                          padding: "12px 0",
-                          color: "var(--text-2)",
-                          verticalAlign: "top",
-                        }}
-                      >
-                        {ruling.reason}
-                      </td>
-                      <td
-                        className="data"
-                        style={{
-                          padding: "12px 0 12px 16px",
-                          textAlign: "right",
-                          verticalAlign: "top",
-                          fontWeight: 600,
-                          whiteSpace: "nowrap",
-                          color: ruling.passed
-                            ? "var(--positive)"
-                            : "var(--negative)",
-                        }}
-                      >
-                        {ruling.passed ? "PASS" : "FAIL"}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+              {/* The inspection record. Server-rendered COMPLETE: every STATUS
+                  and OUTTOL cell filled and the sigma row present, so the
+                  verdict is readable with JS blocked, by a crawler, and if
+                  hydration fails. The arm in the gutter animates over a
+                  document that is already finished. */}
+              <InspectionTable
+                state={task.state}
+                clauses={task.clauses}
+                rulings={verdict.clauses}
+              />
 
               {verdict.summary && (
                 <p style={{ fontSize: 14, color: "var(--text-2)", marginTop: 20 }}>

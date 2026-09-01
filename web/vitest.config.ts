@@ -6,7 +6,12 @@ export default defineConfig({
     environment: "node",
     // The judge tests call a real API and consume its quota, so they are opt-in
     // via RUN_JUDGE_TESTS=1. Everything else is pure and runs on every commit.
-    include: ["lib/**/*.test.ts"],
+    // components/rig holds the shared marker/bone geometry the two rigs draw
+    // from. It is pure data and pure functions, not a React component, and a
+    // wrong entry there fails SILENTLY - a bone naming a marker that does not
+    // exist just draws a stray line to the origin. It is tested, so it is
+    // included.
+    include: ["lib/**/*.test.ts", "components/rig/**/*.test.ts"],
     testTimeout: 120_000,
   },
   resolve: {

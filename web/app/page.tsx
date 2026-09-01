@@ -1,4 +1,4 @@
-import { FenceHero } from "@/components/landing/FenceHero";
+import { VolumeHero } from "@/components/landing/VolumeHero";
 import {
   Figures,
   FinalCta,
@@ -9,13 +9,15 @@ import {
 } from "@/components/landing/Sections";
 
 /**
- * The landing page. Dark, with one strong animated visual in the hero and plain
- * dense sections below it. See web/DESIGN.md.
+ * The landing page.
+ *
+ * A light plate with ONE bounded dark viewport in the hero. The page is not
+ * dark - the volume is, and only the volume. See web/DESIGN.md.
  */
 export default function LandingPage() {
   return (
-    <div className="on-dark" style={{ background: "var(--d-ground)" }}>
-      <FenceHero />
+    <div style={{ background: "var(--page)" }}>
+      <VolumeHero />
       <Marquee />
       <HowItWorks />
       <VerdictLog />

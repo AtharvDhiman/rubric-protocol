@@ -1,92 +1,205 @@
 @import "tailwindcss";
 
 /* ===========================================================================
-   RUBRIC DESIGN SYSTEM
-   web/DESIGN.md is the authority. This file implements it.
+   RUBRIC - CAPTURE VOLUME
 
-   One dark surface throughout: the app now shares the landing page ground.
-   App page titles use the landing display scale via .page-title.
-   Borders, never shadows. Radius 2px on inputs and buttons, 0 elsewhere.
-   Strict 8px spacing scale. Nothing rotates except the verdict stamp.
+   The page is an instrumented capture volume: a light metrology plate with
+   bounded dark viewports cut into it, in which a rig is visibly measuring
+   something real.
+
+   The judge confidence IS the solve residual and the sealed clauses ARE the
+   tolerances, so "CONF 94 / THRESHOLD 70 / D +24" is not a metaphor bolted
+   onto the verdict - it is the verdict, printed the way an instrument prints
+   one.
+
+   The colour rule follows from that, and it is the most important decision in
+   the system: ACCEPTABLE STATES ARE ACHROMATIC. A passing clause is ink, not
+   green. Colour is spent on exactly three things - one alarm, one held state,
+   and one money-moved event - so a verdict sheet is a neutral field carrying
+   exactly the marks you were looking for.
+
+   Borders, never shadows. Radius 0 everywhere. Nothing rotates but the stamp.
    =========================================================================== */
 
 :root {
-  /* ===== FENCE LINE =====
-     Rubric is a lever-tumbler lock. Each clause is a tumbler, the rubric hash
-     is the key's bitting, and the money only moves when every gate lines up on
-     one brass fence. The interface is that mechanism drawn at engineering
-     scale, so the palette is a machine's: zinc deck, cold-rolled plate,
-     graphite ink, and brass on the parts that move.
+  /* =======================================================================
+     GROUNDS - the plate.
+     Cool instrument grey with a faint cyan-green cast. Deliberately not warm
+     cream. No pure #FFFFFF anywhere: the lightest surface stops at #F7F8F5,
+     and that restraint is what lets the dark viewports read as LIT rather
+     than as a second theme. Separations are plane changes, not second inks -
+     page/surface is only 1.197:1 apart.
+     ======================================================================= */
+  --page: #d8dcda;        /* volume floor. Plates sit on it; text does not.  */
+  --surface: #edefec;     /* the calibration sheet. All content lives here.  */
+  /* RESERVED for state COMMITTED ON-CHAIN: sealed clause sets, the verdict
+     sheet, settled receipts. A whiter sheet always means "this is on the
+     chain" - it is a state, never a decoration. */
+  --raised: #f7f8f5;
+  --sunk: #dde1de;        /* a well cut into a sheet: textarea, code, quote. */
+  --row-hover: #e2e6e3;   /* background change ONLY. No lift, no shadow.     */
 
-     Token NAMES are unchanged from every previous system. Twenty components
-     read them, so remapping values moves the product at once. */
+  /* =======================================================================
+     INK - four steps, achromatic-cool.
+     Each tier is tuned against the WORST light ground it is allowed on, not
+     the most flattering one. Measured, worst case:
+       --text 13.36  --text-2 9.53  --text-muted 6.14  --text-faint 4.92
+     FORBIDDEN: every one of these on any --d-* ground.
+     ======================================================================= */
+  --text: #101418;        /* headings, figures, rules, marker dots           */
+  --text-2: #2a3136;      /* body prose, clause text, submission text        */
+  --text-muted: #454e54;  /* mono labels, column heads, telemetry keys       */
+  /* 10px annotations, leaders, and INPUT PLACEHOLDERS. A placeholder is text
+     and owes the full 4.5:1; this is the token that pays it. */
+  --text-faint: #545c62;
 
-  --page: #cfd3d4;        /* Deck - machined zinc, lightened for legibility.  */
-  --surface: #eef0f0;     /* Plate - cold-rolled; every content surface        */
-  /* Ground - surface-ground plate, reserved for state COMMITTED on-chain:
-     sealed clause sets, the verdict sheet, settled rows. Only Ground plates get
-     bolts, so a bolt means "this is on the chain" rather than "this is a box". */
-  --raised: #f8f9f9;
-  --sunk: #e2e5e5;        /* wells sunk into a plate: textareas, code blocks   */
-  /* Solid, never alpha: a machined edge is an edge, not a shadow of one. */
-  --border: #14171a;
-  --hairline: #c4c9c9;
-  --border-strong: #14171a;
-  --input-rule: #14171a;
-  --row-hover: #e2e5e5;
+  /* Disabled controls, deliberately the SAME value as --text-faint. A
+     disabled control on an instrument is still legible - it just does not
+     respond. Disabled is signalled by a dashed --hairline border,
+     cursor: not-allowed and aria-disabled, NEVER by fading the label. That
+     removes the whole class of disabled-contrast failures instead of
+     arguing the 1.4.3 exemption. */
+  --text-disabled: #545c62;
 
-  --text: #14171a;        /* Graphite - all type, all rules, the bolt body     */
-  --text-2: #232a2e;
-  --text-muted: #383e42;  /* faceplate callout text                            */
-  --text-faint: #4d5357;
+  /* =======================================================================
+     ACCENT - the marker. Deep signal teal, a tracking camera colour.
+     Marks IDENTITY ONLY: clause numbers, links, active nav, live readouts.
+     Never a fill behind text, never decorative, never a gradient.
+       --accent 5.36 worst  --accent-strong 7.44 worst
+       --raised on --accent-strong fill = 9.66 (button label)
+     FORBIDDEN on every --d-* ground: --accent is 2.58 there, and inside a
+     volume the identity colour is --marker instead. No exceptions.
+     ======================================================================= */
+  --accent: #0b5f63;
+  --accent-strong: #08484b;
 
-  /* Brass governs the whole colour rule: it marks the part that MOVES. The
-     fence, the active tick, the focus ring. Nothing decorative is ever brass.
-     It is 2.85:1 on Deck - below even the 3:1 non-text floor - so brass NEVER
-     appears on Deck, as type or as graphic. Plate and Ground only. */
-  --accent: #6b5010;
-  --accent-strong: #6b5010;
+  /* =======================================================================
+     THE ONE ALARM. Out of tolerance, and nothing else - not a disabled
+     button, not a delete link, not an incomplete field.
+     Colour is NEVER the only channel: a FAIL is also the word FAIL, also a
+     non-zero OUTTOL integer, also a doubled 2px row rule, also a square
+     marker rather than a disc. That redundancy is required, not polish:
+     --negative against --positive is 1.04:1, so in greyscale or to a
+     deuteranope the status is invisible unless the other channels ship.
+       5.25 worst case.  FORBIDDEN on --d-*: use --v-negative.
+     ======================================================================= */
+  --negative: #a5261a;
 
-  /* The three terminal states of a bolt, and only these. */
-  --positive: #175a3a;    /* Thrown - released, APPROVED, settled              */
-  --negative: #96121e;    /* Arrest - the stop. REJECTED, and the blocking clause */
-  /* A lever lock is binary, but Rubric is not: a held task is neither thrown
-     nor arrested. Steel, deliberately outside the brass/green/red family, for
-     a fence that stopped partway against a tumbler at an indeterminate height. */
-  --warning: #26406e;
+  /* =======================================================================
+     THE ONE EVENT - and NOT the colour of a passing clause.
+     Green appears once per screen, only where the chain actually moved money:
+     RELEASED FROM ESCROW, and a settled receipt left edge. This is what makes
+     a green pixel mean "the chain paid" rather than "a check went well".
+       5.44 worst case.  FORBIDDEN on --d-*: use --v-positive.
+     ======================================================================= */
+  --positive: #146045;
 
-  --rule-strong: #14171a;
-  --overlay: rgba(20, 23, 26, 0.55);
+  /* =======================================================================
+     UNRESOLVED, NOT FAILED. HELD / needs_manual_review / below threshold.
+     Cold blue, structurally outside the red-green pair, because a held task
+     is neither out of tolerance nor released: the escrow is untouched.
+     Always paired with a DASHED rule. Dotted = hypothesis, solid =
+     measurement, everywhere in this product, no exceptions.
+       6.69 worst case.  FORBIDDEN on --d-*: 1.74 on --d-panel. Use
+     --v-warning. This exact cross-context slip is what a review caught in the
+     source proposal, where drifting bones were specified in --warning.
+     ======================================================================= */
+  --warning: #20477f;
 
-  /* --- LANDING - same deck, same plate. There is no separate landing skin. */
-  --d-ground: #cfd3d4;
-  --d-section: #eef0f0;
-  --d-panel: #f8f9f9;
-  --d-panel-dark: #d2d6d6;
-  --d-border: #14171a;
-  --d-border-2: #c4c9c9;
-  --d-text: #14171a;
-  --d-muted: #383e42;
-  --d-faint: #4d5357;
+  /* =======================================================================
+     RULES. Borders, never shadows. 1px solid, no alpha, anywhere.
+     --hairline is load-bearing: it is the only separator between table rows,
+     so it owes 3:1 as a graphic. At 3.76:1 on --surface it clears.
+     FORBIDDEN: --hairline as text at any size, and as the sole boundary of
+     an interactive control (controls take --input-rule).
+     ======================================================================= */
+  --hairline: #737b77;
+  --border: #101418;
+  --border-strong: #101418;
+  --input-rule: #101418;
+  --rule-strong: #101418;
+  /* Modal scrim. Composites over --page to #45494b, on which --d-text is
+     8.23:1 - so the dialog above it is readable by measurement. */
+  --overlay: rgba(12, 16, 19, 0.72);
 
+  /* =======================================================================
+     GHOST DISPLAY TYPE. Outline only, aria-hidden, and ALWAYS duplicated by
+     real text nearby - it is a texture, never the only carrier of a word.
+     Set to clear the 3:1 graphic floor by measurement rather than by claiming
+     a decorative exemption: 3.37 on --page, 3.34 worst in a volume.
+     ======================================================================= */
+  --ghost-stroke: #6e7673;  /* light ground only    */
+  --ghost-vol: #687478;     /* inside a volume only */
+
+  /* =======================================================================
+     THE CAPTURE VOLUME.
+     The d-* names are REMAPPED, not deleted: they stop meaning "the dark
+     landing page" and start meaning "inside the volume". A volume is always a
+     BOUNDED inset panel, never the page itself, and it appears on exactly two
+     screens - the landing stage and the /task arm gutter. A third dark panel
+     anywhere means this system has failed.
+       --d-text 14.57 worst  --d-muted 8.49  --d-faint 6.08  --d-border 4.19
+     FORBIDDEN: every d-* ink on every light ground.
+     ======================================================================= */
+  --d-ground: #0c1013;
+  --d-section: #141a1d;
+  --d-panel: #1b2226;
+  --d-panel-dark: #080b0d;
+  --d-border: #78857f;
+  --d-border-2: #6c7772;
+  --d-text: #f2f4f1;
+  --d-muted: #b6beba;
+  --d-faint: #98a19d;
+
+  /* =======================================================================
+     VOLUME-ONLY GEOMETRY AND STATUS INKS.
+     Measured worst case, inside a volume:
+       --marker 9.27   --rig-line 4.19   --rig-solved 3.47
+       --v-negative 5.72   --v-positive 9.75   --v-warning 8.36
+     --marker doubles as the focus ring inside a volume, because
+     --accent-strong is 1.85:1 there and is banned.
+
+     HARD RULE, and the reason --rig-line is not darker: NO OPACITY ANIMATION
+     ON ANY MEANING-BEARING RIG LINE, EVER. Weight is carried by DASH PATTERN
+     (solid = measured, 3-2 dash = inferred) plus the --rig-line /
+     --rig-solved colour step. Crossfades interpolate COLOUR between two
+     endpoints that each already clear 3:1. At this value even a stray 0.85
+     alpha still gives 3.41:1, so the mistake fails safe.
+
+     FORBIDDEN: all six on every light ground. --marker is 1.26:1 on --page -
+     this is the exact leak that produced a 1.02:1 failure in an earlier
+     system. Enforced mechanically by the .volume scope below, not by review
+     discipline.
+     ======================================================================= */
+  --marker: #4fd8d2;
+  --rig-line: #78857f;    /* measured bones, camera frusta, the probe        */
+  --rig-solved: #6c7772;  /* inferred geometry - always dashed as well       */
+  --v-negative: #ff6b4a;
+  --v-positive: #5fe0a8;
+  --v-warning: #8fbdff;
+
+  /* The 6x6 floor grid under the skeleton. 1.48:1 on --d-ground, which is
+     below 3:1 BY DESIGN and legitimately so: it is aria-hidden, carries zero
+     information, and nothing in the simulation or the copy refers to it. It
+     is allowed to be faint precisely because it means nothing. */
+  --grid: #2a3336;
+
+  /* Solana brand, quarantined. The 16px mark beside the wordmark only,
+     aria-hidden, with the wordmark carrying the accessible name. Never a
+     gradient on type, never a button fill, never a second accent. These are
+     somebody else brand colours being quoted, and they are tuned for a black
+     ground: as TEXT on this plate they measure 1.02:1, which is how an
+     earlier system shipped an invisible PASS. */
   --sol-purple: #9945ff;
   --sol-green: #14f195;
 
-  /* Sourced from next/font under DIFFERENT names (--font-archivo,
-     --font-azeret). If both sides used --font-sans the declaration would
-     reference itself, because :root IS the html element - the same element
-     next/font sets its variable on. That cycle is invalid at computed-value
-     time, the variable resolves to nothing, and every font silently falls back
-     to the system stack. That shipped once and was invisible until someone
-     read the computed style. */
-  --font-sans: var(--font-archivo), "Archivo", system-ui, -apple-system, sans-serif;
-
-  /* Mono is mandatory again, and it is doing real work: every figure a person
-     might compare, copy or verify. Azeret's squared figures make a hash read as
-     a measured part number rather than a string. */
-  --font-mono: var(--font-azeret), "Azeret Mono", ui-monospace, SFMono-Regular,
-    Menlo, monospace;
-  --font-serif: var(--font-sans);
+  /* Sourced from next/font under distinct names so a missing variable falls
+     back to the stack rather than to the other family. */
+  --font-sans: var(--font-archivo), "Archivo", system-ui, -apple-system,
+    sans-serif;
+  --font-mono: var(--font-martian), "Martian Mono", ui-monospace,
+    "Cascadia Mono", Consolas, SFMono-Regular, Menlo, monospace;
+  --font-serif: var(--font-sans);  /* there is no serif voice in this system */
 }
 
 * {
@@ -135,31 +248,59 @@ select:focus-visible,
    is mono. `.data` is that rule, made reusable.
    --------------------------------------------------------------------------- */
 
-/* Figures a person might compare, copy or verify. No monospace family any
-   more - tabular-nums gives the column alignment that mattered, and Inter's
-   figures are cleaner at small sizes than a mono face was. */
+/* Figures a person might compare, copy or verify: amounts, confidences,
+   clause indices, addresses, hashes, durations, joint angles.
+
+   The family is not optional and not a preference. A previous system dropped
+   it - the comment here used to say "no monospace family any more" - on the
+   argument that tabular-nums already gave column alignment. That misses what
+   mono is doing: alignment is why figures line up, but the SQUARED DRAWING
+   OFFICE FIGURE is why a hash reads as a measured part number rather than as
+   a string of characters. The brief calls this the most important typographic
+   rule in the app, so it is expressed structurally: prose gets the sans face
+   by selector, everything else inherits mono, and a figure therefore cannot
+   leak into the prose face by accident. */
 .data {
+  font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
-  letter-spacing: -0.01em;
+  font-variation-settings: "wdth" 100;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+}
+
+/* A long identifier - a 44-character base58 address - only fits on one line at
+   375px if the mono condenses. This is the entire functional reason the family
+   changed: the previous mono had no width axis, so an address had to wrap
+   mid-token or hide behind an ellipsis. */
+.data--long {
+  font-variation-settings: "wdth" 75;
+  font-size: 11px;
+  word-break: break-all;
+}
+
+/* Rig readouts. Same family, lighter, wider tracking, and FIXED WIDTH cells
+   with clipping rather than ellipsis - a truncated residual is worse than a
+   clipped one, and a reflowing telemetry strip would break the fixed-pixel
+   gutter that the arm is aligned to. */
+.telemetry {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  font-variation-settings: "wdth" 87.5;
+  font-weight: 400;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: clip;
 }
 
 .label {
+  font-family: var(--font-mono);
   font-size: 10px;
+  font-variation-settings: "wdth" 87.5;
   font-weight: 500;
-  letter-spacing: 0.14em;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
-  color: var(--text-muted);
-}
-
-/* The one accented phrase treatment, borrowed from the hero headline. Italic
-   serif at a single size, used where a line needs a change of voice rather
-   than another weight. */
-.accent-phrase {
-  font-family: var(--font-serif);
-  font-style: italic;
-  font-weight: 400;
-  font-size: 1.08em;
-  letter-spacing: -0.03em;
   color: var(--text-muted);
 }
 
@@ -225,19 +366,24 @@ h3 {
 
 .stamp {
   display: inline-block;
-  font-weight: 500;
+  font-family: var(--font-mono);
   font-size: 11px;
+  font-variation-settings: "wdth" 87.5;
+  font-weight: 500;
   letter-spacing: 0.14em;
   text-transform: uppercase;
   padding: 5px 10px;
-  border: 1.5px solid currentColor;
-  border-radius: 4px;
-  background: rgba(255, 255, 255, 0.7);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 1),
-    0 1px 2px rgba(16, 18, 27, 0.06);
+  /* 2px outline, no fill, no radius, no shadow. A stamp is pressed INTO the
+     sheet: it is ink and an edge, and nothing else. The previous version had a
+     4px radius, a translucent white fill and an inset highlight, which made it
+     a rounded chip sitting ON the page rather than a mark made on it - and the
+     fill quietly changed the contrast of every stamp colour placed over it. */
+  border: 2px solid currentColor;
+  border-radius: 0;
+  background: none;
+  box-shadow: none;
+  /* The one rotation in the entire product. */
   transform: rotate(-4deg);
-  /* No mix-blend-mode. Multiply was right for ink on a cream page; on a dark
-     ground it drives the stamp toward black and erases it. */
   white-space: nowrap;
 }
 
@@ -249,9 +395,6 @@ h3 {
 
 /* The single permitted glow in the product: the large APPROVED stamp on the
    verdict sheet. Row stamps get none. */
-.stamp-lg.stamp-approved {
-  box-shadow: 0 0 28px rgba(20, 241, 149, 0.14);
-}
 
 .stamp-lg {
   font-size: 13px;
@@ -322,20 +465,6 @@ h3 {
     box-shadow 0.35s ease, color 0.35s ease, filter 0.35s ease;
 }
 
-.btn::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(
-    115deg,
-    transparent 20%,
-    rgba(16, 18, 27, 0.07) 48%,
-    transparent 76%
-  );
-  transform: translateX(-130%);
-  transition: transform 0.65s ease;
-  pointer-events: none;
-}
 
 .btn:hover:not(:disabled)::after {
   transform: translateX(130%);
@@ -530,9 +659,15 @@ select.field option {
    LANDING PAGE
    --------------------------------------------------------------------------- */
 
-.on-dark {
-  background: var(--d-ground);
-  color: var(--d-text);
+/* .on-dark is gone. It meant "the dark landing page", and there is no
+   longer such a thing: the page is a light plate, and the only dark ground
+   in the product is .volume, which redefines the ground and ink tokens for
+   itself. Kept as a no-op alias so a stray usage degrades to the plate
+   rather than to unreadable dark ink on a dark ground. */
+.on-dark,
+.plate-section {
+  background: var(--surface);
+  color: var(--text);
 }
 
 .hero {
@@ -540,7 +675,7 @@ select.field option {
   min-height: 780px;
   height: 100vh;
   overflow: hidden;
-  background: var(--d-ground);
+  background: var(--page);
   display: flex;
   flex-direction: column;
 }
@@ -568,7 +703,7 @@ select.field option {
 .marquee {
   overflow: hidden;
   white-space: nowrap;
-  border-block: 1px solid var(--d-border);
+  border-block: 1px solid var(--border);
   padding: 14px 0;
 }
 
@@ -710,7 +845,7 @@ select.field option {
   }
   .divide-x > * + * {
     border-left: 0 !important;
-    border-top: 1px solid var(--d-border);
+    border-top: 1px solid var(--border);
     padding-left: 0 !important;
     padding-top: 32px;
   }
@@ -790,63 +925,14 @@ select.field option {
    always means "somewhere you can go".
    --------------------------------------------------------------------------- */
 
-.nav-pill {
-  position: relative;
-  overflow: hidden;
-  display: inline-flex;
-  align-items: center;
-  height: 40px;
-  padding: 0 18px;
-  border-radius: 7px;
-  border: 1px solid rgba(16, 18, 27, 0.16);
-  background: linear-gradient(105deg, #ffffff 0%, #f0f2f6 48%, #dfe4ed 100%);
-  color: #1a1c24;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9);
-  font-size: 14px;
-  font-weight: 400;
-  letter-spacing: -0.01em;
-  white-space: nowrap;
-  text-decoration: none;
-  transition: background 0.35s ease, border-color 0.35s ease,
-    box-shadow 0.35s ease;
-}
 
-.nav-pill::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(
-    115deg,
-    transparent 30%,
-    rgba(16, 18, 27, 0.06) 50%,
-    transparent 70%
-  );
-  transform: translateX(-120%);
-  transition: transform 0.6s ease;
-}
 
-.nav-pill:hover::before {
-  transform: translateX(120%);
-}
 
-.nav-pill:hover {
-  border-color: rgba(47, 75, 216, 0.35);
-  background: linear-gradient(105deg, #ffffff 0%, #f4f6fb 45%, #e4eaf7 100%);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 1),
-    0 2px 10px rgba(47, 75, 216, 0.12);
-}
 
 /* The current page keeps the cool light on permanently rather than adding a
    second indicator - one signal, always on, instead of an underline. */
 /* The current page keeps its lift on permanently rather than adding a second
    indicator - one signal, always on, instead of an underline. */
-.nav-pill--active {
-  border-color: rgba(47, 75, 216, 0.5);
-  background: linear-gradient(105deg, #ffffff 0%, #eef2fd 45%, #dde5f8 100%);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 1),
-    0 2px 12px rgba(47, 75, 216, 0.18);
-  color: var(--accent);
-}
 
 @media (max-width: 700px) {
   /* Smaller type, but NOT a smaller target. An earlier version shrank these to
@@ -1367,6 +1453,55 @@ select.field option {
 }
 
 /* ---------------------------------------------------------------------------
+   NAV
+
+   Text links with a 2px accent underline on the current page.
+
+   What was here before was a "pill": a 105deg white-to-grey gradient, a 7px
+   radius, an inset highlight and a sweeping specular ::before on hover. It was
+   also built from five hardcoded hex values that no token controlled, so it
+   silently survived two palette changes looking like neither system.
+
+   That component is the single clearest SaaS-template tell in the old build,
+   and it is exactly what the brief says to avoid. An instrument labels its
+   controls; it does not make them glossy.
+   --------------------------------------------------------------------------- */
+
+.nav-pill {
+  display: inline-flex;
+  align-items: center;
+  height: 40px;
+  padding: 0 2px;
+  margin-right: 20px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: none;
+  border-radius: 0;
+  box-shadow: none;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-variation-settings: "wdth" 87.5;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  text-decoration: none;
+  white-space: nowrap;
+  transition: color 0.18s linear, border-color 0.18s linear;
+}
+
+.nav-pill:hover {
+  color: var(--text);
+}
+
+/* The current page. Colour alone would not carry this for everyone, so the
+   underline does the work and aria-current carries it for a screen reader. */
+.nav-pill--active {
+  color: var(--text);
+  border-bottom-color: var(--accent);
+}
+
+/* ---------------------------------------------------------------------------
    TOUCH TARGETS
    Standalone controls clear 44px on a phone.
 
@@ -1459,4 +1594,357 @@ select.field option {
   }
   .field-clause,
   textarea { min-height: 120px; }
+}
+
+
+/* ===========================================================================
+   THE VOLUME SCOPE
+
+   This block is the enforcement mechanism for the whole colour system, and it
+   is worth being explicit about why it exists rather than trusting review.
+
+   The volume inks are legible on a dark ground and catastrophic on a light
+   one: --marker measures 1.26:1 on --page. An earlier system shipped exactly
+   this bug in the other direction - Solana brand green used as body text on a
+   light plate, at 1.02:1, effectively invisible - and it survived review
+   because "it is the brand colour" sounds like a reason.
+
+   So the restriction is made structural. Inside .volume the ground tokens are
+   REDEFINED to the dark set, which means a component written against --surface
+   and --text automatically resolves to the volume equivalents when it is
+   placed inside one, and the volume-only inks simply have nothing sensible to
+   resolve to anywhere else.
+   =========================================================================== */
+
+.volume {
+  --page: var(--d-ground);
+  --surface: var(--d-section);
+  --raised: var(--d-panel);
+  --sunk: var(--d-panel-dark);
+  --text: var(--d-text);
+  --text-2: var(--d-text);
+  --text-muted: var(--d-muted);
+  --text-faint: var(--d-faint);
+  --border: var(--d-border);
+  --hairline: var(--d-border-2);
+  --border-strong: var(--d-border);
+  --rule-strong: var(--d-border);
+
+  /* Identity inside a volume is --marker, never --accent: --accent-strong is
+     1.85:1 on --d-panel and is banned here. */
+  --accent: var(--marker);
+  --accent-strong: var(--marker);
+
+  /* The status inks lift to their volume variants for the same reason. */
+  --positive: var(--v-positive);
+  --negative: var(--v-negative);
+  --warning: var(--v-warning);
+  --ghost-stroke: var(--ghost-vol);
+
+  background: var(--d-ground);
+  color: var(--d-text);
+}
+
+/* ---------------------------------------------------------------------------
+   FOCUS
+
+   The ring is --text rather than the accent. On a primary button the fill IS
+   --accent-strong, and while outline-offset does lift the ring clear onto the
+   ground, a ring that can ever equal the thing it surrounds is a bad default.
+   --text measures 13.36:1 on the worst light ground it can land on, and
+   --marker measures 9.27:1 on the worst volume ground, so both edges clear
+   3:1 against whatever they touch in either context.
+   --------------------------------------------------------------------------- */
+
+:is(a, button, input, textarea, select, summary, [tabindex]):focus-visible {
+  outline: 2px solid var(--text);
+  outline-offset: 2px;
+  border-radius: 0;
+}
+
+/* An inner hairline so the ring is separated from a dark fill as well as from
+   the ground behind it. */
+.btn-primary:focus-visible {
+  box-shadow: inset 0 0 0 1px var(--raised);
+}
+
+.volume :is(a, button, input, textarea, select, summary, [tabindex]):focus-visible {
+  outline-color: var(--marker);
+}
+
+/* ---------------------------------------------------------------------------
+   RADIUS AND SHADOW
+
+   Radius 0 everywhere and no shadows at all. An instrument is milled, not
+   moulded: every boundary in this system is a 1px rule, and depth is carried
+   by the plane change between --page, --surface and --raised rather than by
+   a blur. This is a deliberate documented break from the previous 2px/4px/6px
+   /7px mix, which had accumulated four different values with no rule behind
+   which was used where.
+   --------------------------------------------------------------------------- */
+
+/* Radius zero, stated at real specificity rather than in :where().
+   :where() contributes ZERO specificity, which is usually the polite choice -
+   but here it meant every component rule with a class selector silently beat
+   it, and 2px and 4px radii survived the reset. A system-wide invariant should
+   win by default and be overridden deliberately, not the other way round. */
+button,
+input,
+textarea,
+select,
+.btn,
+.field,
+.panel,
+.record-row,
+.plate,
+.stamp,
+[class*="card"] {
+  border-radius: 0;
+}
+
+/* No shadows anywhere in the product. Depth is the plane change between
+   --page, --surface and --raised; a blur is not a plane. */
+.btn,
+.panel,
+.plate,
+.record-row,
+.stamp,
+.app-header,
+.app-header-inner {
+  box-shadow: none;
+}
+
+/* ---------------------------------------------------------------------------
+   THE CLAUSE STATION
+
+   The sealed clauses with the inspection arm running down their left edge.
+
+   The gutter is a fixed 64px in PIXELS, never a fraction or a ch unit. The arm
+   is drawn in the SVG's own pixel coordinates (L1 = 34, L2 = 26, targets at
+   dx = 44), so a gutter that reflowed with the type would put the probe
+   somewhere other than the datum it is supposed to be touching. Fixed px is
+   what keeps the drawing and the DOM in agreement.
+   --------------------------------------------------------------------------- */
+
+.clause-station {
+  position: relative;
+  /* Room for the gutter. Padding, not a grid column, and that is the whole
+     point - see below. */
+  padding-left: 64px;
+}
+
+/* The gutter is taken OUT OF FLOW deliberately.
+
+   It was a 64px grid column first, and that produced an unbounded feedback
+   loop: the arm sizes itself from the measured clause list, an in-flow gutter
+   stretches the grid row, a stretched row stretches the <ol>, the
+   ResizeObserver fires, the arm grows to match, and around again. Three
+   clauses whose rows total 170px produced an <ol> 8568px tall and still
+   climbing.
+
+   Absolute positioning breaks the cycle at its weakest link: the gutter can
+   read the row height but can no longer contribute to it, so the measurement
+   is one-way and settles in a single pass. */
+.clause-gutter {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 64px;
+  /* The arm draws its elbow outside the SVG box on purpose; the root clips it
+     back into the volume so nothing escapes onto the light plate. */
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-right: 0;
+}
+
+@media (max-width: 900px) {
+  .clause-station { padding-left: 28px; }
+  .clause-gutter { width: 28px; }
+}
+
+/* ===========================================================================
+   THE LANDING HERO — a capture volume cut into the plate
+   =========================================================================== */
+
+.vh {
+  background: var(--page);
+  border-bottom: 1px solid var(--border);
+}
+
+.vh-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px 24px;
+  max-width: 1240px;
+  margin: 0 auto;
+  padding: 20px 32px;
+}
+
+.vh-mark {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-family: var(--font-sans);
+  font-size: 18px;
+  font-variation-settings: "wdth" 112;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  color: var(--text);
+  text-decoration: none;
+}
+
+/* The datum mark. A filled square, not a logo: it is the origin the rest of
+   the page is aligned to. */
+.vh-mark-dot {
+  width: 6px;
+  height: 6px;
+  background: var(--accent);
+}
+
+.vh-nav-links {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px 22px;
+}
+
+.vh-nav-links a:not(.btn) {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-variation-settings: "wdth" 87.5;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  text-decoration: none;
+}
+
+.vh-nav-links a:not(.btn):hover { color: var(--text); }
+
+.vh-body {
+  display: grid;
+  /* The rail is a FIXED 420px and the volume takes the rest. Not a fraction:
+     the rail holds a fixed measure of prose, and letting it stretch on a wide
+     screen would push the lede past a comfortable line length while the panel
+     - the thing worth the space - stayed the same size. */
+  grid-template-columns: 420px minmax(0, 1fr);
+  gap: 48px;
+  align-items: center;
+  max-width: 1240px;
+  margin: 0 auto;
+  padding: 40px 32px 64px;
+}
+
+.vh-eyebrow { margin: 0 0 18px; }
+
+.vh-title {
+  margin: 0;
+  font-family: var(--font-sans);
+  font-size: clamp(38px, 4.4vw, 56px);
+  font-variation-settings: "wdth" 112;
+  font-weight: 600;
+  line-height: 1.02;
+  letter-spacing: -0.045em;
+  color: var(--text);
+  text-wrap: balance;
+}
+
+.vh-lede {
+  margin: 22px 0 0;
+  max-width: 46ch;
+  font-size: 16px;
+  line-height: 1.6;
+  color: var(--text-2);
+}
+
+.vh-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 30px;
+}
+
+.vh-spec {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 28px;
+  margin: 36px 0 0;
+  padding-top: 20px;
+  border-top: 1px solid var(--hairline);
+}
+
+.vh-spec dt { margin-bottom: 6px; }
+.vh-spec dd { margin: 0; font-size: 15px; color: var(--text); }
+
+.vh-stage { position: relative; }
+
+/* Outline-only display type, running off the panel's top-left corner. The
+   panel is painted after it in the stacking order, so the panel edge CLIPS the
+   letterforms - the wordmark is behind the viewport, not floating over it. */
+.vh-ghost {
+  position: absolute;
+  top: -34px;
+  left: -46px;
+  z-index: 0;
+  font-family: var(--font-sans);
+  font-size: clamp(64px, 9vw, 128px);
+  font-variation-settings: "wdth" 125;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1;
+  color: transparent;
+  -webkit-text-stroke: 1.25px var(--ghost-stroke);
+  pointer-events: none;
+  user-select: none;
+}
+
+/* A positioning wrapper ONLY.
+
+   It used to also set an aspect ratio, a border and overflow - and so did the
+   rig component inside it. Two elements owning the same box meant two 1px
+   borders drawn 1px apart, and two aspect ratios disagreeing: the wrapper held
+   a 4:5 panel while the rig laid itself out at 16:9 inside it, leaving the
+   figure in the top 45% and the telemetry cut off by the wrapper overflow.
+
+   The component owns the viewport. This only positions it and puts it above
+   the ghost type. */
+.vh-volume {
+  position: relative;
+  z-index: 1;
+}
+
+@media (max-width: 1023px) {
+  .vh-body {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 36px;
+    padding: 32px 24px 48px;
+  }
+  /* The rail stacks ABOVE the panel rather than below it. The claim should be
+     read before the instrument that illustrates it. */
+  .vh-stage { order: 2; }
+  .vh-rail { order: 1; }
+  .vh-ghost { left: 0; top: -26px; }
+}
+
+@media (max-width: 700px) {
+  .vh-nav { padding: 16px; }
+  .vh-body { padding: 24px 16px 40px; }
+  /* The rig switches itself to 4:5 and to its 13-marker subset at this same
+     width - 16:9 on a phone is a letterbox a few millimetres tall. The
+     breakpoint lives in the component too; they must not drift apart. */
+  .vh-spec { gap: 20px; }
+}
+
+/* The landing nav is not inside .app-header-inner, so the app-wide touch floor
+   does not reach it. Same rule, same reason: a finger, not a pointer. */
+@media (max-width: 760px), (pointer: coarse) {
+  .vh-nav-links a:not(.btn),
+  .vh-mark {
+    min-height: 44px;
+    display: inline-flex;
+    align-items: center;
+  }
 }

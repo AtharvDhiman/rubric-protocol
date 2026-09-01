@@ -107,44 +107,87 @@ rubric/
 ## Design system (Part 5)
 
 **`web/DESIGN.md` is the authority. Read it before writing any UI.** It is not a
-summary of this section — it replaces it.
+summary of this section - it replaces it.
 
-An earlier draft of this brief specified a different visual language ("The
-Examiner's Desk": Instrument Serif + Spectral + Caveat, feTurbulence paper grain,
-crop marks, elements deliberately rotated off-axis). **That direction is dead.**
-The current system explicitly forbids decorative and handwriting fonts, faux-paper
-texture, and any rotation other than the verdict stamp. If a stale instruction
-asks for paper grain, a left-margin rail, a folio, or an off-straight element,
-it is out of date — follow `web/DESIGN.md`.
+Rubric has now shipped five visual systems. Earlier drafts of this brief
+specified "The Examiner's Desk" (Instrument Serif + Spectral + Caveat, paper
+grain, crop marks, rotated elements), then an IBM Plex record-ledger, then a
+pure-black direction, then "Fence Line" (a lever-tumbler lock in zinc and
+brass). **All of those are dead.** If any stale instruction - including anywhere
+above in this file - asks for IBM Plex, Azeret Mono, Instrument Serif, a section
+mark as a clause motif, paper texture, a brass fence, a lock drawing, a
+left-margin rail, a folio, or an off-straight element, it is out of date.
 
+The current system is **CAPTURE VOLUME**: a light metrology plate with bounded
+dark viewports cut into it, in which a rig is visibly measuring something real.
 The short version:
 
-- Type is IBM Plex Sans + IBM Plex Mono, and nothing else, via `next/font/google`.
-  Every number a person might compare, copy, or verify — amounts, scores,
-  addresses, hashes, timestamps — is Plex Mono. That is the most important
-  typographic rule in the app.
-- Light document-like app surfaces (`#f5f2ea` page / `#fbfaf6` surface); a dark
-  landing page (`#0a0a0c`). Borders, never shadows. Radius 2px on inputs and
-  buttons, 0 elsewhere. Strict 8px spacing scale.
-- Exactly two motifs: the `§` clause mark in `#7c33d6`, and the verdict stamp
-  (2px outline, no fill, rotated -4deg, `mix-blend-mode: multiply`). Do not invent
-  a third.
-- The purple→green gradient appears in exactly two places per screen: the Solana
-  mark and the primary button.
+- Type is Archivo + Martian Mono via `next/font/google`, and nothing else. The
+  jurisdiction rule is enforceable rather than aspirational: **if a human wrote
+  it as a sentence it is Archivo, and everything else is mono.** Because the
+  prose face only lands on paragraphs, a figure cannot leak into it - which is
+  what makes "every verifiable figure is monospace" a structural property of the
+  stylesheet instead of something a person has to remember.
+- Light instrument-grey plate (`#d8dcda` page / `#edefec` surface); the dark
+  ground is never the page, only a bounded inset panel, and it appears on
+  exactly two screens.
+- Borders, never shadows. **Radius 0 everywhere.** Nothing rotates but the stamp.
+- **Acceptable states are achromatic.** A passing clause is ink, not green.
+  Colour is spent on one alarm, one held state, and one money-moved event - so a
+  green pixel means "the chain paid", never "a check went well".
+- Colour is never the only channel. `--negative` against `--positive` is 1.04:1,
+  so every status also carries the word, a shape, and an integer.
+- Volume-only inks are scoped under `.volume` so the restriction is mechanical.
+  `web/lib/contrast.test.ts` parses the real stylesheet and fails the build on
+  any pair under its floor.
 
-Screens: `/` landing (dark, one animated aperture visual, inline SVG + CSS
-keyframes only — no framer-motion/GSAP/three.js — and complete with zero motion
-under `prefers-reduced-motion`), `/docket` (record list, not cards), `/create`
-(rubric drafting + a confirmation modal showing the exact canonical clause text
-and its hash before sealing), `/task/[id]` (the verdict sheet — build this first,
-it is the demo).
+Screens: `/` landing (the volume panel with the mocap skeleton, then a pipeline
+latency row, how-it-works, and the spec + verdict ledger), `/docket` (a real
+record table, not cards), `/create` (the tolerance sheet, with a confirmation
+modal showing the exact canonical clause text and its hash before sealing),
+`/task/[id]` (the verdict sheet with the inspection arm - build this first, it
+is the demo).
 
-Every on-chain action runs through one `<TxFlow>` component with four explicit
-states — preparing → awaiting signature → confirming → done — plus first-class
-"signature declined" and "not confirmed" failures, and a cluster-aware Explorer
-link. Never leave a spinner hanging, and never auto-retry a transaction that may
-already have landed. The UI reflects verified on-chain state, never an optimistic
-guess.
+### Motion (this supersedes the earlier "CSS keyframes only" rule)
+
+The landing was originally specified as "inline SVG + CSS keyframes only". That
+was **relaxed deliberately, with my approval**, because a motion-capture rig
+cannot be driven by keyframes alone. What changed and what did not:
+
+- **Allowed now:** vanilla `requestAnimationFrame` driving inline SVG attributes.
+- **Still forbidden, unchanged:** framer-motion, GSAP, three.js, and any new
+  npm dependency. That was the rule the keyframes line existed to protect.
+- **Still inline SVG, never canvas.** Canvas cannot server-render, and both the
+  reduced-motion frame and the no-JS frame must exist in the HTML.
+
+Two rigs share one language: an ambient **mocap skeleton** on the landing, and an
+**inspection arm** on `/task/[id]` that traverses the real sealed clauses and
+rules on each. The kinematics and easing live in `web/lib/rig.ts` and are unit
+tested.
+
+The easing is the point, and it is not a cubic-bezier. A bezier scales its whole
+curve with the duration; a real motion controller has a ramp bounded by torque,
+so the ramp lasts the same number of milliseconds however far the axis travels
+and a longer move gets a longer flat cruise. That property is what reads as
+machinery rather than animation. Overshoot is zero - a springy settle is what an
+uncalibrated axis does.
+
+Every rig server-renders its **terminal** state and the client rewinds after
+mount, so the finished document is what is in the HTML. `prefers-reduced-motion`
+is checked before the first frame is scheduled, and the still frame is the same
+render function at the terminal state, never a separate fallback path.
+
+The rigs must never state a fact that is not real. Readouts sit in the same mono
+face as figures the user is asked to verify, so invented telemetry (room
+dimensions, feed rates, rig serial numbers) is banned outright, and a frame
+counter is derived from elapsed milliseconds rather than from rAF ticks.
+
+Every on-chain action still runs through one `<TxFlow>` component with four
+explicit states - preparing, awaiting signature, confirming, done - plus
+first-class "signature declined" and "not confirmed" failures, and a
+cluster-aware Explorer link. Never leave a spinner hanging, and never auto-retry
+a transaction that may already have landed. The UI reflects verified on-chain
+state, never an optimistic guess.
 
 ## Environment notes (as of 2026-08-31)
 

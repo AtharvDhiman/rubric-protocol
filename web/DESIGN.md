@@ -1,245 +1,272 @@
 # Rubric — design system
 
+**CAPTURE VOLUME**
+
 This file is the authority for every screen in this app. Read it before writing
-any UI. If a screen drifts from this, the screen is wrong, not this file.
+any UI. If a screen drifts from this file, the screen is wrong, not the file.
+
+> **This replaces every previous system.** Rubric has shipped four: an
+> "Examiner's Desk" paper direction, an IBM Plex record-ledger on `#0a0a0c`, a
+> pure-black Vesper direction, and "Fence Line" (a lever-tumbler lock in zinc and
+> brass). All four are dead. If a stale instruction anywhere — including in
+> `CLAUDE.md` — asks for IBM Plex, Azeret Mono, Instrument Serif, a `§` clause
+> mark, paper grain, a brass fence, a lock drawing, 2px/4px/6px radii or "one
+> animated aperture", it is out of date. Follow this file.
+
+---
 
 ## The concept
 
-Rubric is an escrow protocol where acceptance criteria are sealed on-chain and an
-AI judge rules against them. The interface is light, precise, and lit from above
-— surfaces read as machined metal and glass on paper. Nothing is decorated for
-its own sake; light marks the things you can act on.
+The page is an **instrumented capture volume**: a light metrology plate with
+bounded dark viewports cut into it, in which a rig is visibly measuring
+something real.
 
-ONE visual system across the whole product. The landing page and the app share
-the same ground, type, borders and button language. The landing has exactly one
-extra thing: the animated aperture in its hero. A visitor moving from the landing
-into the app should not feel a seam.
+This is not a costume. Rubric's actual mechanic is that acceptance criteria are
+sealed on-chain *before* work starts, and a judge then measures a submission
+against them. That is metrology. So:
 
-> **This replaces the previous systems.** Rubric shipped three before: an
-> "Examiner's Desk" light/paper direction, an IBM Plex record-ledger on
-> `#0a0a0c`, and a pure-black Vesper direction. All three are dead. The current
-> system keeps the black system's *language* — lit metal, glass, one sweep — and
-> inverts its *ground*. If a stale instruction anywhere asks for
-> IBM Plex, a monospace family, `§` clause marks, 2px radii, paper texture or
-> "borders, never shadows", it is out of date — follow this file.
+| The product | The instrument |
+|---|---|
+| the sealed clauses | the tolerances |
+| the judge's confidence | the solve residual |
+| the confidence threshold | the pass limit |
+| a rejection citing a clause | the coordinate where the probe stopped |
 
-## What this must NOT look like
+`CONF 94 / THRESHOLD 70 / Δ +24` is not a metaphor bolted onto the verdict. It
+**is** the verdict, printed the way an instrument prints one.
 
-- No Roboto, Poppins, Montserrat, or raw `system-ui` as a visible font.
-- No rounded-2xl card grids floating on a light background.
-- No purple→blue SaaS gradient heroes.
-- No emoji anywhere in the UI.
-- No second accent colour. The palette is paper, ink, grey, and one cool blue.
-- If a screen starts resembling a Tailwind starter template, stop and re-read
-  this file.
+---
 
-Restraint is still the point. The light is the ornament; nothing else needs to be.
+## The colour rule — read this before touching any colour
 
-## Type — the entire system
+**Acceptable states are achromatic. A passing clause is ink, not green.**
 
-```
-Inter              300–700   everything: headings, body, buttons, labels, data
-Instrument Serif   400 ital  one accented phrase per page, and nothing else
-```
+Colour is spent on exactly three things:
 
-Both via `next/font/google`. Nothing else.
+- `--negative` — **the one alarm.** Out of tolerance, and nothing else. Not a
+  disabled button, not a delete link, not an incomplete field.
+- `--warning` — **unresolved, not failed.** HELD / needs manual review / below
+  threshold. Structurally outside the red-green pair, because a held task is
+  neither out of tolerance nor released: *the escrow is untouched*.
+- `--positive` — **the one event.** Only where the chain actually moved money.
 
-Rules:
+That last one is the highest-leverage decision in the system. It makes a green
+pixel mean *"the chain paid"* rather than *"a check went well"*.
 
-- Headings: Inter 500, tight tracking (`-0.035em`, and `-0.045em` on display
-  sizes). Sentence case.
-- Body: Inter 400, 15–17px, line-height 1.55–1.6.
-- Labels and metadata: Inter 500, uppercase, 10–11px, letter-spacing `0.14em`.
-- **The accented phrase.** Instrument Serif, italic, 400, `1.08em`,
-  `-0.03em`, in `--text-muted`. One phrase per page — the hero's *trust*, and
-  its equivalents. It is a change of voice, not a highlight: it is grey, not
-  white, so it recedes rather than shouts. Use `.accent-phrase`. Two of these on
-  one screen means one of them is wrong.
+### Colour is never the only channel
 
-> **There is no monospace family.** The previous system set every figure in IBM
-> Plex Mono so columns would line up. Inter's `font-variant-numeric: tabular-nums`
-> does the same job, so `.data` provides alignment without a second family to
-> download. `--font-mono` still exists as an alias to `--font-sans` so older call
-> sites keep resolving; do not add new ones.
+`--negative` against `--positive` is **1.04:1**. In greyscale, or to a
+deuteranope, they are the same. So every status carries four channels:
 
-> Implementation note. `next/font` publishes `--font-inter` / `--font-instrument`
-> and the stylesheet maps those onto `--font-sans` / `--font-serif`. The two names
-> MUST differ. `:root` IS the `html` element — the same element `next/font` sets
-> its variable on — so reusing the name makes the declaration reference itself.
-> A cyclic `var()` is invalid at computed-value time, the variable resolves to
-> nothing, and every screen silently falls back to the system font stack. That
-> shipped once and was invisible until someone read the computed style.
+1. the **word** (`PASS` / `FAIL` / `HELD`)
+2. a **shape** (filled disc / hollow ring / filled square)
+3. an **integer** (`OUTTOL 0` or `1`)
+4. the colour
 
-## Tokens — THE WHOLE PRODUCT
+Shipping the colour without the other three is a bug, not a simplification.
 
-| Role          | Value                      | Used for                                    |
-| ------------- | -------------------------- | ------------------------------------------- |
-| Ground        | `#fbfbfd`                  | page background everywhere                  |
-| Section       | `#f4f5f8`                  | the alternating band                        |
-| Panel         | `#eef0f4`                  | log panels, hash previews, receipts         |
-| Border        | `rgba(16,18,27,0.14)`      | dividers, record rows, section rules        |
-| Hairline      | `rgba(16,18,27,0.09)`      | the quieter divider                         |
-| Input rule    | `rgba(16,18,27,0.28)`      | the underline beneath a form field          |
-| Row hover     | `rgba(16,18,27,0.035)`     | the record-row wash                         |
-| Text          | `#0e1016`                  |                                             |
-| Text body     | `#34363f`                  | clause prose and other long-form reading    |
-| Text muted    | `#63656f`                  | ledes, secondary lines, the accent phrase   |
-| Text faint    | `#86887f`                  | labels, timestamps, units                   |
-| Accent        | `#2f4bd8`                  | clause numbers, active nav, focus rings     |
-| Green         | `#0a7f4f`                  | approved, paid, live                        |
-| Red           | `#c62740`                  | rejected                                    |
-| Amber         | `#a56a09`                  | held for review                             |
+### Dotted means hypothesis, solid means measurement
 
-**There is no dark theme. Do not introduce black or near-black surfaces
-anywhere**, other than the primary button and the type itself.
+Product-wide, no exceptions. A dashed rule, a dashed border and a `3 2` dashed
+bone all mean the same thing: *this was inferred, not measured*. A held task's
+panel is dashed for exactly this reason.
 
-The ground is `#fbfbfd`, not `#ffffff`: a white with a faint cool bias, chosen to
-sit under the blue accent rather than fight it. Pure white next to `#2f4bd8`
-reads as unconsidered.
+---
 
-Status colours stay chromatic because they carry meaning, and each is darkened
-from its dark-theme value — the old `#14F195` and `#ff4d6d` were tuned to glow on
-black and are unreadable on paper. Every one is paired with a word in the markup,
-never colour alone.
+## Tokens
 
-> Implementation note. `color-scheme: light` is set on `html`/`body` so the
-> browser paints its own widgets to match: the `<select>` popup, the scrollbar,
-> form controls. Recolouring a `<select>` with CSS does NOT fix its popup — that
-> list is drawn by the OS, and `color-scheme` is the only thing it obeys.
+The complete set lives in `app/globals.css`. Two things about it are structural
+rather than stylistic:
 
-## Surfaces and light
+**Token names never change.** ~20 components read them. A new visual system is a
+value remap. This is why four redesigns have not required touching every file.
 
-- Corner radius: 6px on buttons and inputs, 7px on nav pills, 4px on stamps,
-  0 elsewhere. Never above 10px.
-- Depth comes from **light**, not from drop shadows for their own sake: a
-  gradient body, an `inset 0 1px 0` highlight along the top edge, and a glow only
-  on hover or on the current page.
-- Everything sits on a strict 8px spacing scale.
-- Tables and record rows are separated by 1px hairlines, never by gaps or cards.
-- Nothing is rotated except verdict stamps.
+**The volume scope is mechanical enforcement, not a convention.** Volume inks are
+legible on a dark ground and catastrophic on a light one — `--marker` is
+**1.26:1** on `--page`. Rather than trusting review, `.volume { }` redefines the
+ground and ink tokens, so a component written against `--surface` and `--text`
+resolves correctly wherever it is placed, and a volume ink has nothing sensible
+to resolve to outside one.
 
-## The three motifs
+`lib/contrast.test.ts` parses the real stylesheet and crosses **every** ink
+against **every** ground it is permitted on. It also asserts that the dangerous
+cross-family pairs *stay* dangerous — if someone tunes a volume ink until it
+also works on paper, the scoping rule silently becomes decoration, so that is a
+test failure on purpose.
 
-1. **THE CLAUSE NUMBER.** Acceptance criteria are numbered 1 2 3 in `--accent`,
-   tabular figures, weight 500. Never bullets. Used everywhere clauses appear.
-   *(This previously used the section sign — §1 §2 §3. The owner asked for that
-   glyph to be removed from the site. Do not reintroduce it.)*
+This project has shipped a contrast catastrophe twice. Both times a sentence
+that sounded like a reason ("it's the brand colour") carried it through review.
+The test does not accept sentences.
 
-2. **THE VERDICT STAMP.** A rounded outline containing a single uppercase word at
-   `0.14em` tracking: APPROVED (`#0a7f4f`), REJECTED (`#c62740`), SEALED,
-   HELD (`#a56a09`), IN REVIEW. 1.5px border, a white inner light and a 1px lift,
-   rotated exactly `-4deg`. **No `mix-blend-mode`.** It is tempting again now
-   that the ground is paper — `multiply` is the classic ink-on-paper trick — but
-   it was removed for a reason and the reason still applies: the stamp sits over
-   panels and row washes, not only over the ground, and `multiply` darkens it
-   unpredictably against each one. The rotation is the ONE permitted tilt in the
-   product.
+---
 
-3. **THE SWEEP.** Every button and nav pill carries a specular highlight that
-   crosses it on hover — a pseudo-element translating from `-130%` to `130%` over
-   0.65s. It is what makes the surfaces read as lit rather than painted. It is
-   never used on anything that is not interactive; that is the whole signal.
+## Type
 
-## Buttons
+Two families, each with a jurisdiction, both via `next/font/google`.
 
-Two, and only two.
+- **Archivo** — display, page titles, running prose. Carries a `wdth` axis; the
+  nameplate sets expanded and heavy.
+- **Martian Mono** — everything else.
 
-- **Primary** — graphite metal. `linear-gradient(180deg,#2c2f39,#17191f 48%,#0c0d12)`,
-  white label, inset top highlight. It is the only near-black object on the page,
-  which is exactly the inversion of the dark system where it was the only white
-  one: the primary action is the single solid, opaque thing on screen.
-  **One per screen.**
-- **Default** — light glass. A near-white diagonal gradient, a
-  `rgba(16,18,27,0.16)` border, an inset white highlight and a 1px lift. Hover
-  brightens it and turns the border toward the accent.
+### The jurisdiction rule is enforceable, not aspirational
 
-The sweep inverts with them: it is a *dark* streak crossing light glass, and a
-*light* streak crossing the dark primary. A white sweep on white glass is
-invisible, which is how you can tell whether someone checked.
+> If a human wrote it as a sentence, it is Archivo. Everything else is mono.
 
-Nav pills are a third surface, not a third button: a light metal ramp
-(`105deg, #ffffff → #f0f2f6 48% → #dfe4ed`) used for navigation only, so the pill
-shape always means "somewhere you can go". The current page keeps its lift and
-accent border on permanently instead of adding an underline — one signal, always
-on.
+Because the prose face only ever lands on paragraphs, a figure **cannot** leak
+into it. That makes *"every verifiable figure is monospace"* a structural
+property of the stylesheet rather than a discipline someone has to remember.
+Mono therefore carries most visible glyphs: every label, column head, status
+word, unit, amount, confidence, address, hash, joint angle and timestamp.
 
-## Solana brand mark
+**Martian Mono replaced Azeret Mono for a functional reason, not a stylistic
+one.** Azeret has no width axis. A Solana address is 44 base58 characters, and at
+375px no fixed-width mono fits one on a line. Martian condenses to `wdth 75`,
+which does — so the address stays one selectable, copyable string instead of
+wrapping mid-token or hiding behind an ellipsis.
 
-`<SolanaMark size={20} />` — three bars stacked, gap = size/8, bar height =
-size/4.4, purple→green gradient. This is the one place the interface is allowed
-to be chromatic beyond status, because it is somebody else's brand and it is
-being quoted, not designed.
+**API note:** do not pass `weight` alongside `axes` (next/font rejects the
+combination), and do not list `wght` *in* `axes` (it is filtered out of the
+definable set and throws). Both faces expose weight automatically as variable
+fonts.
+
+### Precision is a typographic rule
+
+Decimals shown = decimals actually measured. Confidence is an **integer** 0–100
+because `lib/verifier.ts` returns an integer; rendering `0.94` asserts precision
+the model never reported. Units live on the value (`0.98 USDC`), never in the
+label.
+
+---
+
+## Layout
+
+`max-width: 1240px`, 32px gutters (16px under 700px), 8px spacing scale.
+
+**`border-radius: 0` everywhere. No `box-shadow` anywhere.** An instrument is
+milled, not moulded: every boundary is a 1px rule, and depth is carried by the
+plane change between `--page`, `--surface` and `--raised` rather than by a blur.
+This is a deliberate break from the previous mix of 2px/4px/6px/7px, which had
+accumulated four values with no rule behind which was used where.
+
+**Nothing rotates except the verdict stamp** (−4deg).
+
+App screens ≥1080px use `88px | minmax(0,1fr) | 296px`:
+
+- **left — the station gutter.** Balloon indices, datum dots, the arm. Never content.
+- **centre — the field.**
+- **right — the telemetry rail.** Key/value pairs, right-aligned figures.
+
+`minmax(0, 1fr)` is not interchangeable with `1fr`: a bare `1fr` takes its
+content's size as an automatic minimum, which is what let a wide child force
+horizontal overflow in a previous system.
+
+### `--raised` means committed on-chain
+
+A whiter sheet always means *"this is on the chain"* — sealed clause sets, the
+verdict sheet, settled receipts. It is a state, never a decoration.
+
+---
 
 ## Motion
 
-- The hero animates on load in one orchestrated sequence, not as scattered
-  effects. Everything below the fold animates on scroll via `useInView`
-  (IntersectionObserver, threshold 0.2, triggerOnce).
-- Animate `transform` / `opacity` / `filter` only. `will-change: transform` on
-  the aperture and rings.
-- The aperture and both rings turn **clockwise**, at three different speeds. The
-  speed difference is what separates them into depths; they do not counter-rotate.
-- `@media (prefers-reduced-motion: reduce)` disables every transform and rotation,
-  leaving elements at final opacity. **The page must be complete with zero motion.**
-- All keyframes live in one block in `globals.css`.
+**Vanilla `requestAnimationFrame` only.** No three.js, no GSAP, no
+framer-motion, no new dependencies. Inline SVG, never canvas — canvas cannot
+server-render, and both the reduced-motion frame and the no-JS frame must exist
+in the HTML.
 
-## Entrance motion
+> `CLAUDE.md` originally said the landing was "inline SVG + CSS keyframes only".
+> That was relaxed deliberately, with the repo owner's approval, because a
+> motion-capture rig cannot be driven by keyframes alone. The *dependency* rule
+> it was protecting is unchanged and still enforced.
 
-One orchestrated page-load sequence, not scattered effects.
+### The easing is the whole point
 
-Elements carry `.appear` plus a modifier — `--scale`, `--soft`, `--mask`,
-`--pop`, `--btn`, `--side`, `--stat` — and a `--d` delay that stages them:
-logo `0.08s`, then the nav pills every `0.12s`, then the hero badge, the headline
-lines, the lede, and the buttons last. Duration `1.05s`,
-`cubic-bezier(0.16, 1, 0.3, 1)`.
+`lib/rig.ts` implements a **trapezoidal velocity profile**, not a cubic-bezier.
+The difference is not decorative:
 
-Two rules that are not decoration:
+A bezier scales its **entire curve** with the duration, so a long move and a
+short move are the same shape at different speeds. A motion controller does not
+work that way — acceleration is bounded by torque, which is a property of the
+motor and not of the move — so the ramp lasts the same number of **milliseconds**
+however far the axis travels. A long move gets a longer flat **cruise**, not a
+lazier curve.
 
-- **`.appear` rests at opacity 1.** If animations never run — a failed
-  stylesheet, an old engine, reduced motion — the page is fully visible rather
-  than a blank screen waiting for a keyframe that is not coming.
-  `animation-fill-mode: both` supplies the 0% frame during the delay, so when
-  animations *do* run the elements still hide and then arrive.
-- **Each element retires its own animation** on `animationend`, gaining `.is-in`
-  which clears the animation entirely. Without it a finished animation's fill
-  state keeps holding a transform, and anything transforming later — a hover
-  lift, the stamp's rotation — fights it.
+That single property is what the eye reads as *driven* rather than *animated*.
+`RAMP_MS = 70`. `lib/rig.test.ts` asserts it directly.
 
-`components/AppearMotion.tsx` wires both, plus a fallback: if nothing is running
-after two frames, it forces `.is-in` on everything. That covers the case
-`opacity: 1` cannot — an animation that is *declared* but never *starts* would
-otherwise strand elements at opacity 0 forever.
+**Overshoot is zero by default.** A springy settle is what an *uncalibrated* axis
+does, and would say the opposite of what this product claims. `settle()` exists
+and is tested; nothing in the rigs calls it.
 
-Below the fold, sections use `.reveal` with `useInView` (IntersectionObserver,
-threshold 0.2, triggerOnce) instead. Load sequence above, scroll reveal below.
+**Never animate opacity on a meaning-bearing rig line.** Weight is carried by
+dash pattern plus the `--rig-line` / `--rig-solved` colour step. Crossfades
+interpolate *colour* between two endpoints that each already clear 3:1, so a
+stray alpha fails safe.
 
-## Accessibility
+### Server-render complete, then rewind
 
-- Headings in document order, one real `<h1>` per page.
-- Labelled form controls. Real `<button>` elements.
-- A visible 2px `--accent` focus ring at offset 2px on every interactive element.
-- Decorative SVG is `aria-hidden="true"`.
-- Stamps are `aria-hidden` with the status also present as text.
-- Every status colour is paired with a word, so nothing depends on colour alone.
-- Maintain 4.5:1 contrast over the hero glow; the vignette exists for this.
+Every rig renders its **terminal state** on the server. The client rewinds to
+frame zero in a `setTimeout(…, 0)` *after* mount.
 
-## Responsive
+This means the finished document is what exists in the HTML, what a crawler
+sees, what renders with JS blocked, and what survives a hydration failure. The
+animation is a **rewind of a complete document**, never a build-up toward one.
 
-Below 900px: stack all multi-column sections, scale the aperture to ~130vw so it
-bleeds off-screen rather than shrinking, and stack the landing figures 2×2.
-The docket's six fixed-width columns restack onto two lines below 700px — they
-cannot shrink, and **the page must never scroll horizontally**, at any width down
-to 375px.
+`prefers-reduced-motion` is checked **before the first frame is scheduled**, so
+no rAF work is ever queued, and the still frame is the *same render function* at
+the terminal state — never a separate fallback path that can drift.
 
-## Deviations, recorded so they are decisions and not drift
+### The rigs must never lie
 
-1. **No scroll cue in the hero.** The source brief specifies a hairline, an
-   animated tick and a "Scroll" label at the bottom of the hero. The owner asked
-   for it to be removed after seeing it built, so it is gone along with its
-   keyframes.
+This is a product whose pitch is *"pay on proof, not on trust"*, and the rig
+readouts sit in the same mono face as figures the user is asked to verify. So:
 
-2. **The docket row restacks below 700px rather than scrolling.** At 375px the
-   six fixed-width columns forced a 597px row and the page scrolled sideways,
-   which this file forbids at any width. Below 700px the row wraps onto two lines
-   and the column headings hide, because they no longer sit above anything. The
-   values stay self-describing: an amount, a duration, a stamp.
+- `FRAME` is derived from **elapsed milliseconds**, never from rAF tick count —
+  a tick counter follows display refresh and would print a lie on a 120Hz screen.
+- `RESIDUAL` is the actual RMS marker offset, driven by the same interpolation
+  that moves the markers. It is the drawing's own state, not a scripted countdown.
+- Deleted for asserting facts that do not exist: `VOL 6.0 × 6.0 × 3.0 m`,
+  `RIG 01`, `FEED 12 mm/s`, `PROBE Z`. There is no room and there are no cameras.
+- If `solveIK2` reports `clamped`, the arm shows `STATE OUT-OF-ENVELOPE` and
+  falls back to the track rail. A rig that admits it cannot reach is in
+  character; one that points confidently at nothing is not.
+
+---
+
+## What this must NOT look like
+
+- No Roboto, Poppins, Montserrat, Inter, Space Grotesk, or raw `system-ui`.
+- No rounded card grids floating on a light background.
+- No purple→blue SaaS gradient hero.
+- No glass/blur pills. (`.nav-pill` was the SaaS tell in the previous build.)
+- No emoji anywhere in the UI.
+- No decorative `01 / 02 / 03` numbering. Numbers are **join keys**: the balloons
+  on the skeleton and the columns below share indices, and the test is
+  falsifiable — remove the drawing and the numbers stop making sense.
+- No third dark panel. The volume appears on exactly two screens.
+- No second accent colour.
+
+---
+
+## Accessibility floor
+
+Not negotiable, and machine-checked where possible.
+
+- Body text ≥ 4.5:1 against its **actual computed** background; large text and
+  graphics ≥ 3:1.
+- Touch targets ≥ 44px wherever `(pointer: coarse)` — **gated on pointer type,
+  not viewport width.** An iPad in portrait reports `innerWidth: 768` and fell
+  outside a 760px breakpoint while being a pure touch device. Width was always a
+  proxy for "is this being touched", and a bad one.
+- Links inside running prose keep the WCAG 2.5.8 exemption via `.in-prose` — a
+  44px slab behind a word in a paragraph overlaps its neighbours and makes taps
+  *less* accurate.
+- Form fields set at 16px on touch: iOS Safari zooms the page in when a field
+  under 16px takes focus, and does not zoom back out.
+- Disabled controls keep `--text-faint` and are signalled by a dashed border,
+  `cursor: not-allowed` and `aria-disabled` — **never** by fading the label. This
+  removes the whole class of disabled-contrast failures instead of arguing the
+  1.4.3 exemption.
+- Rigs are `role="img"` with an `aria-label` naming the **terminal** state.
+  Decorative geometry is `aria-hidden`. Nothing about a verdict is knowable only
+  through motion.

@@ -26,6 +26,8 @@ import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import { GoogleGenAI } from "@google/genai";
 import * as z from "zod/v4";
 
+import { DEFAULT_CONFIDENCE_THRESHOLD } from "./constants";
+
 /**
  * WHICH MODEL JUDGES.
  *
@@ -61,12 +63,17 @@ export function judgeModel(provider: JudgeProvider = judgeProvider()): string {
 
 /**
  * Below this confidence the protocol refuses to settle automatically and holds
- * the task for a human. Env-tunable; 70 is the documented default.
+ * the task for a human. Env-tunable; the documented default lives in
+ * `lib/constants.ts` so the screens that PRINT the threshold and the judge that
+ * ENFORCES it read the same number. This function is server-only - it reads a
+ * non-public env var - so UI passes its result down as a prop.
  */
 export function confidenceThreshold(): number {
   const raw = process.env.CONFIDENCE_THRESHOLD;
   const parsed = raw === undefined ? NaN : Number(raw);
-  if (!Number.isFinite(parsed) || parsed < 0 || parsed > 100) return 70;
+  if (!Number.isFinite(parsed) || parsed < 0 || parsed > 100) {
+    return DEFAULT_CONFIDENCE_THRESHOLD;
+  }
   return parsed;
 }
 
