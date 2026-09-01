@@ -21,34 +21,34 @@
      Token NAMES are unchanged from every previous system. Twenty components
      read them, so remapping values moves the product at once. */
 
-  --page: #aeb3b6;        /* Deck - machined zinc. Not a document, not an app. */
-  --surface: #e6e8e8;     /* Plate - cold-rolled; every content surface        */
+  --page: #cfd3d4;        /* Deck - machined zinc, lightened for legibility.  */
+  --surface: #eef0f0;     /* Plate - cold-rolled; every content surface        */
   /* Ground - surface-ground plate, reserved for state COMMITTED on-chain:
      sealed clause sets, the verdict sheet, settled rows. Only Ground plates get
      bolts, so a bolt means "this is on the chain" rather than "this is a box". */
-  --raised: #f0f2f2;
-  --sunk: #dcdfdf;        /* wells sunk into a plate: textareas, code blocks   */
+  --raised: #f8f9f9;
+  --sunk: #e2e5e5;        /* wells sunk into a plate: textareas, code blocks   */
   /* Solid, never alpha: a machined edge is an edge, not a shadow of one. */
   --border: #14171a;
   --hairline: #c4c9c9;
   --border-strong: #14171a;
   --input-rule: #14171a;
-  --row-hover: #dcdfdf;
+  --row-hover: #e2e5e5;
 
   --text: #14171a;        /* Graphite - all type, all rules, the bolt body     */
   --text-2: #232a2e;
   --text-muted: #383e42;  /* faceplate callout text                            */
-  --text-faint: #5a6166;
+  --text-faint: #4d5357;
 
   /* Brass governs the whole colour rule: it marks the part that MOVES. The
      fence, the active tick, the focus ring. Nothing decorative is ever brass.
      It is 2.85:1 on Deck - below even the 3:1 non-text floor - so brass NEVER
      appears on Deck, as type or as graphic. Plate and Ground only. */
-  --accent: #7d5e12;
-  --accent-strong: #7d5e12;
+  --accent: #6b5010;
+  --accent-strong: #6b5010;
 
   /* The three terminal states of a bolt, and only these. */
-  --positive: #1c6b45;    /* Thrown - released, APPROVED, settled              */
+  --positive: #175a3a;    /* Thrown - released, APPROVED, settled              */
   --negative: #96121e;    /* Arrest - the stop. REJECTED, and the blocking clause */
   /* A lever lock is binary, but Rubric is not: a held task is neither thrown
      nor arrested. Steel, deliberately outside the brass/green/red family, for
@@ -59,15 +59,15 @@
   --overlay: rgba(20, 23, 26, 0.55);
 
   /* --- LANDING - same deck, same plate. There is no separate landing skin. */
-  --d-ground: #aeb3b6;
-  --d-section: #e6e8e8;
-  --d-panel: #f0f2f2;
+  --d-ground: #cfd3d4;
+  --d-section: #eef0f0;
+  --d-panel: #f8f9f9;
   --d-panel-dark: #d2d6d6;
   --d-border: #14171a;
   --d-border-2: #c4c9c9;
   --d-text: #14171a;
   --d-muted: #383e42;
-  --d-faint: #5a6166;
+  --d-faint: #4d5357;
 
   --sol-purple: #9945ff;
   --sol-green: #14f195;
@@ -843,7 +843,10 @@ select.field option {
 }
 
 @media (max-width: 700px) {
-  .nav-pill { height: 34px; padding: 0 12px; font-size: 13px; }
+  /* Smaller type, but NOT a smaller target. An earlier version shrank these to
+     34px, which is the wrong instinct: a phone is touched, and 44px is the
+     smallest thing a finger hits reliably. Narrow the padding instead. */
+  .nav-pill { height: 44px; padding: 0 12px; font-size: 13px; }
 }
 
 /* ---------------------------------------------------------------------------
@@ -1268,4 +1271,135 @@ select.field option {
   .reel-reason { opacity: 1; transform: none; }
   .reel-mark { color: var(--positive); }
   .reel-stamp { opacity: 1; transform: rotate(-4deg) scale(1); }
+}
+
+/* ---------------------------------------------------------------------------
+   THE LANDING HEADER, AND MOBILE
+   The nav was an unwrappable flex row. At 375px it was wider than the viewport,
+   which forced the header wide, which the hero grid inherited - so the page did
+   not scroll sideways, it CLIPPED, which is worse: content was simply gone with
+   no way to reach it.
+   --------------------------------------------------------------------------- */
+
+.fence-nav {
+  display: flex;
+  align-items: center;
+  gap: 28px;
+  padding: 20px 40px;
+  border-bottom: 1px solid var(--hairline);
+}
+
+.fence-nav-links {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 26px;
+}
+
+@media (max-width: 760px) {
+  .fence-nav {
+    flex-wrap: wrap;
+    gap: 12px 16px;
+    padding: 14px 16px;
+  }
+  .fence-nav-links {
+    margin-left: 0;
+    width: 100%;
+    flex-wrap: wrap;
+    gap: 8px 18px;
+  }
+  /* A phone is touched, not pointed at. 44px is the smallest thing a finger
+     hits reliably, so every control clears it - links included, which is why
+     they get padding rather than only the buttons growing. */
+  .fence-nav-links a:not(.btn) {
+    min-height: 44px;
+    display: inline-flex;
+    align-items: center;
+    font-size: 15px;
+  }
+  .fence-nav-links .btn,
+  .btn {
+    min-height: 44px;
+  }
+  /* The wordmark is a link home, so it is a tap target like any other. */
+  .nameplate {
+    min-height: 44px;
+    display: inline-flex;
+    align-items: center;
+  }
+
+  .fence-hero {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 28px;
+    padding: 28px 16px 40px;
+  }
+  /* minmax(0,1fr) rather than 1fr: a bare 1fr track has an automatic minimum of
+     its content's size, so a wide child stretches the column instead of being
+     constrained by it. That is what let the rail render at 468px in a 375px
+     viewport. */
+  .fence-rail,
+  .fence-stage {
+    min-width: 0;
+    max-width: 100%;
+  }
+  .fence-stage {
+    width: auto;
+    margin-right: 0;
+    padding: 0;
+    border: 0;
+    background: transparent;
+  }
+}
+
+@media (max-width: 480px) {
+  .fence-rail h1 { font-size: 30px; }
+  .reel-row { grid-template-columns: 18px 1fr; }
+  /* The ruling drops under the clause on a narrow screen rather than being
+     squeezed beside it. */
+  .reel-mark { grid-column: 2; justify-self: start; }
+  .reel-foot { flex-direction: column; align-items: flex-start; gap: 12px; }
+}
+
+/* ---------------------------------------------------------------------------
+   TOUCH TARGETS
+   Everything interactive clears 44px on a phone. Applied here rather than per
+   component so a new control cannot quietly ship below the floor.
+   --------------------------------------------------------------------------- */
+
+@media (max-width: 760px) {
+  .app-header-inner a,
+  .app-header-inner button,
+  .record-row,
+  .btn,
+  .nav-pill {
+    min-height: 44px;
+  }
+
+  .app-header-inner a,
+  .app-header-inner button {
+    display: inline-flex;
+    align-items: center;
+  }
+
+  /* The docket's category filters sit in their own row and are easy to miss
+     with a thumb at 28px tall. */
+  .app-main nav a {
+    min-height: 44px;
+    display: inline-flex;
+    align-items: center;
+  }
+}
+
+/* Form fields on a phone.
+   16px is not a style choice: iOS Safari zooms the whole page in when a field
+   under 16px takes focus, and it does not zoom back out. Every field is set at
+   16 for that reason alone, and cleared to the 44px touch floor. */
+@media (max-width: 760px) {
+  input,
+  textarea,
+  select {
+    font-size: 16px;
+    min-height: 44px;
+  }
+  textarea { min-height: 120px; }
 }

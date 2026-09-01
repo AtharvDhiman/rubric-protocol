@@ -28,7 +28,7 @@ export function Marquee() {
             style={{ color: "var(--d-faint)", letterSpacing: "0.18em" }}
           >
             {item}
-            <span style={{ color: "var(--sol-purple)", marginLeft: 48 }}>◆</span>
+            <span style={{ color: "var(--text-faint)", marginLeft: 48 }}>◆</span>
           </span>
         ))}
       </div>
@@ -100,7 +100,7 @@ export function HowItWorks() {
                   fontWeight: 600,
                   lineHeight: 1,
                   letterSpacing: "-0.01em",
-                  color: "var(--sol-purple)",
+                  color: "var(--accent)",
                 }}
               >
                 {step.n}
@@ -217,7 +217,7 @@ export function VerdictLog() {
                   width: 6,
                   height: 6,
                   borderRadius: "50%",
-                  background: "var(--sol-green)",
+                  background: "var(--positive)",
                   display: "inline-block",
                 }}
               />
@@ -243,7 +243,7 @@ export function VerdictLog() {
                   animation: inView
                     ? `logIn 0.4s ease-out ${0.2 + i * 0.5}s both`
                     : undefined,
-                  borderLeft: isFinal ? "2px solid var(--sol-green)" : undefined,
+                  borderLeft: isFinal ? "2px solid var(--positive)" : undefined,
                   paddingLeft: isFinal ? 12 : undefined,
                   marginTop: isFinal ? 8 : undefined,
                 }}
@@ -251,7 +251,7 @@ export function VerdictLog() {
                 <span style={{ color: "var(--d-faint)" }}>{line.time}</span>
                 <span style={{ color: "var(--d-muted)", flex: 1 }}>{line.body}</span>
                 {line.verdict && (
-                  <span style={{ color: "var(--sol-green)" }}>{line.verdict}</span>
+                  <span style={{ color: "var(--positive)", fontWeight: 500 }}>{line.verdict}</span>
                 )}
               </div>
             );

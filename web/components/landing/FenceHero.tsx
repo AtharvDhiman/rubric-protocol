@@ -48,15 +48,7 @@ export function FenceHero() {
         }}
       />
 
-      <nav
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: 28,
-          padding: "20px 40px",
-          borderBottom: "1px solid var(--hairline)",
-        }}
-      >
+      <nav className="fence-nav">
         <Link
           href="/"
           className="nameplate appear appear--scale"
@@ -66,14 +58,8 @@ export function FenceHero() {
         </Link>
 
         <div
-          className="appear appear--soft"
-          style={{
-            ["--d" as string]: "0.2s",
-            marginLeft: "auto",
-            display: "flex",
-            alignItems: "center",
-            gap: 26,
-          }}
+          className="fence-nav-links appear appear--soft"
+          style={{ ["--d" as string]: "0.2s" }}
         >
           <a href="#how-it-works" style={navLink}>
             How it works
