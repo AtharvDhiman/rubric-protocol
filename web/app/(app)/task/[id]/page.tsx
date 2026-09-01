@@ -9,7 +9,7 @@
 
 import Link from "next/link";
 import { prisma } from "@/lib/db";
-import { DEMO_MODE, demoTaskById } from "@/lib/demo";
+import { DEMO_MODE, demoTaskById, isSampleTask } from "@/lib/demo";
 import { ClauseList } from "@/components/ClauseList";
 import { MetaRow } from "@/components/MetaRow";
 import { Stamp } from "@/components/Stamp";
@@ -142,6 +142,23 @@ export default async function TaskPage({
   return (
     <article>
       {/* ---------------- HEADER ---------------- */}
+      {isSampleTask(task.id) && (
+        <div
+          role="status"
+          style={{
+            border: "1px solid var(--warning)",
+            borderRadius: 2,
+            padding: "12px 16px",
+            marginBottom: 20,
+          }}
+        >
+          <span className="label" style={{ color: "var(--warning)" }}>
+            SEEDED EXAMPLE · this record was not sealed on-chain, no escrow
+            exists, and the signatures below are placeholders
+          </span>
+        </div>
+      )}
+
       <p className="label label-11" style={{ margin: 0 }}>
         MATTER Nº {recordNumber} · {task.category.toUpperCase()} · OPENED{" "}
         {formatDate(task.createdAt)}

@@ -9,7 +9,7 @@
 
 import Link from "next/link";
 import { prisma } from "@/lib/db";
-import { DEMO_MODE, demoTasks } from "@/lib/demo";
+import { DEMO_MODE, demoTasks, isSampleTask } from "@/lib/demo";
 import { MetaRow } from "@/components/MetaRow";
 import { Stamp, stampForState } from "@/components/Stamp";
 import { formatUsdc } from "@/lib/task-view";
@@ -143,6 +143,16 @@ export default async function DocketPage({
         </span>
       </div>
 
+      {tasks.some((task) => isSampleTask(task.id)) && (
+        <p
+          className="label"
+          style={{ color: "var(--warning)", marginTop: 12 }}
+        >
+          SOME RECORDS BELOW ARE SEEDED EXAMPLES, MARKED SAMPLE. NO ESCROW EXISTS
+          FOR THOSE.
+        </p>
+      )}
+
       <hr className="rule" style={{ marginTop: 24 }} />
 
       {/* ---------------- FILTERS ---------------- */}
@@ -267,6 +277,15 @@ export default async function DocketPage({
                   textAlign: "right",
                 }}
               >
+                {isSampleTask(task.id) && (
+                  <span
+                    className="label"
+                    style={{ color: "var(--warning)", marginRight: 8 }}
+                    title="A seeded example. No escrow exists for this record."
+                  >
+                    SAMPLE
+                  </span>
+                )}
                 <Stamp variant={stampForState(task.state)} small />
               </span>
             </Link>
