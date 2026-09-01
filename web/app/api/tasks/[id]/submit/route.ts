@@ -11,6 +11,8 @@ import { NextResponse } from "next/server";
 import { PublicKey } from "@solana/web3.js";
 import { prisma } from "@/lib/db";
 import { hashSubmissionHex } from "@/lib/hash";
+import { verifyWorkerProof } from "@/lib/server/worker-auth";
+import type { WorkerProof } from "@/lib/worker-auth";
 
 export const runtime = "nodejs";
 
@@ -30,7 +32,7 @@ export async function POST(
     return NextResponse.json({ error: "Request body must be JSON." }, { status: 400 });
   }
 
-  const { content, workerAddress } = body ?? {};
+  const { content, workerAddress, proof } = body ?? {};
 
   if (typeof content !== "string" || content.trim().length === 0) {
     return NextResponse.json(
@@ -76,24 +78,43 @@ export async function POST(
     );
   }
 
-  // KNOWN GAP - see "Known limitations" in the README.
-  //
-  // Nothing here proves the caller controls `workerAddress`; it is taken from
-  // the request body. While the task is OPEN, anyone can therefore overwrite the
-  // staged submission of a worker who has not yet sealed on-chain.
-  //
-  // What that does and does not buy an attacker: it CANNOT redirect the bounty,
-  // because `submit_work` is signed by the worker's own wallet and the escrow
-  // pays whoever the chain records. It CAN grief - overwrite the content a
-  // worker staged so that the hash they go on to sign no longer matches what is
-  // stored, at which point the verify route refuses to judge and holds the task.
-  // Annoying and worth closing; not a path to anyone else's money.
-  //
-  // The real fix is to make the client sign a short message with its wallet and
-  // verify that signature against `workerAddress` here. That adds a signing
-  // prompt before the transaction, which is a product decision, so it is written
-  // down rather than done quietly.
   const submissionHash = hashSubmissionHex(content);
+
+  // Prove the caller actually holds `workerAddress` before letting them write.
+  //
+  // Until this existed the field was just a string in a request body, so anyone
+  // could overwrite a submission another worker had staged but not yet sealed -
+  // not to steal the bounty, which only the chain can direct, but to break an
+  // honest worker's submission so their task got held instead of judged.
+  //
+  // The signature covers the task, the wallet and a hash of this exact body, so
+  // it cannot be replayed onto different content or a different task, and it is
+  // only accepted within a few minutes of being issued.
+  const auth = verifyWorkerProof({
+    taskId: id,
+    workerAddress,
+    submissionHash,
+    proof: proof as WorkerProof | undefined,
+  });
+  if (!auth.ok) {
+    return NextResponse.json({ error: auth.reason }, { status: auth.status });
+  }
+
+  // Nobody but the worker who staged it may replace a submission. Signature or
+  // not, silently overwriting someone else's staged work is not something this
+  // endpoint should do.
+  if (
+    task.submissionContent &&
+    task.workerAddress &&
+    task.workerAddress !== workerAddress
+  ) {
+    return NextResponse.json(
+      { error: "Another worker has already submitted to this task." },
+      { status: 409 }
+    );
+  }
+
+
 
   await prisma.task.update({
     where: { id },

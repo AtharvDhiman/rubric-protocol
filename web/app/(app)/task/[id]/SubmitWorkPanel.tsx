@@ -24,7 +24,9 @@ import {
 } from "@solana/spl-token";
 import { useRubricProgram } from "@/lib/useRubricProgram";
 import { TxFlow, useTxFlow } from "@/components/TxFlow";
-import { fromHex } from "@/lib/hash";
+import { fromHex, hashSubmissionHex } from "@/lib/hash";
+import { workerAuthMessage } from "@/lib/worker-auth";
+import bs58 from "bs58";
 import { methodsOf } from "@/lib/anchor-methods";
 
 export function SubmitWorkPanel({
@@ -40,7 +42,7 @@ export function SubmitWorkPanel({
 }) {
   const router = useRouter();
   const { connection } = useConnection();
-  const { publicKey, connected } = useWallet();
+  const { publicKey, connected, signMessage } = useWallet();
   const { program, usdcMint, error: idlError } = useRubricProgram();
   const { state, run, reset, busy } = useTxFlow();
   // The judge runs after the transaction is already done, so it cannot be a
@@ -72,13 +74,36 @@ export function SubmitWorkPanel({
     await run(async (tx) => {
       tx.preparing();
 
+      // Step 0 - prove this wallet is the one submitting.
+      //
+      // Costs the worker one signature prompt, before the transaction. It is not
+      // a transaction and moves nothing; it stops anyone else overwriting the
+      // work staged here between now and the moment it is sealed on-chain. The
+      // bytes are built by the same shared function the server verifies with.
+      if (!signMessage) {
+        throw new Error(
+          "This wallet cannot sign messages, which is required to submit work."
+        );
+      }
+      const workerAddress = publicKey.toBase58();
+      const submissionHash = hashSubmissionHex(content);
+      const issuedAt = new Date().toISOString();
+      // Named apart from the TRANSACTION signature further down. They are
+      // different things: this authenticates the writer, that one moves money.
+      const authSignature = await signMessage(
+        new TextEncoder().encode(
+          workerAuthMessage({ taskId, workerAddress, submissionHash, issuedAt })
+        )
+      );
+
       // Step 1 - store the content, get the hash the chain will commit to.
       const response = await fetch(`/api/tasks/${taskId}/submit`, {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
           content,
-          workerAddress: publicKey.toBase58(),
+          workerAddress,
+          proof: { signature: bs58.encode(authSignature), issuedAt },
         }),
       });
       const body = await response.json();
