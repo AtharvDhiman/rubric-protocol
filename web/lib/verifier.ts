@@ -458,35 +458,60 @@ async function askGemini(
   // applied to its answer can never disagree.
   const schema = z.toJSONSchema(JudgePayloadSchema) as Record<string, unknown>;
 
-  const interaction = await withDeadline(
-    genai.interactions.create({
+  // `models.generateContent` with `responseJsonSchema`, NOT `interactions.create`
+  // with `response_format`.
+  //
+  // The latter is silently advisory on some models: gemini-2.5-flash ignored the
+  // schema completely and answered with its own invented shape
+  // ({"clause_0": {"rule_met": ...}}), wrapped in a markdown fence, so every
+  // verdict failed to parse and every task was held. The guards caught it and
+  // nothing was ever wrongly approved, but the judge did not work at all. This
+  // endpoint actually binds the schema.
+  const response = await withDeadline(
+    genai.models.generateContent({
       model,
-      // Gemini has no separate system field on this endpoint, so the system
-      // prompt is prepended. The untrusted submission is still fenced by the
-      // per-request nonce inside userMessage, which is what actually matters.
-      input: `${SYSTEM_PROMPT}
+      // Gemini has no separate system field here, so the system prompt is
+      // prepended. The untrusted submission is still fenced by the per-request
+      // nonce inside userMessage, which is what actually matters.
+      contents: `${SYSTEM_PROMPT}
 
 ---
 
 ${userMessage}`,
-      response_format: {
-        type: "text",
-        mime_type: "application/json",
-        schema,
+      config: {
+        responseMimeType: "application/json",
+        responseJsonSchema: schema,
       },
-    } as never),
+    }),
     JUDGE_TIMEOUT_MS
   );
 
-  const text = (interaction as { output_text?: string }).output_text;
+  const text = response.text;
   if (!text) {
     return { kind: "unusable", reason: "The judge returned no output." };
   }
   try {
-    return { kind: "ok", value: JSON.parse(text) };
+    return { kind: "ok", value: JSON.parse(stripCodeFence(text)) };
   } catch {
     return { kind: "unusable", reason: "The judge's response was not valid JSON." };
   }
+}
+
+/**
+ * Remove a ```json ... ``` wrapper if the model added one.
+ *
+ * Belt and braces. Asking for `application/json` is supposed to make this
+ * impossible, and on the endpoint above it does - but a fenced reply is exactly
+ * how the previous endpoint failed, and a judge that holds every task because of
+ * three backticks is a bad way to find that out again.
+ */
+function stripCodeFence(text: string): string {
+  const trimmed = text.trim();
+  if (!trimmed.startsWith("```")) return trimmed;
+  return trimmed
+    .replace(/^```[a-zA-Z]*\s*/, "")
+    .replace(/\s*```$/, "")
+    .trim();
 }
 
 /**

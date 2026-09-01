@@ -65,13 +65,34 @@ Circle's devnet USDC as the bounty mint), and the keypair in `VERIFIER_SECRET_KE
 resolves to the same pubkey as the on-chain `config.verifier_authority` — so this
 server is the only account whose verdicts the program will accept.
 
-**What is still unverified:** a full seal → submit → verdict → settle round trip
-on devnet. Every piece has been exercised on its own, and the whole sequence is
-covered against a local validator by the 19 Anchor tests using a mock mint. What
-has not been run is that sequence on devnet with real transfers, and it is
-blocked on supply rather than on code: `config.bounty_mint` is Circle's devnet
-USDC and the deploying wallet holds none. Fund it from Circle's devnet faucet
-(and top up devnet SOL, currently ~0.04) before attempting it.
+**The round trip is now verified**, against a local validator:
+
+```bash
+npx dotenv-cli -e .env.e2e -- npx tsx scripts/e2e-flow.mjs
+```
+
+It drives the real API routes over HTTP against a real deployed program, standing
+in for the browser wallet with a keypair, and checks token balances on-chain at
+every step. What it proved, in one run:
+
+| Step | Result |
+| --- | --- |
+| Seal a funded rubric | 5 USDC left the poster, escrow ATA holds 5 |
+| Submit with no signature | rejected, 401 |
+| Submit signed by the wrong wallet | rejected, 401 |
+| Submit signed correctly | accepted; server and client hashes agree; chain says `Submitted` |
+| Judge rules | `approved` → `SETTLED` |
+| Payout | worker received **4.90 USDC** — the bounty less the 2% fee — and the escrow account was closed |
+| `reclaim_expired` on an expired task | poster got the **full 2 USDC** back, no fee on a refund, escrow closed |
+
+This was blocked for a long time on devnet USDC, which needs Circle's faucet. A
+local validator with a mint we control removes that dependency, and the program,
+the routes and the judge are all the real ones.
+
+**What is still unverified:** the same sequence on devnet with Circle's USDC, and
+the browser wallet path. The script signs with a keypair where Phantom would, so
+wallet-adapter integration — the popup, the rejection path, the `signMessage`
+prompt — has not been exercised by a real extension.
 
 ### The program keypair
 
@@ -320,57 +341,38 @@ worth knowing before you show this to anyone:
   quota failure in those tests is reported as a skip, not a failure, because a
   429 says nothing about whether the judge rules correctly.
 
-**5. The submit endpoint does not authenticate the worker.** `POST /api/tasks/[id]/submit`
-takes `workerAddress` from the request body and does not verify the caller controls
-it, so while a task is OPEN anyone can overwrite a submission that has been staged
-but not yet sealed on-chain. This cannot redirect a bounty — `submit_work` is signed
-by the worker's own wallet and the escrow pays whoever the chain records — and the
-verify route now refuses to judge any submission that does not hash to the
-`submission_hash` sealed on-chain, so a tampered submission is held rather than
-ruled on. What remains is a griefing vector against an honest worker. Closing it
-means having the client sign a message with its wallet and verifying that
-signature server-side, which adds a signing prompt before the transaction.
-
-**6. `reclaim_expired` has no UI.** The instruction exists, is covered by the
-Anchor tests, and is the poster's way out of an expired or abandoned task — but
-nothing in the web app calls it, so a poster has to invoke it against the program
-directly to get their escrow back. It is deliberately not wired up here rather
-than shipped untested: exercising a money-moving flow needs devnet USDC this
-wallet does not have (see "What is still unverified"). It is the first thing to
-build once the wallet is funded.
-
-**7. No dispute or arbitration path.** Out of scope for the MVP. A rejected worker's
+**5. No dispute or arbitration path.** Out of scope for the MVP. A rejected worker's
 only recourse is the public reasoning.
 
-**8. The clock is the validator's.** `Clock::get()` is not a precise wall clock;
+**6. The clock is the validator's.** `Clock::get()` is not a precise wall clock;
 deadlines are accurate to within a slot or so, which is fine at hour granularity.
 
-**9. A closed destination token account delays settlement.** `submit_verdict`
+**7. A closed destination token account delays settlement.** `submit_verdict`
 requires the worker's, the poster's, and the fee destination's token accounts to
 exist, on both the approve and reject paths. If one is closed, the verdict
 transaction fails. The verifier recreates any missing account idempotently in the
 same transaction, which closes the race — but a determined party could still hold
 up their own settlement, and the grace-period reclaim is the backstop.
 
-**10. Dust sent to a settled task's escrow address is unrecoverable.** Once a task
+**8. Dust sent to a settled task's escrow address is unrecoverable.** Once a task
 settles, its escrow account is closed and the task is terminal. ATA creation is
 permissionless, so anyone can recreate that address and send tokens to it, and no
 instruction will ever sign for it again. Do not retry a deposit against a settled
 task.
 
-**11. Task ids are sequential per creator, so a specific id can be blocked.** The
+**9. Task ids are sequential per creator, so a specific id can be blocked.** The
 escrow uses `init`, which fails if the account already exists. Someone who
 predicts `(creator, task_id)` can pre-create the escrow ATA and make that one id
 unusable. The cost is theirs (rent per blocked id), the poster simply gets the
 next id, and no funds are at risk — but it is a cheap nuisance.
 
-**12. `initialize_config` must be run by the program's upgrade authority.** This is
+**10. `initialize_config` must be run by the program's upgrade authority.** This is
 enforced on-chain, and it is what stops a bystander from front-running the setup
 transaction and installing themselves as admin and verifier. The consequence: do
 not make the program immutable before initializing the config, or the deployment
 is unusable.
 
-**13. Landing-page figures are targets, not measurements.** They are labelled as
+**11. Landing-page figures are targets, not measurements.** They are labelled as
 such in the UI and live in `web/lib/constants.ts`.
 
 ---
