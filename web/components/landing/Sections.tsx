@@ -89,14 +89,25 @@ export function HowItWorks() {
               paddingLeft: i === 0 ? 0 : 48,
             }}
           >
-            <div style={{ display: "flex", alignItems: "baseline", gap: 12 }}>
+            <div style={{ display: "flex", alignItems: "baseline", gap: 14 }}>
+              {/* Step number. This used to carry a section mark; the owner asked
+                  for that symbol gone from the site, so the numeral does the work
+                  on its own - same Plex Mono, same single purple. */}
               <span
                 className="data"
-                style={{ fontSize: 20, fontWeight: 600, color: "var(--sol-purple)" }}
+                style={{
+                  fontSize: 26,
+                  fontWeight: 600,
+                  lineHeight: 1,
+                  letterSpacing: "-0.01em",
+                  color: "var(--sol-purple)",
+                }}
               >
-                §{step.n}
+                {step.n}
               </span>
-              <h3 style={{ fontSize: 18, color: "var(--d-text)" }}>{step.title}</h3>
+              <h3 style={{ fontSize: 20, color: "var(--d-text)", margin: 0 }}>
+                {step.title}
+              </h3>
             </div>
             <p
               style={{
@@ -121,9 +132,9 @@ export function HowItWorks() {
 
 const LOG_LINES: Array<{ time: string; body: string; verdict?: string }> = [
   { time: "14:02:41", body: "submission received — 500 of 500 labels" },
-  { time: "14:02:42", body: "§1 sampled 50, focus check", verdict: "PASS" },
-  { time: "14:02:53", body: "§2 twelve blurred frames excluded", verdict: "PASS" },
-  { time: "14:03:07", body: "§3 one label per image", verdict: "PASS" },
+  { time: "14:02:42", body: "clause 1 sampled 50, focus check", verdict: "PASS" },
+  { time: "14:02:53", body: "clause 2 twelve blurred frames excluded", verdict: "PASS" },
+  { time: "14:03:07", body: "clause 3 one label per image", verdict: "PASS" },
   { time: "14:03:22", body: "verdict approved — confidence 96" },
   { time: "14:03:22", body: "released 25.00 USDC — finality 0.4s" },
 ];

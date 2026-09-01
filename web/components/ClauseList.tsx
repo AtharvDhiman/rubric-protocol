@@ -21,7 +21,7 @@ export function ClauseList({ clauses }: { clauses: string[] }) {
           }}
         >
           <span className="clause-mark" style={{ fontSize: 14, paddingTop: 2 }}>
-            §{i + 1}
+            {i + 1}
           </span>
           <span style={{ fontSize: 15, lineHeight: 1.6 }}>{clause}</span>
         </li>

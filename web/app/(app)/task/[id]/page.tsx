@@ -371,7 +371,7 @@ export default async function TaskPage({
                           fontSize: 13,
                         }}
                       >
-                        §{ruling.index + 1}
+                        {ruling.index + 1}
                       </td>
                       <td
                         style={{

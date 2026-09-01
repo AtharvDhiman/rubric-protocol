@@ -571,7 +571,7 @@ function ClauseRow({
       style={{ display: "flex", gap: 12, alignItems: "flex-start", marginTop: 16 }}
     >
       <span className="clause-mark" style={{ fontSize: 14, paddingTop: 10 }}>
-        §{index + 1}
+        {index + 1}
       </span>
       <div style={{ flex: 1 }}>
         <textarea

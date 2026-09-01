@@ -94,7 +94,7 @@ describe("canonicalizeRubric", () => {
     expect(canonicalizeRubric(altered)).not.toBe(canonicalizeRubric(RUBRIC));
   });
 
-  it("changes when clause ORDER changes - §2 is not §3", () => {
+  it("changes when clause ORDER changes - clause 2 is not clause 3", () => {
     const reordered = { ...RUBRIC, clauses: [...RUBRIC.clauses].reverse() };
     expect(canonicalizeRubric(reordered)).not.toBe(canonicalizeRubric(RUBRIC));
   });

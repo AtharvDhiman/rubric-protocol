@@ -72,7 +72,7 @@ Rules:
 | Text body     | `#d4d4d8` | clause text and other long-form reading                         |
 | Text muted    | `#a1a1aa` |                                                                 |
 | Text faint    | `#71717a` | labels, timestamps, units                                       |
-| Purple        | `#9945FF` | § numerals, active nav underline, sealed stamp                  |
+| Purple        | `#9945FF` | clause numerals, active nav underline, sealed stamp             |
 | Green         | `#14F195` | approved, paid, live indicators                                 |
 | Red           | `#ff4d6d` | rejected — brighter than a light-theme red so it holds on dark  |
 | Amber         | `#f59e0b` | held for review                                                 |
@@ -105,9 +105,14 @@ Rules:
 
 ## The two motifs that are allowed (because they mean something)
 
-1. **THE CLAUSE MARK.** Acceptance criteria are numbered §1 §2 §3, in Plex Mono, in
-   `#9945FF`. Never bullets, never "1." — the section mark signals that clauses are
-   binding terms, which is literally true here. Used everywhere clauses appear.
+1. **THE CLAUSE NUMBER.** Acceptance criteria are numbered 1 2 3, in Plex Mono, in
+   `#9945FF`. Never bullets. The numeral does the work: colour and monospace mark
+   these out as binding terms rather than a list. Used everywhere clauses appear.
+
+   > This previously used the section sign — §1 §2 §3. The owner asked for that
+   > symbol to be removed from the site, so it is gone from every screen and from
+   > this spec. Do not reintroduce it. The numbering, the purple and the monospace
+   > all stay; only the glyph went.
 
 2. **THE VERDICT STAMP.** A rectangular outline containing a single uppercase word in
    Plex Mono 600 at 0.16em tracking: APPROVED (`#14F195`), REJECTED (`#ff4d6d`),

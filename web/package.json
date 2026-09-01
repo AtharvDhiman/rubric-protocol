@@ -19,6 +19,7 @@
     "@anchor-lang/core": "^1.1.2",
     "@anthropic-ai/sdk": "^0.122.0",
     "@google/genai": "^2.19.0",
+    "@noble/curves": "^2.4.0",
     "@noble/hashes": "^2.4.0",
     "@prisma/adapter-pg": "^7.10.0",
     "@prisma/client": "^7.10.0",
