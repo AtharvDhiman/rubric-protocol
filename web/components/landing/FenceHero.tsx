@@ -1,6 +1,6 @@
 import Link from "next/link";
 
-import { LockMechanism } from "@/components/LockMechanism";
+import { VerdictReel } from "@/components/VerdictReel";
 
 /**
  * The landing hero: a two-column faceplate.
@@ -13,15 +13,7 @@ import { LockMechanism } from "@/components/LockMechanism";
  * The thing you are looking at is the thing that decides whether you get paid.
  */
 
-// A scripted verdict for the landing: every clause passes, so the fence travels
-// clean through the stack and the bolt throws. A real rejection arrests against
-// the clause that caused it, and that is what /task/[id] shows.
-const DEMO_STATES = ["pass", "pass", "pass", "pass", "pass"] as const;
 
-// A real SHA-256, so the bitting profile on the landing is cut by an actual
-// digest rather than by decorative noise.
-const DEMO_HASH =
-  "cbdea82dd4a379bdd9c69b1f45a83fc2e75c76b746938d439d3434b404a262b3";
 
 const navLink: React.CSSProperties = {
   fontSize: 13,
@@ -160,11 +152,7 @@ export function FenceHero() {
 
         {/* ---- right: the mechanism ---- */}
         <div className="fence-stage">
-          <LockMechanism
-            states={[...DEMO_STATES]}
-            hash={DEMO_HASH}
-            partLabel={`FENCE / ${DEMO_STATES.length} TUMBLERS / SEALED`}
-          />
+          <VerdictReel />
         </div>
       </div>
     </header>

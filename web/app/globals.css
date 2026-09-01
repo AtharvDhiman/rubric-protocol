@@ -1137,3 +1137,135 @@ select.field option {
     margin-right: -20px;
   }
 }
+
+/* ---------------------------------------------------------------------------
+   THE VERDICT REEL
+   The hero: a settled verdict replaying itself. Rulings land one at a time,
+   the stamp presses, the payout counts up. Motion carries the ORDER of events,
+   which is information - a verdict is a sequence, not a state.
+   --------------------------------------------------------------------------- */
+
+.reel {
+  margin: 0;
+  padding: 26px 28px 22px;
+  border: 1px solid var(--border);
+  display: grid;
+  gap: 18px;
+}
+
+.reel-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--hairline);
+}
+
+.reel-conf { color: var(--text-muted); }
+
+.reel-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 14px;
+}
+
+/* Three columns: the clause number in its own gutter, the operative text, and
+   the ruling hard right so the verdict reads down a single edge. */
+.reel-row {
+  display: grid;
+  grid-template-columns: 22px 1fr auto;
+  gap: 4px 14px;
+  align-items: baseline;
+  padding-bottom: 13px;
+  border-bottom: 1px solid var(--hairline);
+}
+.reel-row:last-child { border-bottom: 0; padding-bottom: 0; }
+
+.reel-n { color: var(--accent); font-weight: 500; }
+
+.reel-clause {
+  font-size: 15px;
+  line-height: 1.45;
+  color: var(--text);
+}
+
+.reel-mark {
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  color: var(--text-faint);
+  transition: color 0.3s ease;
+}
+
+/* The reasoning is a citation: it hangs under the clause it answers, indented
+   to the clause column, and arrives only once that clause has been ruled on. */
+.reel-reason {
+  grid-column: 2 / -1;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text-muted);
+  opacity: 0;
+  transform: translateY(-3px);
+  transition: opacity 0.42s ease, transform 0.42s ease;
+}
+
+.reel-row.is-ruled .reel-mark { color: var(--positive); }
+.reel-row.is-ruled .reel-reason { opacity: 1; transform: none; }
+
+.reel-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  padding-top: 4px;
+}
+
+/* The stamp presses: it arrives oversized and slightly off-angle, then settles.
+   The -4deg rotation is the one permitted tilt in the product. */
+.reel-stamp {
+  display: inline-block;
+  padding: 7px 14px;
+  border: 1.5px solid var(--positive);
+  border-radius: 4px;
+  color: var(--positive);
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.16em;
+  background: rgba(255, 255, 255, 0.6);
+  opacity: 0;
+  transform: rotate(-14deg) scale(1.5);
+  transition:
+    opacity 0.18s ease,
+    transform 0.5s cubic-bezier(0.2, 1.4, 0.4, 1);
+}
+.reel-stamp.is-in {
+  opacity: 1;
+  transform: rotate(-4deg) scale(1);
+}
+
+.reel-payout {
+  font-size: 15px;
+  color: var(--text);
+}
+.reel-payout .data { font-size: 20px; font-weight: 500; }
+
+.reel-status {
+  color: var(--text-faint);
+  border-top: 1px solid var(--hairline);
+  padding-top: 12px;
+}
+
+@media (max-width: 900px) {
+  .reel { padding: 20px 18px 18px; }
+  .reel-clause { font-size: 14px; }
+}
+
+/* The sheet IS the design. With no motion every ruling, the stamp and the final
+   figure are already present - there is nothing to wait for. */
+@media (prefers-reduced-motion: reduce) {
+  .reel-reason { opacity: 1; transform: none; }
+  .reel-mark { color: var(--positive); }
+  .reel-stamp { opacity: 1; transform: rotate(-4deg) scale(1); }
+}
