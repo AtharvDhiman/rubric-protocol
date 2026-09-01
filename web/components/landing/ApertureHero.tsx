@@ -175,8 +175,9 @@ export function ApertureHero() {
             fontWeight: 600,
             fontSize: 20,
             letterSpacing: "-0.01em",
-            animation: "fadeUp 0.7s cubic-bezier(0.19,1,0.22,1) 0.2s both",
+            ["--d" as string]: "0.2s",
           }}
+          className="appear appear--scale"
         >
           <SolanaMark size={18} />
           Rubric
@@ -188,8 +189,9 @@ export function ApertureHero() {
             display: "flex",
             alignItems: "center",
             gap: 28,
-            animation: "fadeUp 0.7s cubic-bezier(0.19,1,0.22,1) 0.3s both",
+            ["--d" as string]: "0.3s",
           }}
+          className="appear appear--soft"
         >
           <a href="#how-it-works" style={navLink}>
             How it works
@@ -236,8 +238,9 @@ export function ApertureHero() {
             fontSize: 12.5,
             fontWeight: 400,
             letterSpacing: "-0.01em",
-            animation: "fadeUp 0.7s cubic-bezier(0.19,1,0.22,1) 1.4s both",
+            ["--d" as string]: "1.4s",
           }}
+          className="appear appear--pop"
         >
           <svg
             width="18"
@@ -283,8 +286,10 @@ export function ApertureHero() {
             letterSpacing: "-0.015em",
             color: "var(--d-muted)",
             margin: "20px 0 0",
-            animation: "fadeUp 0.7s cubic-bezier(0.19,1,0.22,1) 1.95s both",
+            ["--d" as string]: "1.95s",
+            animationDuration: "1.25s",
           }}
+          className="appear appear--soft"
         >
           Rubric locks the acceptance criteria on-chain before work begins. An AI
           judge checks each submission against those sealed clauses, and Solana
@@ -298,13 +303,20 @@ export function ApertureHero() {
             marginTop: 28,
             flexWrap: "wrap",
             justifyContent: "center",
-            animation: "fadeUp 0.7s cubic-bezier(0.19,1,0.22,1) 2.1s both",
           }}
         >
-          <Link href="/docket" className="btn btn-primary">
+          <Link
+            href="/docket"
+            className="btn btn-primary appear appear--btn"
+            style={{ ["--d" as string]: "2.1s" }}
+          >
             Open the docket
           </Link>
-          <a href="#how-it-works" className="btn">
+          <a
+            href="#how-it-works"
+            className="btn appear appear--side"
+            style={{ ["--d" as string]: "2.24s" }}
+          >
             Read the docs
           </a>
         </div>
