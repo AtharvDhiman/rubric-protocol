@@ -242,6 +242,33 @@ const PARALLAX = 0.16;
  * is a different drawing.
  */
 const CORE_PARALLAX_RATIO = -0.3;
+
+/**
+ * Pointer speed, in CSS pixels per millisecond, that commands the full spin
+ * boost. 2.5 is a brisk deliberate sweep across a laptop screen; a slow read
+ * hovers well under 0.5, and a hard flick tops out around 5 or 6.
+ */
+const SPIN_SPEED_REF = 2.5;
+
+/**
+ * Extra yaw rate at full boost, radians per millisecond.
+ *
+ * Four times SETTLED_YAW_RATE, so a fast sweep takes the shell from a
+ * 21-second revolution to roughly 4.2 seconds. Enough to read as the object
+ * being dragged along by the movement; not so much that it becomes a fidget
+ * spinner and stops looking like an instrument.
+ */
+const SPIN_BOOST_MAX = 0.0012;
+
+/**
+ * How fast the measured speed falls back to zero once the pointer stops.
+ *
+ * The decay lives on the SPEED, not on the accumulated rotation. That is the
+ * whole design: when you stop moving, the shell winds back down to its base
+ * rate over about half a second and stays wherever it got to. It does not
+ * rewind - a wheel spun harder ends up further round, it does not snap back.
+ */
+const SPIN_DECAY_TAU_MS = 170;
 /**
  * Time constant of the pointer filter.
  *
@@ -1152,6 +1179,20 @@ export function Oracle(props: OracleProps) {
   const rewoundRef = useRef<boolean>(false);
 
   /**
+   * Extra yaw accumulated from pointer speed, in radians.
+   *
+   * Accumulated rather than applied as a rate change, and the difference
+   * matters: the pose is a pure function of elapsed time, so raising `yawRate`
+   * would retroactively rewrite the whole rotation history and jump the shell
+   * to a new angle the instant the cursor moved. Integrating an extra rate into
+   * an offset is continuous by construction.
+   *
+   * In a ref so a StrictMode remount resumes the rotation instead of snapping
+   * it back to zero.
+   */
+  const spinRef = useRef<number>(0);
+
+  /**
    * The WEBGL_lose_context handle, kept across mounts because it CANNOT be
    * re-fetched once the context is lost: getExtension returns null on a lost
    * context. Teardown deliberately loses the context, so under React StrictMode
@@ -1319,7 +1360,12 @@ export function Oracle(props: OracleProps) {
      * strictly additive on top of `poseAt`, so the pure, testable pose is
      * still the thing the poster and the reduced-motion frame are drawn from.
      */
-    const draw = (ms: number, yawOffset = 0, pitchOffset = 0): void => {
+    const draw = (
+      ms: number,
+      yawOffset = 0,
+      pitchOffset = 0,
+      spin = 0
+    ): void => {
       if (!resources) return;
       const base = poseAt(ms, behaviour);
       const pose: Pose = {
@@ -1360,7 +1406,10 @@ export function Oracle(props: OracleProps) {
       }
 
       // ---- every wireframe in the rig, through one program ----
-      const rot = rotation3(pose.pitch, pose.yaw);
+      // The spin is added to the SHELL only. The core keeps the base pose and
+      // its counter-lean, so a fast sweep drags the cage around something that
+      // stays put - which is the reading the whole two-matrix split exists for.
+      const rot = rotation3(pose.pitch, pose.yaw + spin);
       modelView(bodyMatrix, rot, CAMERA_DIST);
 
       // The core takes the base pose plus a small NEGATIVE fraction of the
@@ -1574,6 +1623,14 @@ export function Oracle(props: OracleProps) {
     let trackedYaw = 0;
     let trackedPitch = 0;
 
+    /* Pointer SPEED, as distinct from pointer position.
+       Position decides which way the object leans; speed decides how fast the
+       shell turns while you are moving. */
+    let pointerSpeed = 0;
+    let lastX = 0;
+    let lastY = 0;
+    let lastMoveAt = 0;
+
     const onPointerMove = (event: PointerEvent): void => {
       // Coarse pointers do not hover, so a touch would snap the object rather
       // than ease it. Fine pointers only - and on a touch device this listener
@@ -1587,6 +1644,27 @@ export function Oracle(props: OracleProps) {
       const ny = (event.clientY / h) * 2 - 1;
       targetYaw = Math.max(-1, Math.min(1, nx)) * PARALLAX;
       targetPitch = Math.max(-1, Math.min(1, ny)) * PARALLAX;
+
+      // ---- speed ----
+      const at = event.timeStamp;
+      if (lastMoveAt > 0) {
+        // Guard the divisor: two events can share a timestamp, and coalesced
+        // moves can arrive with a zero delta. Infinity here would become a NaN
+        // matrix and take the whole object off screen.
+        const gap = at - lastMoveAt;
+        if (gap > 0.5) {
+          const dx = event.clientX - lastX;
+          const dy = event.clientY - lastY;
+          const speed = Math.hypot(dx, dy) / gap;
+          // Take the peak rather than the latest sample. Pointer streams are
+          // spiky, and a single slow frame in the middle of a fast sweep would
+          // otherwise drop the boost out from under the motion.
+          pointerSpeed = Math.max(pointerSpeed, speed);
+        }
+      }
+      lastMoveAt = at;
+      lastX = event.clientX;
+      lastY = event.clientY;
     };
 
     // The pointer left the document entirely - out of the window, or into the
@@ -1620,7 +1698,21 @@ export function Oracle(props: OracleProps) {
       trackedYaw += (targetYaw - trackedYaw) * k;
       trackedPitch += (targetPitch - trackedPitch) * k;
 
-      draw(elapsedRef.current, trackedYaw, trackedPitch);
+      /* SPEED -> EXTRA ROTATION.
+
+         The measured speed decays toward zero every frame, so a pointer that
+         has stopped produces no boost within about half a second even though
+         no event fires to say it stopped. What is left is integrated into the
+         accumulated spin, which is why the shell speeds up and slows down
+         smoothly instead of stepping between two rates. */
+      if (behaviour.tracksPointer) {
+        pointerSpeed *= Math.exp(-dt / SPIN_DECAY_TAU_MS);
+        const boost =
+          SPIN_BOOST_MAX * Math.min(1, pointerSpeed / SPIN_SPEED_REF);
+        spinRef.current += boost * dt;
+      }
+
+      draw(elapsedRef.current, trackedYaw, trackedPitch, spinRef.current);
 
       // A state that reaches a genuinely frozen pose stops asking for frames.
       // REFUNDED is arrested: once the spin-up move has landed and the pointer
@@ -1630,7 +1722,10 @@ export function Oracle(props: OracleProps) {
         behaviour.freezes &&
         elapsedRef.current > SPINUP_MS &&
         Math.abs(trackedYaw - targetYaw) < 1e-4 &&
-        Math.abs(trackedPitch - targetPitch) < 1e-4
+        Math.abs(trackedPitch - targetPitch) < 1e-4 &&
+        // Never park mid spin-down: the pose would freeze at whatever rate the
+        // boost happened to be at, which is the one visibly wrong way to stop.
+        pointerSpeed < 1e-3
       ) {
         stop();
         return;
