@@ -1,108 +1,254 @@
-import { SolanaMark } from "@/components/SolanaMark";
-import { Stamp } from "@/components/Stamp";
-import { CopyButton } from "@/components/CopyButton";
-import { normalizeText, sha256Bytes, toHex, CANONICAL_VERSION } from "@/lib/hash";
+import Link from "next/link";
+
+import { demoTasks } from "@/lib/demo";
 import { FooterReveal } from "@/components/FooterReveal";
 
 /**
- * The footer seals its own name.
+ * THE STATEMENT - the site footer, on every page.
  *
- * Every other site puts a copyright line here. This product's entire claim is
- * that a piece of text can be committed and then verified by anyone, so the
- * footer demonstrates that claim on itself: the name and the promise, and the
- * SHA-256 that would be written to a PDA if they were sealed as a rubric.
+ * A full-viewport-height closing panel on a twelve-column grid, with its blocks
+ * staggered in as it arrives.
  *
- * THE DIGEST IS REAL. It is computed here by `sha256Bytes` from lib/hash.ts -
- * the same load-bearing function that hashes live clauses at create time and
- * re-derives them at verify time. It is not a decorative hex string, and it is
- * not pasted in. The exact input is printed above it and normalised by the
- * project's own `normalizeText`, so a reader can run the same two steps and get
- * the same 64 characters. That is the only reason it is allowed to be here: a
- * hash nobody can reproduce is a texture pretending to be evidence, which on
- * this product would be the exact lie the whole thing exists to prevent.
+ * WHERE IT COMES FROM
+ * -------------------
+ * unionspaces.co.uk, measured rather than described: footer height 860px
+ * against an inner height of 860, so exactly 100vh; twelve equal 83.7px
+ * columns; and one link in the whole element, closing on prose and an address
+ * instead of a sitemap.
  *
- * It sits on --raised, and that is a statement rather than a shade. --raised
- * means COMMITTED ON-CHAIN everywhere else in the product - sealed clause sets,
- * the verdict sheet, settled receipts - so the footer is claiming membership of
- * that set, and the SEALED stamp beside it is the same component the clause
- * panel uses.
+ * What it is NOT, and this was worth measuring twice: there is no sticky
+ * reveal. The footer is `position: static`. The page above it does not slide
+ * off a pinned panel - the blocks are simply parked and brought in as the
+ * footer is scrolled to. A `div.pin-spacer` does sit before it, so GSAP pins
+ * something on that page, but it is not this.
  *
- * Computed once at module scope. The value can never change between renders -
- * the input is a constant and the hash is pure - so recomputing it per render
- * would be work that provably produces the same 32 bytes.
+ * That matters here for a structural reason as well as a factual one. This site
+ * runs a full-bleed shader field at `position: fixed; inset: 0`, and a sticky
+ * reveal needs the page content to be OPAQUE so it can hide the footer until it
+ * is revealed - which is exactly what would hide the field. The two are
+ * mutually exclusive, and the reference does not ask for the one that loses.
+ *
+ * WHY THIS AND NOT A DEVICE
+ * -------------------------
+ * The candidates it beat were all concept-led - a hash panel, a confidence
+ * plot, a cited refusal, a ledger - and each was a clever thing. None of them
+ * was making an argument about presence. This one uses the full height of the
+ * screen as its material, which is a different kind of claim and the one the
+ * bottom of a page is actually good at.
+ *
+ * A full screen of height still has to be earned, so it is not an empty panel
+ * with a wordmark in it: the left column carries the claim at reading size, the
+ * right carries the record, and the baseline carries the routes.
+ *
+ * NOTHING IS WRITTEN INTO IT
+ * --------------------------
+ * Every figure is COUNTED from lib/demo.ts at render - matters on record,
+ * judged, escrow released, median seconds to verdict - so none of them can
+ * drift from what the docket actually contains.
+ *
+ * CONTRAST on --page: --text 13.36:1 - --text-2 9.53:1 - --text-muted 6.14:1 -
+ * --accent 5.36:1 - --hairline 3.14:1 as a graphic. No volume ink appears; none
+ * is legal on this ground.
  */
 
-/** What is sealed. Printed verbatim below, so the hash is reproducible. */
-const SEALED_TEXT = "Pay on proof, not on trust.";
+const FOOTER_CSS = `
+.fs {
+  display: flex;
+  flex-direction: column;
+  /* svh, not vh: on mobile Safari vh is the LARGEST viewport, so a 100vh footer
+     is taller than the screen whenever the toolbar is showing and its baseline
+     sits below the fold. */
+  min-height: 100svh;
+  background: var(--page);
+  border-top: 1px solid var(--border);
+}
 
-const CANONICAL = normalizeText(SEALED_TEXT);
-const DIGEST = toHex(sha256Bytes(CANONICAL));
+.fs-inner {
+  flex: 1;
+  display: grid;
+  /* Twelve columns, as the reference. minmax(0, 1fr) rather than 1fr: a bare
+     1fr takes its content as an automatic minimum, which is how a wide child
+     silently forces horizontal overflow on the whole document. */
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  gap: 0 24px;
+  align-content: space-between;
+  max-width: 1240px;
+  width: 100%;
+  margin: 0 auto;
+  padding: 56px 32px 32px;
+}
 
-/**
- * Two lines of 32, in groups of 8.
- *
- * 64 characters do not fit on one line at 375px in any width setting of the
- * mono, and a digest that wraps wherever the box happens to end is unreadable
- * as a figure. Splitting it deliberately means the break is always in the same
- * place, so the two halves can be compared against another copy by eye.
- */
-const DIGEST_LINES = [DIGEST.slice(0, 32), DIGEST.slice(32)].map((half) =>
-  (half.match(/.{8}/g) ?? []).join(" ")
-);
+.fs-eyebrow {
+  grid-column: 1 / -1;
+  margin: 0 0 auto;
+  color: var(--text-muted);
+}
+
+.fs-claim { grid-column: 1 / span 7; margin: 48px 0 0; }
+.fs-record { grid-column: 9 / -1; margin: 48px 0 0; }
+
+.fs-lede {
+  margin: 0;
+  font-family: var(--font-sans);
+  font-size: clamp(24px, 3.4vw, 42px);
+  font-weight: 500;
+  line-height: 1.18;
+  letter-spacing: -0.03em;
+  color: var(--text);
+  text-wrap: balance;
+  max-width: 20ch;
+}
+.fs-sub {
+  margin: 22px 0 0;
+  max-width: 46ch;
+  font-size: 15px;
+  line-height: 1.62;
+  color: var(--text-2);
+}
+
+.fs-figures { display: grid; gap: 0; margin: 0; }
+.fs-fig {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--hairline);
+}
+.fs-fig:first-child { border-top: 1px solid var(--hairline); }
+.fs-fig dt { color: var(--text-muted); }
+.fs-fig dd { margin: 0; font-size: 19px; color: var(--text); }
+
+/* The name, at the size a full-height panel exists to allow. */
+.fs-name {
+  grid-column: 1 / -1;
+  margin: 56px 0 0;
+  font-family: var(--font-sans);
+  /* clamp(), never raw vw. A viewport unit ignores the root font size, so a
+     reader who has zoomed the page gets no larger type at all. */
+  font-size: clamp(64px, 13vw, 168px);
+  font-variation-settings: "wdth" 118;
+  font-weight: 700;
+  letter-spacing: -0.05em;
+  line-height: 0.86;
+  color: var(--text);
+}
+
+.fs-base {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px 28px;
+  flex-wrap: wrap;
+  margin-top: 28px;
+  padding-top: 18px;
+  border-top: 1px solid var(--border);
+}
+.fs-links { display: flex; gap: 22px; flex-wrap: wrap; }
+.fs-links a {
+  color: var(--accent);
+  text-decoration: none;
+  border-bottom: 1px solid var(--hairline);
+}
+.fs-links a:hover { border-bottom-color: var(--accent); }
+.fs-base .label { color: var(--text-muted); }
+
+@media (max-width: 760px), (pointer: coarse) {
+  .fs-links a { min-height: 44px; display: inline-flex; align-items: center; }
+}
+
+@media (max-width: 900px) {
+  /* Seven columns of claim beside four of record leaves both too narrow to
+     read, so they stop being columns. */
+  .fs-claim, .fs-record { grid-column: 1 / -1; }
+  .fs-record { margin-top: 32px; }
+  .fs-inner { padding: 40px 24px 26px; }
+  .fs-name { margin-top: 40px; }
+}
+
+@media (max-width: 700px) {
+  .fs-inner { padding: 32px 16px 20px; }
+  /* A full screen of height is mostly empty room once the type has come down. */
+  .fs { min-height: 0; }
+}
+`;
 
 export function SiteFooter() {
+  const tasks = demoTasks();
+  const judged = tasks.filter((t) => t.verdictJson !== null);
+  const settled = tasks.filter((t) => t.state === "SETTLED");
+
+  // Median seconds from submission to decision, over records actually decided.
+  // Median rather than mean: across a handful of records one slow verdict drags
+  // a mean to a value no individual record ever had.
+  const gaps = judged
+    .filter((t) => t.submittedAt && t.decidedAt)
+    .map((t) => (t.decidedAt!.getTime() - t.submittedAt!.getTime()) / 1000)
+    .sort((a, b) => a - b);
+  const median = gaps.length
+    ? Math.round(gaps[Math.floor((gaps.length - 1) / 2)])
+    : null;
+
   return (
-    <footer className="wf">
-      {/* Texture. The name is announced by the nav on every page, so nothing
-          here is read out again. */}
-      <div className="wf-hatch" aria-hidden="true" />
+    <footer className="fs">
+      <style>{FOOTER_CSS}</style>
 
       <FooterReveal>
-        <div className="wf-inner">
-          <section
-            className="wf-seal"
-            data-reveal
-            aria-label="The project name, sealed"
-          >
-            <div className="wf-seal-head">
-              <span className="label">SEALED RECORD</span>
-              <Stamp variant="sealed" small />
-            </div>
+        <div className="fs-inner">
+          <p className="label fs-eyebrow" data-reveal>
+            RUBRIC PROTOCOL · AI-JUDGED ESCROW ON SOLANA
+          </p>
 
-            <p className="wf-name">RUBRIC</p>
-            <p className="wf-claim">{SEALED_TEXT}</p>
-
-            <dl className="wf-seal-grid">
-              <dt className="label">SHA-256</dt>
-              <dd>
-                <span className="data wf-digest">
-                  {DIGEST_LINES.map((line) => (
-                    <span key={line}>{line}</span>
-                  ))}
-                </span>
-                <CopyButton value={DIGEST} label="Copy digest" />
-              </dd>
-
-              <dt className="label">CANONICAL</dt>
-              <dd className="data">
-                v{CANONICAL_VERSION} · NFC · {sha256Bytes(CANONICAL).length}{" "}
-                bytes
-              </dd>
-            </dl>
-
-            <p className="wf-note">
-              Hashed by the same function that seals every rubric on this
-              protocol. Normalise the line above to NFC, take its SHA-256, and
-              you get these 64 characters.
+          <div className="fs-claim" data-reveal>
+            <p className="fs-lede">
+              The criteria are sealed before the work starts.
             </p>
-          </section>
+            <p className="fs-sub">
+              A poster writes the acceptance criteria, hashes them on-chain and
+              funds the escrow. Nobody can edit them afterwards — not the
+              poster, not the platform. An AI judge rules on each sealed clause
+              in the open, and the program pays or refunds on that verdict
+              alone.
+            </p>
+          </div>
 
-          <div className="wf-facts" data-reveal>
-            <span className="wf-fact">
-              <SolanaMark size={14} />
-              <span className="label">BUILT ON SOLANA · USDC ESCROW</span>
+          <div className="fs-record" data-reveal>
+            <dl className="fs-figures">
+              <div className="fs-fig">
+                <dt className="label">MATTERS ON RECORD</dt>
+                <dd className="data">{tasks.length}</dd>
+              </div>
+              <div className="fs-fig">
+                <dt className="label">JUDGED</dt>
+                <dd className="data">{judged.length}</dd>
+              </div>
+              <div className="fs-fig">
+                <dt className="label">ESCROW RELEASED</dt>
+                <dd className="data">{settled.length}</dd>
+              </div>
+              {median !== null && (
+                <div className="fs-fig">
+                  <dt className="label">MEDIAN TO VERDICT</dt>
+                  <dd className="data">{median}s</dd>
+                </div>
+              )}
+            </dl>
+          </div>
+
+          <p className="fs-name" data-reveal>
+            RUBRIC
+          </p>
+
+          <div className="fs-base" data-reveal>
+            <span className="fs-links">
+              <Link href="/docket">The docket</Link>
+              <Link href="/create">Create a task</Link>
+              <Link href="/my-work">My work</Link>
             </span>
-            <span className="label">RUBRIC PROTOCOL</span>
+            <span className="label">
+              BUILT ON SOLANA · USDC ESCROW · SEEDED SAMPLE
+            </span>
           </div>
         </div>
       </FooterReveal>
