@@ -9,6 +9,13 @@ import {
 } from "react";
 
 import { servoMs } from "@/lib/rig";
+import {
+  fieldAmplitudeMax,
+  maxGlowScale,
+  peakEnvelope,
+  worstFieldBackdrop,
+  type Rgb,
+} from "@/lib/glow";
 
 import {
   VERTEX_FLOATS,
@@ -393,6 +400,59 @@ const GLOW_PLATE_SCALE = 0.5;
  * backdrop it does not have.
  */
 const GLOW_FIELD_SCALE = 0.27;
+
+/**
+ * ShaderField's plate tuning, mirrored so the ceiling can be computed without
+ * one rig importing the other's module.
+ *
+ * Duplicated values rot, so these are not trusted on their honour:
+ * lib/glow.test.ts parses the REAL numbers out of ShaderField.tsx - the gain
+ * from its tuning table and the weights from its fragment shader source - and
+ * fails if any of them has drifted from a line here.
+ */
+const FIELD_GAIN = 0.18;
+const FIELD_WEIGHT = 0.42;
+const FIELD_GLOW_WEIGHT = 0.58;
+const FIELD_PROBE_NUMERATOR = 0.16;
+const FIELD_PROBE_FLOOR = 0.34;
+
+/** A palette Vec3 as the plain ink lib/glow.ts works in. */
+const toRgb = (v: Vec3): Rgb => ({ r: v[0], g: v[1], b: v[2] });
+
+/**
+ * What is BEHIND the core's additive light.
+ *
+ * In a volume the canvas paints its own ground, so the backdrop is exactly what
+ * it cleared to. On a flat plate it is --page, which the palette already holds
+ * under --d-ground because PLATE_INK remaps it. Under the field it is --page
+ * plus whatever the field is adding, which varies along the field's tint - so
+ * the worst point on that line is found rather than assumed.
+ */
+function glowBackdrop(
+  palette: Palette,
+  surface: OracleSurface,
+  fieldBacked: boolean,
+  ink: Vec3
+): Rgb {
+  const base = toRgb(palette["--d-ground"]);
+  if (surface !== "plate" || !fieldBacked) return base;
+  return worstFieldBackdrop(
+    toRgb(ink),
+    base,
+    // The field tints between its energy and secondary inks, which on the plate
+    // are --accent and --warning - the same two the palette holds under the
+    // volume names PLATE_INK maps them from.
+    toRgb(palette["--marker"]),
+    toRgb(palette["--v-warning"]),
+    fieldAmplitudeMax(
+      FIELD_GAIN,
+      FIELD_WEIGHT,
+      FIELD_GLOW_WEIGHT,
+      FIELD_PROBE_NUMERATOR,
+      FIELD_PROBE_FLOOR
+    )
+  );
+}
 /**
  * Time constant of the pointer filter.
  *
@@ -1621,15 +1681,46 @@ export function Oracle(props: OracleProps) {
           : 0;
       const idlePulse = idle * pulse;
 
-      // Scaled on the plate only - the dark volume has headroom to spare and is
-      // left alone - and scaled further again when the field is behind the
-      // canvas adding light under the glow. See GLOW_FIELD_SCALE.
-      const glowScale =
+      /* THE SCALE, which is a preference capped by physics.
+
+         The tuned constants choose the LOOK - how much of the available room to
+         spend, and therefore how strongly the breath reads. They do not choose
+         whether the core clips, because that was never theirs to choose: the
+         core is additive light, so its ceiling belongs to the ink and the
+         ground, and both differ per state and per screen.
+
+         Deriving the cap rather than hand-tuning it is what caught HELD, whose
+         core is --warning on the plate. Its blue is 0.498 against --accent's
+         0.388 AND its envelope is the largest of the three, so it saturated
+         under a scale derived for --accent and looked settled. Nothing reported
+         it, because a clipped additive glow does not error - it just quietly
+         stops breathing at the top.
+
+         min(), not replacement. Where the tuned value already fits it wins
+         untouched, and SETTLED on a flat plate still runs at exactly the 0.5 it
+         was tuned to. */
+      const tunedScale =
         surface !== "plate"
           ? 1
           : fieldBacked
             ? GLOW_FIELD_SCALE
             : GLOW_PLATE_SCALE;
+
+      const glowScale = coreToken
+        ? Math.min(
+            tunedScale,
+            maxGlowScale(
+              toRgb(palette[coreToken]),
+              glowBackdrop(palette, surface, fieldBacked, palette[coreToken]),
+              behaviour.glow,
+              peakEnvelope(
+                behaviour.pulseGlow,
+                IDLE_PULSE_DEPTH,
+                behaviour.pulsePeriodMs
+              )
+            )
+          )
+        : tunedScale;
       const intensity =
         behaviour.glow *
         glowScale *
