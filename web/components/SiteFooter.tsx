@@ -158,52 +158,52 @@ const FOOTER_CSS = `
 
 }
 
-/* THE RISE.
+/* THE RISE, AND THE DARKENING.
 
-   data-reveal goes on the NAME, not on the mask around it, and that placement
-   is the fix for a real bug rather than a preference. Arming the wrapper and
-   animating the child meant two elements had to agree about one move: the
-   attribute landed on one, the transition lived on the other, and the arm and
-   release of FooterReveal's own cycle raced against it. The symptom was a
-   CSSTransition stuck in playState "running" forever with the word parked
-   137px below the clip and never coming back. Arming the element that actually
-   moves removes the coupling, so there is nothing left to race.
+   Both are read off one number: --fr-p, the share of the way the footer has
+   come into view, written by FooterReveal on every block. Because it is a
+   position rather than a trigger, the whole thing is reversible for free -
+   scroll toward the footer and the name climbs out of the mask and deepens,
+   scroll away and it goes back down and pales, at exactly the speed the reader
+   is moving.
 
-   Only the DISTANCE is overridden here. Everything else - when it arms, when it
-   releases, the stagger index, the reduced-motion escape - stays with
-   FooterReveal, which already gets all of it right. */
+   data-reveal sits on the NAME rather than on the mask around it. Arming the
+   wrapper while animating the child meant two elements had to agree about one
+   move, and the previous trigger's own cycle raced against it.
 
-/* Parked below the mask. Opacity stays 1: this block reveals by masking, and a
-   fade on top of that reads as two effects applied to one object. 104% rather
-   than 100% because at this letter-spacing the glyph box and the ink do not
-   quite agree, and a whole 100% still leaves a hairline of the R at the clip. */
-.fr-host .fs-name[data-reveal][data-fr-armed] {
-  opacity: 1;
-  transform: translateY(104%);
-  /* Arming is INSTANT, and this line is not optional. FooterReveal sets the
-     same thing on its own armed rule; because this override wins the cascade
-     for transform, it has to carry the transition rule with it or the parking
-     inherits the 760ms released transition and ANIMATES. The symptom is the
-     word visibly sliding DOWN out of view as the reader approaches the footer,
-     which reads as a bug because it is one. Hiding happens while it is still
-     off screen; only the rise is animated. */
-  transition: none;
-}
+   Only the DISTANCE and the COLOUR are overridden here. When it moves and how
+   far through it is stay with FooterReveal.
 
-/* The released state. Transform only - never a height or a margin - so the move
-   runs on the compositor and cannot reflow the page behind it. Slower than the
-   520ms the other blocks use, because a taller object travelling further at the
-   same duration reads as flung rather than lifted. */
+   104% rather than 100%: at this letter-spacing the glyph box and the ink do
+   not quite agree, and a whole 100% still leaves a hairline of the R showing
+   at the clip. */
 .fr-host .fs-name[data-reveal] {
+  /* Never fades. This block is revealed by the mask edge, and a fade on top of
+     that reads as two effects applied to one object. */
   opacity: 1;
-  transform: translateY(0);
-  transition: transform 760ms cubic-bezier(0.33, 0, 0.2, 1)
-    calc(var(--fr-i, 0) * 90ms);
-}
+  transform: translateY(calc((1 - var(--fr-p, 1)) * 104%));
 
-/* FooterReveal carries its own reduced-motion escape, and it applies to
-   [data-reveal] - which is now this element - so the name is covered by it
-   without a second copy here. */
+  /* THE DARKENING. Pale as it clears the mask, full ink once it lands - so the
+     word appears to gain weight on the way up rather than simply arriving.
+     Both ends are real tokens: --text-faint is 4.92:1 on the plate and --text
+     is 13.36:1, so the type never passes through a value that would fail on
+     its own, and the resting state is the one the rest of the page uses.
+
+     color-mix is the whole mechanism, so on an engine without it the
+     declaration is dropped and the name is simply --text throughout. Dimmer
+     for a moment on the way in is the only thing lost. */
+  color: color-mix(
+    in srgb,
+    var(--text) calc(var(--fr-p, 1) * 100%),
+    var(--text-faint)
+  );
+
+  /* Transform and colour only - never a height, a margin or a font-size - so
+     the move runs on the compositor and can never reflow the page behind it. */
+  transition:
+    transform 90ms linear,
+    color 90ms linear;
+}
 
 .fs-base {
   grid-column: 1 / -1;

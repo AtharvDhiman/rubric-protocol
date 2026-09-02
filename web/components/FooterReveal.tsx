@@ -3,68 +3,72 @@
 import { Children, useEffect, useRef, type ReactNode } from "react";
 
 /**
- * Staggered entrance for footer content.
+ * Scroll-progress reveal for the footer.
  *
- * The reference this copies (unionspaces.co.uk) marks three blocks
- * `.footer-to-animate`, parks them at opacity 0, and brings them in as the
- * footer enters view. That is the effect. It is worth saying what it is NOT:
- * there is no sticky reveal, no content sliding off a pinned footer. Measured,
- * the footer is `position: static` and the animated parts are simply hidden
- * until they are scrolled to.
+ * The blocks are tied to HOW FAR the footer has entered the viewport rather
+ * than to a trigger that fires once. That single change is what makes the
+ * effect reversible: scroll toward the footer and it comes in and darkens,
+ * scroll away and it goes back out the way it came, at whatever speed the
+ * reader is actually moving.
  *
- * WHAT IS DELIBERATELY DIFFERENT
+ * WHY PROGRESS AND NOT A TRIGGER
  * ------------------------------
- * The reference ships its footer at opacity 0 in the markup and reveals it with
- * script. With JavaScript blocked, or a scroll library that never initialises,
- * the footer is permanently invisible - which is exactly what happened when I
- * went to look at it: every block read `opacity: 0` and the page rendered blank.
+ * This replaces a binary arm/release. A trigger can only play forwards - it
+ * fires once, tears its listeners down, and the footer is finished for the life
+ * of the page. Reversing it would mean a second trigger for the other
+ * direction, then a third state for "changed direction mid-way", and the two
+ * would fight over which one owns the element. A progress value has no states
+ * to disagree about: there is one number, the scroll position decides it, and
+ * every direction falls out of it for free.
  *
- * So this inverts the order. The footer is COMPLETE in the HTML at full
- * opacity, and the effect only exists if a client is running: on mount, and
- * only after confirming the reader has not asked for reduced motion, the parts
- * are armed (hidden) and then released as they come into view. Same animation,
- * but the failure mode is "no animation" rather than "no footer".
+ * WHAT DRIVES THE SPEED
+ * ---------------------
+ * The travel is a DISTANCE, not a duration. The blocks are fully out at
+ * ENTER_AT screens below the fold and fully in at SETTLE_AT, so the reveal is
+ * spread across that much scrolling and is slower or faster exactly as the
+ * reader scrolls slower or faster. Widening the gap between those two numbers
+ * is what makes the rise slower; there is no duration to tune.
  *
- * That is the same rewind-a-finished-document pattern the rigs use, for the
- * same reason.
+ * A short transition is still applied - long enough to smooth the step between
+ * two scroll samples, far too short to feel like an animation of its own. That
+ * is what keeps a coarse wheel from looking like a slideshow without taking the
+ * timing away from the reader.
  *
- * WHY IT ARMS LATE
- * ----------------
- * The obvious shape - hide everything on mount, reveal when it scrolls into
- * view - has a failure that only shows up in testing. Anything hidden on mount
- * needs a watchdog in case the reveal never runs, and that watchdog is a race
- * against the reader: on a long page nobody reaches the footer inside a few
- * seconds, so the watchdog wins and the animation never happens. Lengthening it
- * only trades a missing animation for a long invisible footer.
- *
- * So the content is armed as LATE as possible: hidden while the footer is still
- * about a screen and a half away, released as it reaches the fold. Nothing is
- * ever hidden until it is about to be needed, and every failure degrades to
- * "no animation" rather than "no footer".
- *
- * WHY SCROLL POSITION AND NOT IntersectionObserver
- * ------------------------------------------------
- * IntersectionObserver was the obvious tool and it does not work on this
- * document. `html` and `body` both carry `overflow: hidden auto` - the
- * overflow-x guard that keeps a bled wordmark from widening the page - which
- * means the document is not the observer's implicit root. Verified directly:
- * with the footer 1484px below the fold and a 900px bottom rootMargin, an
- * observer that should have fired at 1520px never fired at all, and neither did
- * a percentage margin.
- *
- * getBoundingClientRect tracks the same scroll correctly, so the trigger is
- * computed from geometry on a passive, rAF-throttled scroll listener. One
- * rect read per frame while scrolling, and the listener removes itself the
- * moment the work is done.
- *
- * WHY A ONE-SHOT
- * --------------
- * Both observers disconnect after firing. A footer that re-animates every time
- * it scrolls past is a footer that flickers while you are trying to read the
- * links in it.
+ * SAFE BY DEFAULT
+ * ---------------
+ * --fr-p defaults to 1 in the stylesheet, which is the finished footer. Script
+ * only ever lowers it. So the server's output, a page with JavaScript blocked,
+ * a reader who asked for no motion, and a thrown exception all land on the same
+ * correct picture - the opposite of the reference this came from, which ships
+ * its footer at opacity 0 and is permanently invisible if its script never
+ * runs.
  */
 
-const STEP_MS = 90;
+/** Progress 0: the host is this many screens below the fold. Raise to slow. */
+const ENTER_AT = 1.35;
+/** Progress 1: the host's top has come this far up the viewport. */
+const SETTLE_AT = 0.15;
+
+/**
+ * How much of the ramp each successive block gives up to the one before it.
+ *
+ * Every block still finishes at progress 1; they just start at different
+ * points, so the group arrives as a sequence rather than as a slab. 0.1 keeps
+ * the last block's ramp at 60% of the full travel, which is enough room for it
+ * to move at a believable speed rather than snapping at the end.
+ */
+const STAGGER = 0.1;
+
+/**
+ * Smoothing between scroll samples, in milliseconds.
+ *
+ * Deliberately tiny. Anything long enough to read as an animation would take
+ * the timing away from the scroll and reintroduce exactly the lag that a
+ * progress-driven reveal exists to avoid.
+ */
+const SMOOTH_MS = 90;
+
+const clamp01 = (n: number): number => (n < 0 ? 0 : n > 1 ? 1 : n);
 
 export function FooterReveal({ children }: { children: ReactNode }) {
   const hostRef = useRef<HTMLDivElement | null>(null);
@@ -73,9 +77,9 @@ export function FooterReveal({ children }: { children: ReactNode }) {
     const host = hostRef.current;
     if (!host) return;
 
-    // Checked BEFORE anything is hidden. A reader who asked for no motion must
-    // never see the content disappear and come back - for them the footer was
-    // already correct in the HTML and is simply left alone.
+    // Checked before anything is touched. For a reader who asked for no motion
+    // the footer is already correct in the markup and is simply left alone -
+    // --fr-p stays at its default of 1 and nothing is ever written.
     if (
       typeof window.matchMedia === "function" &&
       window.matchMedia("(prefers-reduced-motion: reduce)").matches
@@ -88,122 +92,89 @@ export function FooterReveal({ children }: { children: ReactNode }) {
     );
     if (parts.length === 0) return;
 
-    /** Hidden while the footer is further than this many screens away. */
-    const ARM_SCREENS = 1.5;
-    /** Released once its top has come this far up the viewport. */
-    const RELEASE_AT = 0.88;
-
-    let armed = false;
-    let done = false;
     let frame = 0;
-    let watchdog = 0;
     let poll = 0;
+    let last = -1;
 
-    const finish = (): void => {
-      done = true;
-      window.clearTimeout(watchdog);
-      window.clearInterval(poll);
-      window.cancelAnimationFrame(frame);
-      window.removeEventListener("scroll", onScroll);
-      window.removeEventListener("resize", onScroll);
-      parts.forEach((el) => {
-        delete el.dataset.frArmed;
-      });
-    };
-
-    const measure = (): void => {
-      if (done) return;
+    const apply = (): void => {
       const top = host.getBoundingClientRect().top;
       const vh = window.innerHeight || 1;
 
-      if (!armed) {
-        // Never hide something the reader can already see. A short page, or a
-        // reload restored to the bottom, lands here and simply stays finished.
-        if (top < vh) {
-          finish();
-          return;
-        }
-        if (top <= vh * (1 + ARM_SCREENS)) {
-          armed = true;
-          parts.forEach((el, i) => {
-            el.style.setProperty("--fr-i", String(i));
-            el.dataset.frArmed = "";
-          });
-          // Only now is anything hidden, so only now does a watchdog matter -
-          // and it can be generous, because the footer is still off screen.
-          watchdog = window.setTimeout(finish, 10000);
-        }
-        return;
-      }
+      // 0 while the footer is still ENTER_AT screens down, 1 once its top has
+      // risen to SETTLE_AT. Linear on purpose: the easing belongs to the
+      // reader's scroll, and a curve here would fight it.
+      const span = vh * (ENTER_AT - SETTLE_AT);
+      const p = clamp01((vh * ENTER_AT - top) / (span || 1));
 
-      if (top < vh * RELEASE_AT) finish();
+      // One write per frame at most. Comparing first matters more than it
+      // looks: a custom-property write invalidates style for the subtree, and
+      // scroll fires far more often than the value actually changes.
+      if (Math.abs(p - last) < 0.002) return;
+      last = p;
+
+      parts.forEach((el, i) => {
+        // Each block gives up a slice of the ramp to the ones before it, then
+        // covers the rest of the distance itself.
+        const start = Math.min(i * STAGGER, 0.6);
+        const own = clamp01((p - start) / (1 - start || 1));
+        el.style.setProperty("--fr-p", own.toFixed(3));
+      });
     };
 
-    // One rect read per frame at most, however fast the scroll fires.
-    function onScroll(): void {
-      if (done || frame) return;
+    const onScroll = (): void => {
+      // rAF-coalesced, because scroll can fire many times per frame and the
+      // work is a layout read.
+      if (frame) return;
       frame = window.requestAnimationFrame(() => {
         frame = 0;
-        measure();
+        apply();
       });
-    }
+    };
 
-    measure();
-    if (!done) {
-      window.addEventListener("scroll", onScroll, { passive: true });
-      window.addEventListener("resize", onScroll, { passive: true });
-      // A slow poll alongside the listener, and it is not belt-and-braces for
-      // its own sake. This document does not always emit scroll events - the
-      // overflow guard on html/body is enough to change how the page scrolls,
-      // and IntersectionObserver is already unusable here for the same reason -
-      // so the listener alone is not a guarantee that the footer is ever
-      // measured again. 150ms is well inside the 520ms transition, so the
-      // effect is identical when the listener does fire, and it still happens
-      // when it does not. One rect read per tick, and it stops on finish.
-      poll = window.setInterval(measure, 150);
-    }
+    window.addEventListener("scroll", onScroll, { passive: true });
+    window.addEventListener("resize", onScroll);
+
+    // A slow poll alongside the listener. rAF does not run in a background or
+    // hidden tab, and the layout can also change underneath us for reasons
+    // scroll never hears about - a font finishing, an image arriving, a panel
+    // above the footer growing. This costs one rect read every 200ms and keeps
+    // the value honest when the fast path is asleep.
+    poll = window.setInterval(apply, 200);
+
+    apply();
 
     return () => {
-      window.clearTimeout(watchdog);
-      window.clearInterval(poll);
       window.cancelAnimationFrame(frame);
+      window.clearInterval(poll);
       window.removeEventListener("scroll", onScroll);
       window.removeEventListener("resize", onScroll);
-      parts.forEach((el) => {
-        delete el.dataset.frArmed;
-        el.style.removeProperty("--fr-i");
-      });
+      // Hand every block back at its finished value, so a remount never leaves
+      // a half-revealed footer behind.
+      parts.forEach((el) => el.style.removeProperty("--fr-p"));
     };
   }, []);
 
   return (
     <div ref={hostRef} className="fr-host">
       <style>{`
-        /* The armed state is applied by script only, so the default - and the
-           server's output - is the finished footer. */
-        .fr-host [data-reveal][data-fr-armed] {
-          opacity: 0;
-          transform: translateY(14px);
-          /* Arming is INSTANT. A transition here applies in both directions,
-             so the footer would visibly fade OUT as the reader approached it -
-             which looks like a bug, because it is one. Hiding happens while it
-             is still off screen; only the release is animated. */
-          transition: none;
-        }
+        /* 1 is the finished state, and it is the DEFAULT. Script only ever
+           lowers it, so no-JS, reduced motion, and a script that throws all
+           render the same correct footer. */
         .fr-host [data-reveal] {
-          opacity: 1;
-          transform: none;
+          --fr-p: 1;
+          opacity: var(--fr-p);
+          transform: translateY(calc((1 - var(--fr-p)) * 16px));
           transition:
-            opacity 520ms cubic-bezier(0.35, 0, 0.65, 1)
-              calc(var(--fr-i, 0) * ${STEP_MS}ms),
-            transform 520ms cubic-bezier(0.35, 0, 0.65, 1)
-              calc(var(--fr-i, 0) * ${STEP_MS}ms);
+            opacity ${SMOOTH_MS}ms linear,
+            transform ${SMOOTH_MS}ms linear;
         }
-        /* Belt and braces: if the media query changes after mount, the CSS
+
+        /* The reader asked for none of this. Belt and braces alongside the
+           early return above: if the media query changes after mount, the CSS
            still refuses to move anything. */
         @media (prefers-reduced-motion: reduce) {
-          .fr-host [data-reveal],
-          .fr-host [data-reveal][data-fr-armed] {
+          .fr-host [data-reveal] {
+            --fr-p: 1;
             opacity: 1;
             transform: none;
             transition: none;
