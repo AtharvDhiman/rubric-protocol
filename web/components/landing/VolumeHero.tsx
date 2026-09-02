@@ -99,9 +99,25 @@ export function VolumeHero() {
 
         {/* ---- right: the instrument ---- */}
         <div className="vh-stage">
-          <span className="vh-ghost" aria-hidden="true">
-            RUBRIC
-          </span>
+          {/* The wordmark the object sits ON.
+
+              It used to hang off the stage's top-left corner, which put it
+              above the sphere rather than behind it: the two never met, and
+              because the letters ran off the top all you saw was the bottom of
+              each one - six fragments that did not read as a word.
+
+              Centred on the sphere, the relationship becomes the point. The
+              word is the baseline and the object is suspended on it, and the
+              overlap is what makes both read as deliberate.
+
+              The wrapper clips. That is the treatment - letters bleeding off
+              both edges look intentional in a way that a word politely fitted
+              inside a box does not - and it is also structural: the type is
+              deliberately WIDER than its column, and without a clip that would
+              be horizontal overflow on the page. */}
+          <div className="vh-ghostwrap" aria-hidden="true">
+            <span className="vh-ghost">RUBRIC</span>
+          </div>
 
           {/* The bracket frame sits OUTSIDE the viewport and is inset from it,
               so the panel reads as a thing held in a fixture rather than as a

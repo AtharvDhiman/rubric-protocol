@@ -1842,22 +1842,62 @@ select,
 /* Outline-only display type, running off the panel's top-left corner. The
    panel is painted after it in the stacking order, so the panel edge CLIPS the
    letterforms - the wordmark is behind the viewport, not floating over it. */
+/* THE GHOST WORDMARK.
+
+   A clipping frame, so the type can be wider than the column it lives in
+   without ever becoming horizontal overflow on the page. The crop is also the
+   look: letters running off both edges read as deliberate, where a word
+   politely fitted inside its box reads as a caption. */
+.vh-ghostwrap {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+  /* Sized against THIS box, not the viewport - see the font-size below. */
+  container-type: inline-size;
+}
+
+/* Centred on the object rather than hung off a corner, so the sphere sits ON
+   the word. Sized in vw to stay wider than the stage at every width - the
+   bleed is the point, and the wrapper above guarantees it costs nothing. */
 .vh-ghost {
   position: absolute;
-  top: -34px;
-  left: -46px;
-  z-index: 0;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  white-space: nowrap;
   font-family: var(--font-sans);
-  font-size: clamp(64px, 9vw, 128px);
+  /* Fallback for engines without container queries. */
+  font-size: clamp(80px, 11vw, 168px);
   font-variation-settings: "wdth" 125;
   font-weight: 700;
-  letter-spacing: -0.02em;
+  letter-spacing: -0.03em;
   line-height: 1;
   color: transparent;
-  -webkit-text-stroke: 1.25px var(--ghost-stroke);
-  pointer-events: none;
+  /* Outline only. 3.37:1 on --page, which clears the 3:1 graphic floor by
+     measurement rather than by claiming a decorative exemption - and it is
+     always duplicated by the real wordmark in the nav, so it never carries the
+     name on its own. */
+  -webkit-text-stroke: 1.5px var(--ghost-stroke);
   user-select: none;
 }
+
+/* Sized against the COLUMN rather than the viewport.
+
+   vw was wrong here in a way that only shows up at the extremes: past the
+   1240px container cap the stage stops growing while vw keeps going, so the
+   word over-cropped on a wide screen until only the middle of it was left. At
+   23cqw the word is about 110% of its column at EVERY width - enough bleed to
+   read as deliberate, never so much that RUBRIC stops being a word. */
+@supports (container-type: inline-size) {
+  .vh-ghost { font-size: 23cqw; }
+}
+
+@media (max-width: 700px) {
+  .vh-ghost { -webkit-text-stroke-width: 1.25px; }
+}
+
 
 /* THE HERO PANEL - and it owns the box.
 
@@ -1936,35 +1976,35 @@ select,
   color: var(--positive);
 }
 
-/* The layers fill the panel and surrender their own box: one border, one
-   aspect ratio, decided in one place. */
-.vh-volume .cvo-oracle,
-.vh-oracle .cvo-stage {
+/* THE ORACLE FILLS ITS BOX. One rule, one place.
+
+   There were three rules fighting over this at the same specificity - one
+   saying width:100%/aspect:auto, one saying width:auto/aspect:1-1, and a
+   media query flipping the axis again - so which one won came down to source
+   order. The result was a 700x700 sphere inside a 700x525 box, overflowing by
+   175px and anchored to the top, which is what pulled it off the wordmark.
+
+   The rig aspect-corrects its own projection, so it does not need a square
+   element to stay circular; giving it the box and letting it draw inside is
+   both simpler and the only version with a single source of truth for the
+   geometry. The wrapper states the aspect, the rig fills it.
+
+   Two class selectors because the component injects its own stylesheet from
+   inside itself, which lands AFTER this file in the document and wins every
+   equal-specificity tie. */
+.vh-stage .vh-oracle,
+.vh-stage .vh-oracle .cvo-stage {
   width: 100%;
   height: 100%;
   aspect-ratio: auto;
+  max-height: none;
   border: 0;
 }
 
-/* The oracle stays SQUARE inside the wide panel and is centred, rather than
-   being stretched into an ellipse by a 16:9 box. */
-.vh-oracle {
-  display: grid;
-  place-items: center;
-}
-.vh-oracle .cvo-stage {
-  width: auto;
-  height: 100%;
-  aspect-ratio: 1 / 1;
-}
-
 @media (max-width: 700px) {
+  /* Portrait on a phone: a 4:3 box would leave the object a few millimetres
+     tall beside a full-width column of text. */
   .vh-volume { aspect-ratio: 4 / 5; }
-  /* Portrait: the square is width-bound rather than height-bound. */
-  .vh-oracle .cvo-stage {
-    width: 100%;
-    height: auto;
-  }
 }
 
 @media (max-width: 1023px) {
@@ -1977,7 +2017,6 @@ select,
      read before the instrument that illustrates it. */
   .vh-stage { order: 2; }
   .vh-rail { order: 1; }
-  .vh-ghost { left: 0; top: -26px; }
 }
 
 @media (max-width: 700px) {
