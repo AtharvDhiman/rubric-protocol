@@ -134,6 +134,11 @@ export function VolumeHero() {
             <Oracle
               className="vh-oracle"
               surface="plate"
+              // The full-bleed field is genuinely behind this one - nothing
+              // between it and the fixed canvas paints a background - so the
+              // core's additive glow has a lower ceiling here than on the app
+              // screens, where AppShell paints an opaque --page over the field.
+              fieldBacked
               state="SETTLED"
               confidence={HERO_MATTER.confidence}
               threshold={HERO_MATTER.threshold}

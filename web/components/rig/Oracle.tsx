@@ -111,6 +111,19 @@ export interface OracleProps {
   /** Extra classes on the figure. */
   className?: string;
   /**
+   * Whether the full-bleed page field is behind this rig.
+   *
+   * Only meaningful on the plate, and it buys exactly one thing: the core's
+   * emission is additive, so how bright it may get before it saturates depends
+   * on what is BEHIND the canvas. A flat --page and a --page with the field
+   * adding light to it are two different ceilings. See GLOW_FIELD_SCALE.
+   *
+   * Defaults to false, which is the conservative reading for a new mount: a
+   * flat backdrop is the one where the brighter scale is safe, so forgetting
+   * this prop under a field costs brightness rather than correctness.
+   */
+  fieldBacked?: boolean;
+  /**
    * Which ground the object is drawn on.
    *
    * "volume" is the bounded dark viewport. "plate" draws it straight onto the
@@ -332,8 +345,54 @@ const IDLE_PULSE_RADIUS = 0.11;
  * At 0.5 the peak lands on 0.359, just under the ceiling, and the swing goes
  * from about 1.1x of visible range to 4.0x. The core is dimmer at rest and the
  * breath is far stronger, which is the trade that was actually being asked for.
+ *
+ * That 0.009 of margin is real but it is computed against a FLAT --page, and it
+ * only survives where the plate actually is flat. See GLOW_FIELD_SCALE.
  */
 const GLOW_PLATE_SCALE = 0.5;
+
+/**
+ * The same headroom calculation, redone for a plate with the field behind it.
+ *
+ * Making the canvas transparent so the full-bleed field shows through moved the
+ * backdrop out from under this number. The field ADDS light, and the glow adds
+ * more on top, so the ceiling comes down - and it comes down past the peak:
+ *
+ *   flat --page          clips at intensity 0.368 (green)   peak 0.359 fits
+ *   field, typical       clips at 0.322          (blue)     peak is 0.037 over
+ *   field, at its peak   clips at 0.214          (blue)     peak is 0.145 over
+ *
+ * So it clipped at TYPICAL field values, not just extreme ones. The binding
+ * channel also changes: on bare --page it is green, but the field's second ink
+ * is --warning, whose blue (0.498) is higher than --accent's (0.388), so blue
+ * saturates first once the field is contributing.
+ *
+ * The clip that results is worse than a static one. The ceiling moves as the
+ * probe orbits, so the breath is cropped by a varying amount on a period the
+ * rig's own oscillator does not own - an amplitude wobble driven by something
+ * else on the page, which is exactly the kind of borrowed motion this rig is
+ * built to avoid.
+ *
+ * The worst real backdrop is the field at full amplitude with its tint at the
+ * --warning end of the mix, which is rgb(220, 229, 234) - and it has to be
+ * taken from the actual mix rather than from a per-channel maximum, since the
+ * tint is ONE colour along t and cannot be bluest and greenest at once. That
+ * backdrop clips at intensity 0.2138.
+ *
+ * 0.27 puts the peak at 0.194, landing blue at 253 of 255. 0.29 also clears but
+ * only by a single 8-bit unit, which is the quantisation noise floor rather
+ * than a margin; 0.31 does NOT clear, despite looking like it should - it lands
+ * at 256.
+ *
+ * Nothing is lost but absolute brightness. The swing is a pure scaling of
+ * uIntensity, so its RATIO is unchanged at 3.0x, and since it no longer clips,
+ * more of that swing is actually visible than before rather than less.
+ *
+ * /task/[id] keeps 0.5. AppShell paints an opaque --page over the fixed field
+ * there, so that plate really is flat and dimming it would be paying for a
+ * backdrop it does not have.
+ */
+const GLOW_FIELD_SCALE = 0.27;
 /**
  * Time constant of the pointer filter.
  *
@@ -1256,6 +1315,10 @@ export function Oracle(props: OracleProps) {
   // default. Both live mounts pass "plate" explicitly, so this changes nothing
   // that renders today.
   const surface: OracleSurface = props.surface ?? "plate";
+  // False by default: a flat backdrop is the ceiling under which the brighter
+  // scale is safe, so a mount that forgets this prop under the field loses
+  // brightness rather than correctness.
+  const fieldBacked = props.fieldBacked ?? false;
   const { confidence, threshold, clauseCount, passedCount, state, className } =
     props;
 
@@ -1558,9 +1621,15 @@ export function Oracle(props: OracleProps) {
           : 0;
       const idlePulse = idle * pulse;
 
-      // Scaled on the plate only: see GLOW_PLATE_SCALE. The dark volume has
-      // headroom to spare and is left alone.
-      const glowScale = surface === "plate" ? GLOW_PLATE_SCALE : 1;
+      // Scaled on the plate only - the dark volume has headroom to spare and is
+      // left alone - and scaled further again when the field is behind the
+      // canvas adding light under the glow. See GLOW_FIELD_SCALE.
+      const glowScale =
+        surface !== "plate"
+          ? 1
+          : fieldBacked
+            ? GLOW_FIELD_SCALE
+            : GLOW_PLATE_SCALE;
       const intensity =
         behaviour.glow *
         glowScale *
@@ -2002,7 +2071,7 @@ export function Oracle(props: OracleProps) {
       canvas.addEventListener("webglcontextlost", cancelLoss);
       loseExt?.loseContext();
     };
-  }, [behaviour, plan, contextEpoch, surface]);
+  }, [behaviour, plan, contextEpoch, surface, fieldBacked]);
 
   /* ----------------------------------------------------------------------
      THE SERVER-RENDERED DRAWING
