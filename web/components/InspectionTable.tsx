@@ -47,7 +47,7 @@
  *    Only the light family is used below.
  *
  * ---------------------------------------------------------------------------
- * DOM CONTRACT FOR components/rig/InspectionArm.tsx
+ * DOM CONTRACT FOR THE RIG THAT ANNOTATES THIS TABLE
  * ---------------------------------------------------------------------------
  * The arm owns the choreography; this table owns the truth. The arm may rewind
  * and re-register cells by writing to the DOM, and everything it needs to do
@@ -86,7 +86,7 @@
  * cannot desynchronise from the verdict because it reads the verdict's own
  * server-rendered values.
  *
- * `InspectionArm` reports beats through `onRegister(index, passed)` and
+ * A rig may report beats through `onRegister(index, passed)` and
  * `onRewind()` rather than reaching in here itself, so the wiring is a handful
  * of lines in a small client wrapper that does the two attribute copies above.
  * Deliberately NOT React state: a parent that re-rendered this table per beat
@@ -164,7 +164,7 @@ const pad2 = (n: number): string => String(n).padStart(2, "0");
 
 /**
  * The DOM id of the Σ row, so a caller can hand it straight to
- * `InspectionArm`'s `sigmaRowId` prop and have an all-pass run park exactly on
+ * a rig's `sigmaRowId` prop, so an all-pass run can park exactly on
  * the total rather than at the foot of the rail. Derived rather than guessed:
  * the arm and the table must agree on this string or the park lands nowhere.
  */

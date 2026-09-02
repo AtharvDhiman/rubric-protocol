@@ -17,7 +17,7 @@ import { Stamp } from "@/components/Stamp";
 import { CopyButton } from "@/components/CopyButton";
 import { SubmitWorkPanel } from "./SubmitWorkPanel";
 import { ReclaimPanel } from "./ReclaimPanel";
-import { InspectionArm, type ArmRecordState } from "@/components/rig/InspectionArm";
+import { Oracle, type OracleState } from "@/components/rig/Oracle";
 import { InspectionTable } from "@/components/InspectionTable";
 import { SolveBlock } from "@/components/SolveBlock";
 import { explorerTxUrl } from "@/lib/env";
@@ -234,20 +234,7 @@ export default async function TaskPage({
             <Stamp variant="sealed" small />
           </div>
 
-          {/* The gutter the arm travels. It is a bounded dark viewport - a volume -
-              which is the ONLY context the rig inks are legible in, and the
-              .volume class is what makes them resolve at all. */}
-          <div className="clause-station">
-            <div className="volume clause-gutter" aria-hidden="true">
-              <InspectionArm
-                listId="sealed-clauses"
-                clauseCount={task.clauses.length}
-                rulings={verdict?.clauses ?? null}
-                state={task.state as ArmRecordState}
-              />
-            </div>
-            <ClauseList clauses={task.clauses} listId="sealed-clauses" />
-          </div>
+          <ClauseList clauses={task.clauses} listId="sealed-clauses" />
 
           <dl
             style={{
@@ -392,16 +379,36 @@ export default async function TaskPage({
 
           {verdict && (
             <div style={{ marginTop: 32 }}>
-              {/* The solve. Confidence IS the residual, and the threshold it was
-                  gated on is read from the server rather than written here, so
-                  the number on screen cannot drift from the number that decided
-                  the matter. */}
-              <SolveBlock
-                confidence={verdict.confidence}
-                threshold={confidenceThreshold()}
-                escrowReleased={settled}
-                held={held}
-              />
+              {/* The judge and its reading, as one statement.
+
+                  The oracle is driven by the REAL verdict, not by a timer: a
+                  settled matter resolves and turns steadily, a refund arrests
+                  and stops dead, a held matter drifts and never arrives, and an
+                  unjudged one never schedules a frame at all. The figures beside
+                  it say the same thing in mono - which is the redundancy rule
+                  the whole status system runs on, applied to the rig. */}
+              <div className="verdict-oracle">
+                <div className="volume oracle-cell">
+                  <Oracle
+                    confidence={verdict.confidence}
+                    threshold={confidenceThreshold()}
+                    clauseCount={task.clauses.length}
+                    passedCount={verdict.clauses.filter((c) => c.passed).length}
+                    state={task.state as OracleState}
+                  />
+                </div>
+
+                {/* Confidence IS the residual, and the threshold it was gated on
+                    is read from the server rather than written here, so the
+                    number on screen cannot drift from the number that decided
+                    the matter. */}
+                <SolveBlock
+                  confidence={verdict.confidence}
+                  threshold={confidenceThreshold()}
+                  escrowReleased={settled}
+                  held={held}
+                />
+              </div>
 
               <div
                 style={{

@@ -1714,61 +1714,19 @@ select,
   box-shadow: none;
 }
 
-/* ---------------------------------------------------------------------------
-   THE CLAUSE STATION
 
-   The sealed clauses with the inspection arm running down their left edge.
-
-   The gutter is a fixed 64px in PIXELS, never a fraction or a ch unit. The arm
-   is drawn in the SVG's own pixel coordinates (L1 = 34, L2 = 26, targets at
-   dx = 44), so a gutter that reflowed with the type would put the probe
-   somewhere other than the datum it is supposed to be touching. Fixed px is
-   what keeps the drawing and the DOM in agreement.
-   --------------------------------------------------------------------------- */
-
-.clause-station {
-  position: relative;
-  /* Room for the gutter. Padding, not a grid column, and that is the whole
-     point - see below. */
-  padding-left: 64px;
-}
-
-/* The gutter is taken OUT OF FLOW deliberately.
-
-   It was a 64px grid column first, and that produced an unbounded feedback
-   loop: the arm sizes itself from the measured clause list, an in-flow gutter
-   stretches the grid row, a stretched row stretches the <ol>, the
-   ResizeObserver fires, the arm grows to match, and around again. Three
-   clauses whose rows total 170px produced an <ol> 8568px tall and still
-   climbing.
-
-   Absolute positioning breaks the cycle at its weakest link: the gutter can
-   read the row height but can no longer contribute to it, so the measurement
-   is one-way and settles in a single pass. */
-.clause-gutter {
-  position: absolute;
-  left: 0;
-  top: 0;
-  bottom: 0;
-  width: 64px;
-  /* The arm draws its elbow outside the SVG box on purpose; the root clips it
-     back into the volume so nothing escapes onto the light plate. */
-  overflow: hidden;
-  border: 1px solid var(--border);
-  border-right: 0;
-}
-
-@media (max-width: 900px) {
-  .clause-station { padding-left: 28px; }
-  .clause-gutter { width: 28px; }
-}
 
 /* ===========================================================================
    THE LANDING HERO — a capture volume cut into the plate
    =========================================================================== */
 
 .vh {
-  background: var(--page);
+  /* Transparent so the plate field shows through. An opaque --page here would
+     hide the ground behind an identical colour - which is exactly what it did:
+     the field rendered correctly and was covered by a flat repaint of its own
+     base tone. html still paints --page, so there is always a ground even when
+     WebGL is unavailable. */
+  background: transparent;
   border-bottom: 1px solid var(--border);
 }
 
@@ -1901,19 +1859,56 @@ select,
   user-select: none;
 }
 
-/* A positioning wrapper ONLY.
+/* THE HERO PANEL - and it owns the box.
 
-   It used to also set an aspect ratio, a border and overflow - and so did the
-   rig component inside it. Two elements owning the same box meant two 1px
-   borders drawn 1px apart, and two aspect ratios disagreeing: the wrapper held
-   a 4:5 panel while the rig laid itself out at 16:9 inside it, leaving the
-   figure in the top 45% and the telemetry cut off by the wrapper overflow.
+   Ownership had to move. When a single rig filled the panel, the component
+   owned its own aspect ratio and this was a bare positioning wrapper. Now TWO
+   layers stack here and both are absolutely positioned, so the wrapper has no
+   in-flow child left to take its height from: it collapsed to 837x0 while its
+   children rendered at 471px and 420px, overflowing as a white slab. The
+   Oracle also refused to start, because it correctly declines to build a WebGL
+   context for a zero-sized panel.
 
-   The component owns the viewport. This only positions it and puts it above
-   the ghost type. */
+   So the wrapper states the box, and the layers fill it. */
 .vh-volume {
   position: relative;
   z-index: 1;
+  aspect-ratio: 16 / 9;
+  border: 1px solid var(--border);
+  overflow: hidden;
+}
+
+/* The layers fill the panel and surrender their own box: one border, one
+   aspect ratio, decided in one place. */
+.vh-volume .sf-field,
+.vh-volume .cvo-oracle,
+.vh-field .sf-stage,
+.vh-oracle .cvo-stage {
+  width: 100%;
+  height: 100%;
+  aspect-ratio: auto;
+  border: 0;
+}
+
+/* The oracle stays SQUARE inside the wide panel and is centred, rather than
+   being stretched into an ellipse by a 16:9 box. */
+.vh-oracle {
+  display: grid;
+  place-items: center;
+}
+.vh-oracle .cvo-stage {
+  width: auto;
+  height: 100%;
+  aspect-ratio: 1 / 1;
+}
+
+@media (max-width: 700px) {
+  .vh-volume { aspect-ratio: 4 / 5; }
+  /* Portrait: the square is width-bound rather than height-bound. */
+  .vh-oracle .cvo-stage {
+    width: 100%;
+    height: auto;
+  }
 }
 
 @media (max-width: 1023px) {
@@ -1946,5 +1941,64 @@ select,
     min-height: 44px;
     display: inline-flex;
     align-items: center;
+  }
+}
+
+
+/* ===========================================================================
+   THE WEBGL LAYERS
+
+   Two canvases share the hero volume: the field is the ground, the oracle is
+   the subject. Both are absolutely positioned inside the panel so neither
+   contributes height - the panel owns its own aspect ratio, and a canvas that
+   sized the box it lives in would reintroduce exactly the measure-and-grow
+   loop the clause gutter had.
+   =========================================================================== */
+
+.vh-field,
+.vh-oracle {
+  position: absolute;
+  inset: 0;
+}
+
+/* The subject sits above the field. Pointer events pass through both: they are
+   imagery, and nothing in the panel is clickable. */
+.vh-field { z-index: 0; }
+.vh-oracle { z-index: 1; }
+.vh-field,
+.vh-oracle { pointer-events: none; }
+
+/* ---------------------------------------------------------------------------
+   THE VERDICT ORACLE
+
+   The judge and its reading, side by side: the object on the left, CONF /
+   THRESHOLD / D on the right. Same statement twice, once as a shape and once
+   as figures - which is the redundancy rule the whole status system runs on.
+   --------------------------------------------------------------------------- */
+
+.verdict-oracle {
+  display: grid;
+  grid-template-columns: 180px minmax(0, 1fr);
+  gap: 24px;
+  align-items: center;
+}
+
+.oracle-cell {
+  position: relative;
+  aspect-ratio: 1;
+  border: 1px solid var(--border);
+  overflow: hidden;
+}
+
+@media (max-width: 700px) {
+  /* Stacked, and smaller. The oracle is supporting evidence on a phone, not the
+     headline: the figures beside it are what someone actually needs to read. */
+  .verdict-oracle {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 16px;
+  }
+  .oracle-cell {
+    width: 132px;
+    aspect-ratio: 1;
   }
 }

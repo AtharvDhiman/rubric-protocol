@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { AppearMotion } from "@/components/AppearMotion";
+import { ShaderField } from "@/components/rig/ShaderField";
 import { Archivo, Martian_Mono } from "next/font/google";
 import "./globals.css";
 
@@ -129,6 +130,19 @@ export default function RootLayout({
       <body suppressHydrationWarning>
         {/* Wires the entrance sequence: retires each animation when it ends,
             and reveals everything if the animations never ran at all. */}
+        {/* THE PLATE. Full-bleed, fixed, behind every page.
+
+            It is mounted once here rather than per screen so it cannot be
+            forgotten on a new route and cannot restart on navigation - the
+            field is the surface the product sits on, and a surface that
+            reseeds itself when you click a link is a transition, not a
+            ground.
+
+            Amplitude is bounded by arithmetic rather than by eye: forty text
+            nodes on the landing sit directly on this, --hairline is a 3:1
+            graphic with only 0.034 of luminance headroom, and the field only
+            ever adds while the scan line subtracts 0.006. See VARIANT_TUNING. */}
+        <ShaderField variant="plate" />
         <AppearMotion />
         {/* First child of <body> so it runs during HTML parsing, before React's
             bundle executes and hydrates. Dev only - see the constant above. */}

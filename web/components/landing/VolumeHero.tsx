@@ -1,6 +1,7 @@
 import Link from "next/link";
 
-import { Skeleton } from "@/components/rig/Skeleton";
+import { ShaderField } from "@/components/rig/ShaderField";
+import { Oracle } from "@/components/rig/Oracle";
 
 /**
  * The landing hero: a capture volume cut into the plate.
@@ -93,8 +94,27 @@ export function VolumeHero() {
             RUBRIC
           </span>
 
+          {/* The field is the ground and the oracle is the subject.
+
+              Same shader as the plate behind the whole page, in its volume
+              voicing: --marker on --d-ground at full gain, because nothing is
+              overlaid here and the panel is bounded. That is what makes the
+              two read as one instrument at two intensities rather than as two
+              effects.
+
+              The oracle is given the shape of a settled matter. It prints no
+              figures - it is a shell, a ring and a core - so nothing here
+              claims a number about a matter that is not on screen. */}
           <div className="volume vh-volume">
-            <Skeleton />
+            <ShaderField className="vh-field" />
+            <Oracle
+              className="vh-oracle"
+              state="SETTLED"
+              confidence={96}
+              threshold={70}
+              clauseCount={3}
+              passedCount={3}
+            />
           </div>
         </div>
       </div>

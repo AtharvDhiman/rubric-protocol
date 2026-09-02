@@ -16,7 +16,7 @@ import {
  */
 export default function LandingPage() {
   return (
-    <div style={{ background: "var(--page)" }}>
+    <div>
       <VolumeHero />
       <Marquee />
       <HowItWorks />
