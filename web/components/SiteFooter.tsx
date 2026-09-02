@@ -2,6 +2,7 @@ import { SolanaMark } from "@/components/SolanaMark";
 import { Stamp } from "@/components/Stamp";
 import { CopyButton } from "@/components/CopyButton";
 import { normalizeText, sha256Bytes, toHex, CANONICAL_VERSION } from "@/lib/hash";
+import { FooterReveal } from "@/components/FooterReveal";
 
 /**
  * The footer seals its own name.
@@ -56,48 +57,55 @@ export function SiteFooter() {
           here is read out again. */}
       <div className="wf-hatch" aria-hidden="true" />
 
-      <div className="wf-inner">
-        <section className="wf-seal" aria-label="The project name, sealed">
-          <div className="wf-seal-head">
-            <span className="label">SEALED RECORD</span>
-            <Stamp variant="sealed" small />
+      <FooterReveal>
+        <div className="wf-inner">
+          <section
+            className="wf-seal"
+            data-reveal
+            aria-label="The project name, sealed"
+          >
+            <div className="wf-seal-head">
+              <span className="label">SEALED RECORD</span>
+              <Stamp variant="sealed" small />
+            </div>
+
+            <p className="wf-name">RUBRIC</p>
+            <p className="wf-claim">{SEALED_TEXT}</p>
+
+            <dl className="wf-seal-grid">
+              <dt className="label">SHA-256</dt>
+              <dd>
+                <span className="data wf-digest">
+                  {DIGEST_LINES.map((line) => (
+                    <span key={line}>{line}</span>
+                  ))}
+                </span>
+                <CopyButton value={DIGEST} label="Copy digest" />
+              </dd>
+
+              <dt className="label">CANONICAL</dt>
+              <dd className="data">
+                v{CANONICAL_VERSION} · NFC · {sha256Bytes(CANONICAL).length}{" "}
+                bytes
+              </dd>
+            </dl>
+
+            <p className="wf-note">
+              Hashed by the same function that seals every rubric on this
+              protocol. Normalise the line above to NFC, take its SHA-256, and
+              you get these 64 characters.
+            </p>
+          </section>
+
+          <div className="wf-facts" data-reveal>
+            <span className="wf-fact">
+              <SolanaMark size={14} />
+              <span className="label">BUILT ON SOLANA · USDC ESCROW</span>
+            </span>
+            <span className="label">RUBRIC PROTOCOL</span>
           </div>
-
-          <p className="wf-name">RUBRIC</p>
-          <p className="wf-claim">{SEALED_TEXT}</p>
-
-          <dl className="wf-seal-grid">
-            <dt className="label">SHA-256</dt>
-            <dd>
-              <span className="data wf-digest">
-                {DIGEST_LINES.map((line) => (
-                  <span key={line}>{line}</span>
-                ))}
-              </span>
-              <CopyButton value={DIGEST} label="Copy digest" />
-            </dd>
-
-            <dt className="label">CANONICAL</dt>
-            <dd className="data">
-              v{CANONICAL_VERSION} · NFC · {sha256Bytes(CANONICAL).length} bytes
-            </dd>
-          </dl>
-
-          <p className="wf-note">
-            Hashed by the same function that seals every rubric on this protocol.
-            Normalise the line above to NFC, take its SHA-256, and you get these
-            64 characters.
-          </p>
-        </section>
-
-        <div className="wf-facts">
-          <span className="wf-fact">
-            <SolanaMark size={14} />
-            <span className="label">BUILT ON SOLANA · USDC ESCROW</span>
-          </span>
-          <span className="label">RUBRIC PROTOCOL</span>
         </div>
-      </div>
+      </FooterReveal>
     </footer>
   );
 }
