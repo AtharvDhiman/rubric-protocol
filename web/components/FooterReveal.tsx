@@ -23,16 +23,20 @@ import { Children, useEffect, useRef, type ReactNode } from "react";
  *
  * WHAT DRIVES THE SPEED
  * ---------------------
- * The travel is a DISTANCE, not a duration. The blocks are fully out at
- * ENTER_AT screens below the fold and fully in at SETTLE_AT, so the reveal is
- * spread across that much scrolling and is slower or faster exactly as the
- * reader scrolls slower or faster. Widening the gap between those two numbers
- * is what makes the rise slower; there is no duration to tune.
+ * Two things, and only one of them is the obvious one.
  *
- * A short transition is still applied - long enough to smooth the step between
- * two scroll samples, far too short to feel like an animation of its own. That
- * is what keeps a coarse wheel from looking like a slideshow without taking the
- * timing away from the reader.
+ * The progress RAMP - ENTER_AT to SETTLE_AT - decides where in the scroll the
+ * travel is spent. It is not the speed control, and assuming it was is a trap
+ * worth naming: this footer is the last thing on the page, so its top only
+ * travels from one screen down to zero, which is a single screen of scrolling
+ * during which it is visible at all. Widening the ramp pushes more of the
+ * travel above that window, where the reader has not arrived yet, and the part
+ * they can actually see gets SHORTER and faster. The lever points backwards.
+ *
+ * SMOOTH_MS is the speed control. The blocks ease toward the position the
+ * scroll asks for instead of snapping to it, so the word keeps climbing for a
+ * moment after the wheel stops. That is what reads as weight, and it is the
+ * number to change when the rise should be slower or quicker.
  *
  * SAFE BY DEFAULT
  * ---------------
@@ -44,10 +48,10 @@ import { Children, useEffect, useRef, type ReactNode } from "react";
  * runs.
  */
 
-/** Progress 0: the host is this many screens below the fold. Raise to slow. */
-const ENTER_AT = 1.35;
+/** Progress 0: the host is this many screens below the fold. */
+const ENTER_AT = 1.7;
 /** Progress 1: the host's top has come this far up the viewport. */
-const SETTLE_AT = 0.15;
+const SETTLE_AT = 0.05;
 
 /**
  * How much of the ramp each successive block gives up to the one before it.
@@ -60,13 +64,33 @@ const SETTLE_AT = 0.15;
 const STAGGER = 0.1;
 
 /**
- * Smoothing between scroll samples, in milliseconds.
+ * How long the blocks take to catch up to the scroll, in milliseconds.
  *
- * Deliberately tiny. Anything long enough to read as an animation would take
- * the timing away from the scroll and reintroduce exactly the lag that a
- * progress-driven reveal exists to avoid.
+ * This is the speed control, and it is worth saying why the obvious one is not.
+ *
+ * The footer is the last thing on the page, so its top only ever travels from
+ * one screen down to zero - about a single screen of scrolling during which it
+ * is actually visible. Widening the progress ramp therefore does NOT slow the
+ * visible motion: it moves more of the travel off the top of the ramp, where
+ * the footer has not been reached yet, and the part the reader can see gets
+ * shorter and faster. The lever points the wrong way.
+ *
+ * Lag is the lever that points the right way. At 420ms the blocks ease toward
+ * the position the scroll asks for rather than snapping to it, so the word
+ * keeps climbing for a moment after the wheel stops and reads as something with
+ * weight being lifted. Long enough to feel deliberate; short enough that it is
+ * still obviously the reader doing the lifting.
  */
-const SMOOTH_MS = 90;
+const SMOOTH_MS = 420;
+
+/**
+ * The catch-up curve. Fast to leave, slow to arrive - so the tail of every move
+ * is the part that is drawn out, which is what makes it read as heavy rather
+ * than merely delayed. No control point outside [0,1]: an overshoot here would
+ * be a springy settle, which is the one thing the rest of this product's motion
+ * is explicitly not.
+ */
+const SMOOTH_EASE = "cubic-bezier(0.16, 0.6, 0.2, 1)";
 
 const clamp01 = (n: number): number => (n < 0 ? 0 : n > 1 ? 1 : n);
 
@@ -165,8 +189,8 @@ export function FooterReveal({ children }: { children: ReactNode }) {
           opacity: var(--fr-p);
           transform: translateY(calc((1 - var(--fr-p)) * 16px));
           transition:
-            opacity ${SMOOTH_MS}ms linear,
-            transform ${SMOOTH_MS}ms linear;
+            opacity ${SMOOTH_MS}ms ${SMOOTH_EASE},
+            transform ${SMOOTH_MS}ms ${SMOOTH_EASE};
         }
 
         /* The reader asked for none of this. Belt and braces alongside the

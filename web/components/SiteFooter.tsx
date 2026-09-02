@@ -200,9 +200,13 @@ const FOOTER_CSS = `
 
   /* Transform and colour only - never a height, a margin or a font-size - so
      the move runs on the compositor and can never reflow the page behind it. */
+  /* Matches FooterReveal's catch-up exactly. The name is the heaviest thing
+     here and the most obviously wrong if it drifts out of step with the blocks
+     around it, so the duration and the curve are the same numbers rather than
+     a second opinion about them. */
   transition:
-    transform 90ms linear,
-    color 90ms linear;
+    transform 420ms cubic-bezier(0.16, 0.6, 0.2, 1),
+    color 420ms cubic-bezier(0.16, 0.6, 0.2, 1);
 }
 
 .fs-base {
