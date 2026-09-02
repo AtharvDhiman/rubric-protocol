@@ -2,6 +2,7 @@ import { FooterLedger } from "@/components/footers/FooterLedger";
 import { FooterKinetic } from "@/components/footers/FooterKinetic";
 import { FooterGrid } from "@/components/footers/FooterGrid";
 import { FooterSignature } from "@/components/footers/FooterSignature";
+import { FooterCitation } from "@/components/footers/FooterCitation";
 import { SiteFooter } from "@/components/SiteFooter";
 
 /**
@@ -41,6 +42,12 @@ const OPTIONS = [
     name: "Signature",
     note: "One memorable thing that only this product could put at the bottom of a page.",
     render: () => <FooterSignature />,
+  },
+  {
+    key: "F",
+    name: "The citation",
+    note: "One real refusal, quoted in full: the sealed clause, the submission, and the ruling that connects them.",
+    render: () => <FooterCitation />,
   },
   {
     key: "E",
