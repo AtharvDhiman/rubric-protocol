@@ -4,22 +4,32 @@ import { ShaderField } from "@/components/rig/ShaderField";
 import { Oracle } from "@/components/rig/Oracle";
 
 /**
- * The landing hero: a capture volume cut into the plate.
+ * The landing hero.
  *
- * The dark panel is INSET, with a light margin on all four sides and a 1px
- * edge. That is the whole idea and it is worth stating, because the obvious
- * move - a full-bleed dark hero - says something different. A hero background
- * is a mood. A bounded panel with an edge is an INSTRUMENT VIEWPORT: you are
- * looking into a measured space from outside it, which is exactly the
- * relationship the product describes. It is also why the volume may never
- * become the page: the moment the dark reaches the edges, it stops being a
- * thing you are looking into and becomes a theme.
+ * Two motions, and they sit in different places on purpose:
  *
- * Nothing is centred. The rail sits left of the panel, the wordmark runs off
- * the panel's top-left corner and is clipped by its edge, and the type is set
- * ragged-right. Centred layouts read as marketing; an instrument is aligned to
- * a datum.
+ *   THE BACKGROUND is the plate field - full-bleed, fixed, mounted once in the
+ *   root layout so it is the surface the whole product moves over. It is not
+ *   part of this component at all.
+ *
+ *   THE RIGHT SIDE is the instrument: a bounded dark viewport carrying the
+ *   judge oracle, framed by corner brackets and annotated by a readout.
+ *
+ * The dark ground is bounded rather than full-bleed, and that is a rule rather
+ * than a preference: --marker measures 1.26:1 on the light page, so the volume
+ * inks are only legible inside a panel that redefines the ground under them.
+ * A hero background is a mood; a bracketed viewport with a datum readout is an
+ * instrument you are looking into.
  */
+
+/** Matter Nº 42 in lib/demo.ts: SETTLED, 3 clauses, all passing, confidence 94. */
+const HERO_MATTER = {
+  n: "0042",
+  confidence: 94,
+  threshold: 70,
+  clauses: 3,
+  passed: 3,
+} as const;
 
 export function VolumeHero() {
   return (
@@ -41,7 +51,7 @@ export function VolumeHero() {
       </nav>
 
       <div className="vh-body">
-        {/* ---- the rail ---- */}
+        {/* ---- left: the claim ---- */}
         <div className="vh-rail">
           <p className="label vh-eyebrow">AI-JUDGED ESCROW ON SOLANA</p>
 
@@ -66,9 +76,6 @@ export function VolumeHero() {
             </a>
           </div>
 
-          {/* The tolerances this product actually runs on, stated as figures
-              rather than as claims. Every one is read from a constant, so the
-              page cannot drift from the program. */}
           <dl className="vh-spec">
             <div>
               <dt className="label">MAX BOUNTY</dt>
@@ -85,37 +92,69 @@ export function VolumeHero() {
           </dl>
         </div>
 
-        {/* ---- the volume ---- */}
+        {/* ---- right: the instrument ---- */}
         <div className="vh-stage">
-          {/* Ghost display type, overlapping the panel corner and clipped by
-              its edge. aria-hidden and duplicated by the real wordmark in the
-              nav, so it is texture and never the only carrier of the name. */}
           <span className="vh-ghost" aria-hidden="true">
             RUBRIC
           </span>
 
-          {/* The field is the ground and the oracle is the subject.
+          {/* The bracket frame sits OUTSIDE the viewport and is inset from it,
+              so the panel reads as a thing held in a fixture rather than as a
+              box with a decorated border. Corner ticks only - a full rule would
+              just be a second border 12px from the first. */}
+          <div className="vh-frame" aria-hidden="true">
+            <span className="vh-corner vh-corner--tl" />
+            <span className="vh-corner vh-corner--tr" />
+            <span className="vh-corner vh-corner--bl" />
+            <span className="vh-corner vh-corner--br" />
+          </div>
 
-              Same shader as the plate behind the whole page, in its volume
-              voicing: --marker on --d-ground at full gain, because nothing is
-              overlaid here and the panel is bounded. That is what makes the
-              two read as one instrument at two intensities rather than as two
-              effects.
-
-              The oracle is given the shape of a settled matter. It prints no
-              figures - it is a shell, a ring and a core - so nothing here
-              claims a number about a matter that is not on screen. */}
           <div className="volume vh-volume">
             <ShaderField className="vh-field" />
             <Oracle
               className="vh-oracle"
               state="SETTLED"
-              confidence={96}
-              threshold={70}
-              clauseCount={3}
-              passedCount={3}
+              confidence={HERO_MATTER.confidence}
+              threshold={HERO_MATTER.threshold}
+              clauseCount={HERO_MATTER.clauses}
+              passedCount={HERO_MATTER.passed}
             />
+
+            {/* The readout. Every figure here is a real property of the matter
+                the object is drawing - Nº 42 in the seeded records - and the
+                matter is named, so the numbers are checkable rather than
+                atmospheric. The reference this came from printed "LOCATING
+                TRUTH VECTORS... CONFIDENCE: 99.9%", which is a number about
+                nothing; on a product whose pitch is "pay on proof", a readout
+                in the same mono face as figures the user is asked to verify
+                does not get to be decorative. */}
+            <div className="vh-hud telemetry" aria-hidden="true">
+              <div>
+                MATTER Nº <span className="vh-hud-key">{HERO_MATTER.n}</span>
+              </div>
+              <div>
+                CONF <span className="vh-hud-key">{HERO_MATTER.confidence}</span>{" "}
+                / {HERO_MATTER.threshold}
+              </div>
+              <div>
+                CLAUSES{" "}
+                <span className="vh-hud-key">
+                  {HERO_MATTER.passed}/{HERO_MATTER.clauses}
+                </span>{" "}
+                PASS
+              </div>
+              <div className="vh-hud-state">SOLVE LOCKED</div>
+            </div>
           </div>
+
+          {/* The same statement in text, for a reader who gets none of the
+              above: the readout is aria-hidden because it is a duplicate. */}
+          <p className="sr-only">
+            The instrument shows matter number {HERO_MATTER.n}, a settled
+            matter: {HERO_MATTER.passed} of {HERO_MATTER.clauses} sealed clauses
+            passed, at confidence {HERO_MATTER.confidence} against a threshold of{" "}
+            {HERO_MATTER.threshold}, and the escrow was released.
+          </p>
         </div>
       </div>
     </header>

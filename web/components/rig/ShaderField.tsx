@@ -242,7 +242,18 @@ function readPalette(el: Element, variant: FieldVariant): Palette | null {
  */
 const VARIANT_TUNING = {
   volume: { gain: 0.3, scanDepth: 0.018 },
-  plate: { gain: 0.09, scanDepth: 0.006 },
+  // 0.18, not 0.09. At 0.09 the field swings luminance by 0.052 - present,
+  // but close enough to invisible that the motion does not read. 0.18 doubles
+  // that to 0.107, which is a drift you can actually see.
+  //
+  // Raising it is safe in the direction that matters: the field only ADDS, and
+  // brightening a pale ground RAISES contrast for the dark inks on top of it.
+  // The ceiling is set by something else entirely - depth in this system is
+  // carried by the plane change between --page and --surface, so the brightest
+  // field pixel must stay clearly below --surface at 0.8579 or the panels stop
+  // reading as raised. 0.18 peaks at 0.8157 and keeps 0.042 of that gap, and
+  // the peak only occurs at the glow centre; most of the page sits far below it.
+  plate: { gain: 0.18, scanDepth: 0.006 },
 } as const;
 
 /* ==========================================================================
