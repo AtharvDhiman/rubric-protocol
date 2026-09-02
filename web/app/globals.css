@@ -1870,27 +1870,22 @@ select,
    context for a zero-sized panel.
 
    So the wrapper states the box, and the layers fill it. */
-/* THE INSTRUMENT - and it owns the box.
+/* THE INSTRUMENT.
 
-   Ownership had to move here. When a single rig filled the panel, the
-   component owned its own aspect ratio and this was a bare positioning
-   wrapper. Now several layers stack and all of them are absolutely
-   positioned, so the wrapper has no in-flow child left to take its height
-   from: it collapsed to 837x0 while its children rendered at 471px and 420px
-   and overflowed as a white slab, and the Oracle correctly declined to build a
-   WebGL context for a zero-sized panel.
+   No ground and no border: the object sits on the page and the full-bleed
+   field drifts through it. It still has to STATE its box, because every layer
+   inside is absolutely positioned and a wrapper with no in-flow child collapses
+   to zero height - which is what happened before, at 837x0, with the children
+   overflowing as a slab and the Oracle correctly refusing to build a WebGL
+   context for a zero-sized panel.
 
-   It is TALLER than 16:9 now. The object inside is a sphere, and a letterbox
-   crops a sphere on the axis it needs most; 4:3 gives it room and makes the
-   right-hand column read as the subject of the screen rather than as a strip
-   beside the text. */
+   4:3 rather than 16:9. The object is a sphere and a letterbox crops it on
+   exactly the axis it needs most. */
 .vh-volume {
   position: relative;
   z-index: 1;
   aspect-ratio: 4 / 3;
   min-height: 380px;
-  border: 1px solid var(--border);
-  overflow: hidden;
 }
 
 /* THE FIXTURE. Corner ticks on an inset rectangle, drawn OUTSIDE the viewport
@@ -1899,7 +1894,7 @@ select,
    border 14px from the first, which says nothing. */
 .vh-frame {
   position: absolute;
-  inset: -14px;
+  inset: 0;
   z-index: 0;
   pointer-events: none;
 }
@@ -1916,37 +1911,34 @@ select,
 .vh-corner--bl { bottom: 0; left: 0; border-bottom-width: 2px; border-left-width: 2px; }
 .vh-corner--br { bottom: 0; right: 0; border-bottom-width: 2px; border-right-width: 2px; }
 
-/* THE READOUT. Top-right inside the viewport, right-aligned, in the volume
-   inks. It sits above both canvases and never takes pointer events. */
+/* THE READOUT. Top-right, in the page inks now that there is no dark panel
+   under it. It sits above the canvas and never takes pointer events. */
 .vh-hud {
   position: absolute;
-  top: 14px;
-  right: 16px;
+  top: 0;
+  right: 0;
   z-index: 2;
   display: grid;
   gap: 3px;
   text-align: right;
-  color: var(--d-muted);
+  color: var(--text-muted);
   pointer-events: none;
 }
 
-/* The figures themselves, lifted out of the label around them. --d-text is
-   14.57:1 on the darkest volume ground, so this is the emphasis channel and
-   not a colour trick. */
-.vh-hud-key { color: var(--d-text); }
+/* The figures, lifted out of the labels around them. --text is 13.36:1 on the
+   page, so this is the emphasis channel rather than a colour trick. */
+.vh-hud-key { color: var(--text); }
 
-/* The one state word. --v-positive because this matter SETTLED - the chain
-   moved money - which is the only thing green is allowed to mean. */
+/* The one state word. --positive because this matter SETTLED - the chain moved
+   money - which is the only thing green is allowed to mean. 5.44:1 on the page. */
 .vh-hud-state {
   margin-top: 4px;
-  color: var(--v-positive);
+  color: var(--positive);
 }
 
 /* The layers fill the panel and surrender their own box: one border, one
    aspect ratio, decided in one place. */
-.vh-volume .sf-field,
 .vh-volume .cvo-oracle,
-.vh-field .sf-stage,
 .vh-oracle .cvo-stage {
   width: 100%;
   height: 100%;
@@ -2019,7 +2011,6 @@ select,
    loop the clause gutter had.
    =========================================================================== */
 
-.vh-field,
 .vh-oracle {
   position: absolute;
   inset: 0;
@@ -2027,10 +2018,10 @@ select,
 
 /* The subject sits above the field. Pointer events pass through both: they are
    imagery, and nothing in the panel is clickable. */
-.vh-field { z-index: 0; }
-.vh-oracle { z-index: 1; }
-.vh-field,
-.vh-oracle { pointer-events: none; }
+.vh-oracle {
+  z-index: 1;
+  pointer-events: none;
+}
 
 /* ---------------------------------------------------------------------------
    THE VERDICT ORACLE

@@ -108,9 +108,45 @@ export interface OracleProps {
   passedCount: number;
   /** The record state. HELD is not REFUNDED and must never look like one. */
   state: OracleState;
-  /** Extra classes on the figure. The `volume` scope is always applied. */
+  /** Extra classes on the figure. */
   className?: string;
+  /**
+   * Which ground the object is drawn on.
+   *
+   * "volume" is the bounded dark viewport. "plate" draws it straight onto the
+   * light page as a technical drawing - no panel, no black rectangle, the
+   * page's own field showing through the wireframe.
+   *
+   * This is NOT just a background swap. The volume inks are unusable on paper:
+   * --marker measures 1.26:1 on --page, so an oracle that merely lost its panel
+   * would lose the object with it. Every ink is remapped to its light-ground
+   * equivalent, and each one clears 3:1 as a line - --accent 5.36, --hairline
+   * 3.14, --negative 5.25, --warning 6.69.
+   */
+  surface?: OracleSurface;
 }
+
+export type OracleSurface = "volume" | "plate";
+
+/**
+ * The light-ground equivalent of every volume ink.
+ *
+ * Roles are preserved rather than colours: identity stays identity, inferred
+ * geometry stays the quieter step below it, and the two status inks keep their
+ * meaning. Because the mapping happens at READ time and the results are stored
+ * under the original keys, every draw call downstream is unchanged.
+ */
+const PLATE_INK: Record<string, string> = {
+  "--marker": "--accent",
+  "--rig-line": "--text-faint",
+  "--rig-solved": "--hairline",
+  "--v-negative": "--negative",
+  "--v-warning": "--warning",
+  "--d-ground": "--page",
+};
+
+const inkToken = (token: string, surface: OracleSurface): string =>
+  surface === "plate" ? (PLATE_INK[token] ?? token) : token;
 
 /* ==========================================================================
    GEOMETRY CONSTANTS
@@ -559,7 +595,7 @@ function parseColour(value: string): Vec3 | null {
 
 type Palette = Record<string, Vec3>;
 
-function readPalette(el: Element): Palette | null {
+function readPalette(el: Element, surface: OracleSurface): Palette | null {
   let computed: CSSStyleDeclaration;
   try {
     computed = getComputedStyle(el);
@@ -568,7 +604,9 @@ function readPalette(el: Element): Palette | null {
   }
   const palette: Palette = {};
   for (const token of INK_TOKENS) {
-    const ink = parseColour(computed.getPropertyValue(token));
+    // Read the SURFACE'S token, store it under the canonical key. That keeps
+    // the remap in exactly one place; nothing downstream knows it happened.
+    const ink = parseColour(computed.getPropertyValue(inkToken(token, surface)));
     if (!ink) return null;
     palette[token] = ink;
   }
@@ -988,6 +1026,14 @@ const ORACLE_CSS = `
   border: 1px solid var(--border);
   overflow: hidden;
 }
+/* On the plate there is no panel at all: no ground, no border, no clip. The
+   object is drawn onto the page and the full-bleed field drifts through it. */
+.cv-oracle--plate .cvo-stage {
+  background: transparent;
+  border: 0;
+  overflow: visible;
+  max-height: none;
+}
 .cv-oracle .cvo-poster,
 .cv-oracle .cvo-canvas {
   position: absolute;
@@ -1052,6 +1098,7 @@ function cancelLoss(event: Event): void {
 }
 
 export function Oracle(props: OracleProps) {
+  const surface: OracleSurface = props.surface ?? "volume";
   const { confidence, threshold, clauseCount, passedCount, state, className } =
     props;
 
@@ -1099,10 +1146,12 @@ export function Oracle(props: OracleProps) {
     if (!stage || !canvas) return;
 
     const options: WebGLContextAttributes = {
-      // Opaque. The canvas paints the volume ground itself, so every contrast
-      // figure in DESIGN.md is exact rather than dependent on what shows
-      // through - and the poster underneath is cleanly covered.
-      alpha: false,
+      // Opaque inside a volume, where the canvas paints the ground itself and
+      // every contrast figure is therefore exact. On the plate it MUST be
+      // transparent: an opaque canvas clears to its ground colour and would
+      // paint a rectangle over the page, which is the black background this
+      // variant exists to remove.
+      alpha: surface === "plate",
       antialias: true,
       depth: false,
       stencil: false,
@@ -1152,7 +1201,7 @@ export function Oracle(props: OracleProps) {
       };
     }
 
-    const palette = readPalette(canvas);
+    const palette = readPalette(canvas, surface);
     if (!palette) {
       warnOnce("The design tokens could not be read from the cascade.");
       return;
@@ -1584,7 +1633,7 @@ export function Oracle(props: OracleProps) {
       canvas.addEventListener("webglcontextlost", cancelLoss);
       loseExt?.loseContext();
     };
-  }, [behaviour, plan, contextEpoch]);
+  }, [behaviour, plan, contextEpoch, surface]);
 
   /* ----------------------------------------------------------------------
      THE SERVER-RENDERED DRAWING
@@ -1603,11 +1652,15 @@ export function Oracle(props: OracleProps) {
    * the canvas reads. One source of truth: if a state's ink changes, both
    * drawings change together, and neither can quietly disagree with the other.
    */
+  // The poster resolves the same remap through var(), so the static frame and
+  // the canvas cannot disagree about what colour the object is.
   const inkVars = {
-    "--cvo-near": `var(${behaviour.shellNear})`,
-    "--cvo-far": `var(${behaviour.shellFar})`,
-    "--cvo-core": behaviour.core ? `var(${behaviour.core})` : "transparent",
-    "--cvo-arc": `var(${behaviour.ringArc})`,
+    "--cvo-near": `var(${inkToken(behaviour.shellNear, surface)})`,
+    "--cvo-far": `var(${inkToken(behaviour.shellFar, surface)})`,
+    "--cvo-core": behaviour.core
+      ? `var(${inkToken(behaviour.core, surface)})`
+      : "transparent",
+    "--cvo-arc": `var(${inkToken(behaviour.ringArc, surface)})`,
   } as CSSProperties;
 
   const coreRadius = CORE_RADIUS * POSTER_PX_PER_WORLD;
@@ -1625,7 +1678,16 @@ export function Oracle(props: OracleProps) {
 
   return (
     <figure
-      className={className ? `volume cv-oracle ${className}` : "volume cv-oracle"}
+      className={[
+        // The .volume scope belongs to the volume voicing only. Applying it on
+        // the plate would remap every ground and ink token to the dark set for
+        // everything inside, which is the exact leak that scope prevents.
+        surface === "volume" ? "volume" : "cv-oracle--plate",
+        "cv-oracle",
+        className,
+      ]
+        .filter(Boolean)
+        .join(" ")}
       style={inkVars}
     >
       <style>{ORACLE_CSS}</style>

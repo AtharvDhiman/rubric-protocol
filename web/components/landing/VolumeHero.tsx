@@ -1,25 +1,30 @@
 import Link from "next/link";
 
-import { ShaderField } from "@/components/rig/ShaderField";
 import { Oracle } from "@/components/rig/Oracle";
 
 /**
  * The landing hero.
  *
- * Two motions, and they sit in different places on purpose:
+ * Two motions, in two places on purpose:
  *
  *   THE BACKGROUND is the plate field - full-bleed, fixed, mounted once in the
  *   root layout so it is the surface the whole product moves over. It is not
  *   part of this component at all.
  *
- *   THE RIGHT SIDE is the instrument: a bounded dark viewport carrying the
- *   judge oracle, framed by corner brackets and annotated by a readout.
+ *   THE RIGHT SIDE is the judge oracle, drawn straight onto the plate as a
+ *   technical drawing and framed by corner ticks, with the field drifting
+ *   through the wireframe behind it.
  *
- * The dark ground is bounded rather than full-bleed, and that is a rule rather
- * than a preference: --marker measures 1.26:1 on the light page, so the volume
- * inks are only legible inside a panel that redefines the ground under them.
- * A hero background is a mood; a bracketed viewport with a datum readout is an
- * instrument you are looking into.
+ * There is no panel. Removing it required changing the INK rather than just
+ * deleting a background: --marker is 1.26:1 on --page, so an oracle that merely
+ * lost its dark ground would have lost the object with it. Every ink is remapped
+ * to its light-ground equivalent and each clears 3:1 as a line, and the rig also
+ * had to stop asking for an opaque WebGL context - an opaque canvas clears to
+ * its ground colour and paints exactly the rectangle this removes.
+ *
+ * A second shader went with the panel. One ran inside it and one behind the
+ * whole page; the page field is the background here now, which is one WebGL
+ * context fewer and one less thing that can disagree with itself.
  */
 
 /** Matter Nº 42 in lib/demo.ts: SETTLED, 3 clauses, all passing, confidence 94. */
@@ -109,10 +114,10 @@ export function VolumeHero() {
             <span className="vh-corner vh-corner--br" />
           </div>
 
-          <div className="volume vh-volume">
-            <ShaderField className="vh-field" />
+          <div className="vh-volume">
             <Oracle
               className="vh-oracle"
+              surface="plate"
               state="SETTLED"
               confidence={HERO_MATTER.confidence}
               threshold={HERO_MATTER.threshold}
