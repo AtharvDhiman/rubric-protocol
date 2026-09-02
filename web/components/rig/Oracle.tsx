@@ -208,8 +208,28 @@ const SPINUP_MS = 620;
 const SETTLED_YAW_RATE = 0.0003; // ~21 seconds per revolution
 const HELD_YAW_RATE = 0.00009;
 
-/** How far the pointer may nudge the object, in radians. */
-const PARALLAX = 0.11;
+/**
+ * How far the pointer may lean the OUTER shell, in radians. ~9 degrees.
+ *
+ * Raised from 0.11 now that the pointer is tracked across the whole page
+ * rather than only while it is over the object: most of the time the cursor is
+ * somewhere else entirely, so the lean has to be legible from the corner of the
+ * eye to read as a response at all.
+ */
+const PARALLAX = 0.16;
+
+/**
+ * The core leans by this fraction of the shell's lean.
+ *
+ * This is the whole effect. If both layers took the same offset the object
+ * would rotate as one rigid body and the cursor would just be turning a
+ * turntable. At 0.3 the outer shell swings three times further than the core,
+ * so the two separate as the pointer moves and the shell reads as a cage AROUND
+ * something rather than as a texture painted on it - which is the parallax the
+ * reference got from translating its mesh, without walking the object off
+ * centre to get it.
+ */
+const CORE_PARALLAX_RATIO = 0.3;
 /**
  * Time constant of the pointer filter.
  *
@@ -1219,6 +1239,10 @@ export function Oracle(props: OracleProps) {
 
     const projection = new Float32Array(16);
     const bodyMatrix = new Float32Array(16);
+    // The core carries its own matrix so it can lag the shell. Allocated once
+    // here, like the others - a per-frame allocation in a rAF loop is garbage
+    // the collector has to chase sixty times a second.
+    const coreMatrix = new Float32Array(16);
     const flatMatrix = new Float32Array(16);
 
     const metrics: ViewMetrics = {
@@ -1326,6 +1350,14 @@ export function Oracle(props: OracleProps) {
       // ---- every wireframe in the rig, through one program ----
       const rot = rotation3(pose.pitch, pose.yaw);
       modelView(bodyMatrix, rot, CAMERA_DIST);
+
+      // The core takes the base pose plus only a FRACTION of the pointer lean,
+      // so it trails the shell instead of turning with it.
+      const coreRot = rotation3(
+        base.pitch + pitchOffset * CORE_PARALLAX_RATIO,
+        base.yaw + yawOffset * CORE_PARALLAX_RATIO
+      );
+      modelView(coreMatrix, coreRot, CAMERA_DIST);
       modelView(flatMatrix, null, CAMERA_DIST);
 
       const L = resources.line;
@@ -1369,6 +1401,8 @@ export function Oracle(props: OracleProps) {
 
       // THE CORE. Solid: it is the ruling itself, and the ruling is a fact.
       if (plan.coreVisible && coreToken) {
+        // Trailing matrix: this is what separates the core from the shell.
+        gl.uniformMatrix4fv(L.uModelView, false, coreMatrix);
         const ink = palette[coreToken];
         gl.uniform1f(L.uBodyRadius, CORE_RADIUS);
         setInk(ink, ink);
@@ -1504,9 +1538,23 @@ export function Oracle(props: OracleProps) {
     /* ------------------------------------------------------------------
        POINTER PARALLAX
 
-       A few degrees, measured against the PANEL rather than the window - the
-       reference tracked window coordinates, which inside a bounded viewport
-       means the object leans hardest when the pointer is nowhere near it.
+       Measured against the VIEWPORT, and listened for on the window.
+
+       This was bound to the object's own element and normalised against it,
+       which was right while the rig lived inside a bounded dark panel: there,
+       window coordinates make the object lean hardest when the pointer is
+       nowhere near it. The object is on the open plate now, so that reasoning
+       inverts - a listener on the element only responds once the cursor is
+       already on top of the sphere, which is the one moment the effect is
+       least useful.
+
+       The shell takes the full lean and the core takes 0.3 of it, so the two
+       separate as the pointer travels. The offsets are applied to the POSE, not
+       to position: the reference translated its mesh across the screen, which
+       walks the object off centre; rotating keeps it in place and reads as the
+       thing turning to face you. Both are strictly additive on top of `poseAt`,
+       so the pure, testable pose is still what the poster and the
+       reduced-motion frame are drawn from.
        ------------------------------------------------------------------ */
     let targetYaw = 0;
     let targetPitch = 0;
@@ -1515,24 +1563,35 @@ export function Oracle(props: OracleProps) {
 
     const onPointerMove = (event: PointerEvent): void => {
       // Coarse pointers do not hover, so a touch would snap the object rather
-      // than ease it. Fine pointers only.
+      // than ease it. Fine pointers only - and on a touch device this listener
+      // therefore costs one early return per event and nothing else.
       if (event.pointerType !== "mouse" && event.pointerType !== "pen") return;
-      const rect = stage.getBoundingClientRect();
-      if (rect.width < 1 || rect.height < 1) return;
-      const nx = ((event.clientX - rect.left) / rect.width) * 2 - 1;
-      const ny = ((event.clientY - rect.top) / rect.height) * 2 - 1;
+      const w = window.innerWidth;
+      const h = window.innerHeight;
+      if (w < 1 || h < 1) return;
+      // -1 at the left/top edge of the window, +1 at the right/bottom.
+      const nx = (event.clientX / w) * 2 - 1;
+      const ny = (event.clientY / h) * 2 - 1;
       targetYaw = Math.max(-1, Math.min(1, nx)) * PARALLAX;
       targetPitch = Math.max(-1, Math.min(1, ny)) * PARALLAX;
     };
 
-    const onPointerLeave = (): void => {
-      targetYaw = 0;
-      targetPitch = 0;
+    // The pointer left the document entirely - out of the window, or into the
+    // browser chrome. Returning to centre is the honest resting state; holding
+    // the last lean would leave the object pointing at something that is no
+    // longer there.
+    const onPointerOut = (event: PointerEvent): void => {
+      if (event.relatedTarget === null) {
+        targetYaw = 0;
+        targetPitch = 0;
+      }
     };
 
     if (behaviour.tracksPointer) {
-      stage.addEventListener("pointermove", onPointerMove);
-      stage.addEventListener("pointerleave", onPointerLeave);
+      // On the window, not the element: the whole point is that the object
+      // responds while the cursor is somewhere else on the page.
+      window.addEventListener("pointermove", onPointerMove, { passive: true });
+      document.addEventListener("pointerout", onPointerOut);
     }
 
     const tick = (now: number): void => {
@@ -1620,8 +1679,11 @@ export function Oracle(props: OracleProps) {
       resize.disconnect();
       observer?.disconnect();
       document.removeEventListener("visibilitychange", onVisibilityChange);
-      stage.removeEventListener("pointermove", onPointerMove);
-      stage.removeEventListener("pointerleave", onPointerLeave);
+      // Detached from the same targets they were attached to. A window
+      // listener left behind by an unmounted component keeps the whole effect
+      // closure alive - canvas, GL context and all - for the life of the page.
+      window.removeEventListener("pointermove", onPointerMove);
+      document.removeEventListener("pointerout", onPointerOut);
       canvas.removeEventListener("webglcontextlost", onContextLost);
       canvas.removeEventListener("webglcontextrestored", onContextRestored);
       if (resources) destroyResources(gl, resources);
