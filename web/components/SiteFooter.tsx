@@ -205,8 +205,8 @@ const FOOTER_CSS = `
      around it, so the duration and the curve are the same numbers rather than
      a second opinion about them. */
   transition:
-    transform 420ms cubic-bezier(0.16, 0.6, 0.2, 1),
-    color 420ms cubic-bezier(0.16, 0.6, 0.2, 1);
+    transform 700ms cubic-bezier(0.65, 0, 0.35, 1),
+    color 700ms cubic-bezier(0.65, 0, 0.35, 1);
 }
 
 .fs-base {

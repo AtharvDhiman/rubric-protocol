@@ -57,11 +57,17 @@ const SETTLE_AT = 0.05;
  * How much of the ramp each successive block gives up to the one before it.
  *
  * Every block still finishes at progress 1; they just start at different
- * points, so the group arrives as a sequence rather than as a slab. 0.1 keeps
- * the last block's ramp at 60% of the full travel, which is enough room for it
- * to move at a believable speed rather than snapping at the end.
+ * points, so the group arrives as a sequence rather than as a slab.
+ *
+ * Smaller is SLOWER, which is the opposite of the intuition. A block's own ramp
+ * is (p - start) / (1 - start), so a later start leaves less of the ramp to
+ * cover the same travel and the block moves faster through it. At 0.05 the last
+ * block still has 80% of the ramp to itself instead of 60%, so its travel is
+ * spread across more scrolling. The sequence is tighter and every part of it
+ * moves more gently - which is the trade worth making here, because the reader
+ * is watching one wordmark rather than counting the blocks.
  */
-const STAGGER = 0.1;
+const STAGGER = 0.05;
 
 /**
  * How long the blocks take to catch up to the scroll, in milliseconds.
@@ -75,22 +81,40 @@ const STAGGER = 0.1;
  * the footer has not been reached yet, and the part the reader can see gets
  * shorter and faster. The lever points the wrong way.
  *
- * Lag is the lever that points the right way. At 420ms the blocks ease toward
- * the position the scroll asks for rather than snapping to it, so the word
- * keeps climbing for a moment after the wheel stops and reads as something with
- * weight being lifted. Long enough to feel deliberate; short enough that it is
- * still obviously the reader doing the lifting.
+ * Lag is the lever that points the right way. The blocks ease toward the
+ * position the scroll asks for rather than snapping to it, so the word keeps
+ * climbing for a moment after the wheel stops and reads as something with
+ * weight being lifted.
+ *
+ * 700ms. There is a ceiling on this and it is worth naming: past roughly 900 the
+ * word is still arriving long enough after the wheel stopped that it stops
+ * reading as the reader lifting it and starts reading as a thing playing its own
+ * animation - and worse, scrolling away no longer visibly reverses it, which is
+ * the whole point of driving this from progress. 700 is deliberately just under
+ * that.
  */
-const SMOOTH_MS = 420;
+const SMOOTH_MS = 700;
 
 /**
- * The catch-up curve. Fast to leave, slow to arrive - so the tail of every move
- * is the part that is drawn out, which is what makes it read as heavy rather
- * than merely delayed. No control point outside [0,1]: an overshoot here would
- * be a springy settle, which is the one thing the rest of this product's motion
- * is explicitly not.
+ * The catch-up curve, and the third thing making this slower - after a first
+ * attempt that made it faster.
+ *
+ * The instinct was a hard ease-out: fast to leave, long thin tail. Measured
+ * against the actual bezier, that curve reached 90% of every move in 244ms of
+ * the 700 - it front-loads so hard that most of the duration is spent on a tail
+ * too small to see, and it very nearly cancelled the 420 to 700 increase it was
+ * supposed to compound. Time-to-90% had only moved from 196ms to 244ms.
+ *
+ * This is a symmetric ease-in-out instead: 350ms to the halfway point and 499ms
+ * to 90%, so the duration is actually spent on motion the eye can follow. The
+ * slow START is the part that reads as weight - the block does not leap after
+ * the scroll, it takes a moment to get going, which is what a heavy object
+ * does.
+ *
+ * No control point outside [0,1]: an overshoot would be a springy settle, which
+ * is the one thing this product's motion is explicitly not, everywhere else.
  */
-const SMOOTH_EASE = "cubic-bezier(0.16, 0.6, 0.2, 1)";
+const SMOOTH_EASE = "cubic-bezier(0.65, 0, 0.35, 1)";
 
 const clamp01 = (n: number): number => (n < 0 ? 0 : n > 1 ? 1 : n);
 
