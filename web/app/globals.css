@@ -442,7 +442,6 @@ h3 {
   justify-content: center;
   height: 44px;
   padding: 0 20px;
-  border-radius: 6px;
   border: 1px solid rgba(16, 18, 27, 0.16);
   background: linear-gradient(
     135deg,
@@ -1323,7 +1322,6 @@ select.field option {
   display: inline-block;
   padding: 7px 14px;
   border: 1.5px solid var(--positive);
-  border-radius: 4px;
   color: var(--positive);
   font-size: 12px;
   font-weight: 500;
@@ -1683,22 +1681,36 @@ select.field option {
    which was used where.
    --------------------------------------------------------------------------- */
 
-/* Radius zero, stated at real specificity rather than in :where().
-   :where() contributes ZERO specificity, which is usually the polite choice -
-   but here it meant every component rule with a class selector silently beat
-   it, and 2px and 4px radii survived the reset. A system-wide invariant should
-   win by default and be overridden deliberately, not the other way round. */
+/* The reset below is deliberately SMALL, and it is not the thing that enforces
+   the rule.
+
+   It used to be a :where() block. :where() contributes ZERO specificity, so
+   every component rule with a class selector silently beat it and 4px and 6px
+   radii survived the reset. Raising the specificity is the obvious repair and
+   it is the wrong one, because it only fixes the smaller half: most of the
+   radii that actually shipped were inline `style={{ borderRadius: 2 }}` props,
+   and an inline declaration outranks every author rule in the cascade however
+   specific the selector is. No selector wins that argument. The only CSS that
+   would is !important, which would also flatten the 50% status dots and leave
+   no way to make a deliberate exception again.
+
+   So the invariant is enforced where it actually can be: lib/radius.test.ts
+   reads these real source files and fails the build on any radius that is not
+   0 or 50% - in this stylesheet, in an inline style prop, or as a Tailwind
+   `rounded` utility. That covers everything we write, which is why the
+   enumeration of project classes that used to live here (.btn, .panel, .plate,
+   [class*="card"] and friends) is gone: it duplicated a guarantee the test now
+   makes, and a hand-maintained list of class names rots the moment one of them
+   is renamed - silently, because a selector that matches nothing looks exactly
+   like a selector with nothing to do.
+
+   What remains is the one job a test cannot do: neutralising the radius the
+   BROWSER'S own stylesheet puts on form controls. That is not our source, so
+   it is not something we can grep. */
 button,
 input,
 textarea,
-select,
-.btn,
-.field,
-.panel,
-.record-row,
-.plate,
-.stamp,
-[class*="card"] {
+select {
   border-radius: 0;
 }
 
