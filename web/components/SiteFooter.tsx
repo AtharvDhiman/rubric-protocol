@@ -1,42 +1,94 @@
 import { SolanaMark } from "@/components/SolanaMark";
+import { Stamp } from "@/components/Stamp";
+import { CopyButton } from "@/components/CopyButton";
+import { normalizeText, sha256Bytes, toHex, CANONICAL_VERSION } from "@/lib/hash";
 
 /**
- * The wordmark footer. One component, every page.
+ * The footer seals its own name.
  *
- * A hatched band with the name cut into it as outline type. The wordmark is the
- * same technique as the hero ghost - transparent fill, a stroked edge - so the
- * page opens and closes on the same gesture at two different scales.
+ * Every other site puts a copyright line here. This product's entire claim is
+ * that a piece of text can be committed and then verified by anyone, so the
+ * footer demonstrates that claim on itself: the name and the promise, and the
+ * SHA-256 that would be written to a PDA if they were sealed as a rubric.
  *
- * Two things here are decided by measurement rather than by eye:
+ * THE DIGEST IS REAL. It is computed here by `sha256Bytes` from lib/hash.ts -
+ * the same load-bearing function that hashes live clauses at create time and
+ * re-derives them at verify time. It is not a decorative hex string, and it is
+ * not pasted in. The exact input is printed above it and normalised by the
+ * project's own `normalizeText`, so a reader can run the same two steps and get
+ * the same 64 characters. That is the only reason it is allowed to be here: a
+ * hash nobody can reproduce is a texture pretending to be evidence, which on
+ * this product would be the exact lie the whole thing exists to prevent.
  *
- * THE HATCH IS 16%. It darkens the ground it is drawn on, and footer text sits
- * on top of it, so its strength is bounded by the worst text that has to survive
- * it. At 16% of --hairline mixed into --page the ground falls to luminance
- * 0.599, which still gives --text-muted 5.26:1. It is not a free decoration; it
- * spends contrast.
+ * It sits on --raised, and that is a statement rather than a shade. --raised
+ * means COMMITTED ON-CHAIN everywhere else in the product - sealed clause sets,
+ * the verdict sheet, settled receipts - so the footer is claiming membership of
+ * that set, and the SEALED stamp beside it is the same component the clause
+ * panel uses.
  *
- * THE LABELS MOVED UP A STEP. They were --text-faint, which is 4.92:1 on the
- * bare plate and fails at even a 10% hatch (4.47:1). Rather than thin the hatch
- * until the faintest ink survived, the text takes the next step down in the
- * ramp: --text-muted, with room to spare. The hatch made a text decision, which
- * is the correct direction for that argument.
+ * Computed once at module scope. The value can never change between renders -
+ * the input is a constant and the hash is pure - so recomputing it per render
+ * would be work that provably produces the same 32 bytes.
  */
+
+/** What is sealed. Printed verbatim below, so the hash is reproducible. */
+const SEALED_TEXT = "Pay on proof, not on trust.";
+
+const CANONICAL = normalizeText(SEALED_TEXT);
+const DIGEST = toHex(sha256Bytes(CANONICAL));
+
+/**
+ * Two lines of 32, in groups of 8.
+ *
+ * 64 characters do not fit on one line at 375px in any width setting of the
+ * mono, and a digest that wraps wherever the box happens to end is unreadable
+ * as a figure. Splitting it deliberately means the break is always in the same
+ * place, so the two halves can be compared against another copy by eye.
+ */
+const DIGEST_LINES = [DIGEST.slice(0, 32), DIGEST.slice(32)].map((half) =>
+  (half.match(/.{8}/g) ?? []).join(" ")
+);
 
 export function SiteFooter() {
   return (
     <footer className="wf">
-      {/* The hatch and the wordmark are texture. The name is already announced
-          by the nav on every page, so neither is read out again here. */}
+      {/* Texture. The name is announced by the nav on every page, so nothing
+          here is read out again. */}
       <div className="wf-hatch" aria-hidden="true" />
 
       <div className="wf-inner">
-        <p className="label wf-eyebrow">Pay on proof, not on trust</p>
+        <section className="wf-seal" aria-label="The project name, sealed">
+          <div className="wf-seal-head">
+            <span className="label">SEALED RECORD</span>
+            <Stamp variant="sealed" small />
+          </div>
 
-        {/* Clipped, so the type can be sized against the band without a wide
-            glyph ever becoming horizontal overflow on the page. */}
-        <div className="wf-markwrap" aria-hidden="true">
-          <span className="wf-mark">RUBRIC</span>
-        </div>
+          <p className="wf-name">RUBRIC</p>
+          <p className="wf-claim">{SEALED_TEXT}</p>
+
+          <dl className="wf-seal-grid">
+            <dt className="label">SHA-256</dt>
+            <dd>
+              <span className="data wf-digest">
+                {DIGEST_LINES.map((line) => (
+                  <span key={line}>{line}</span>
+                ))}
+              </span>
+              <CopyButton value={DIGEST} label="Copy digest" />
+            </dd>
+
+            <dt className="label">CANONICAL</dt>
+            <dd className="data">
+              v{CANONICAL_VERSION} · NFC · {sha256Bytes(CANONICAL).length} bytes
+            </dd>
+          </dl>
+
+          <p className="wf-note">
+            Hashed by the same function that seals every rubric on this protocol.
+            Normalise the line above to NFC, take its SHA-256, and you get these
+            64 characters.
+          </p>
+        </section>
 
         <div className="wf-facts">
           <span className="wf-fact">

@@ -2145,34 +2145,86 @@ select,
   color: var(--text-muted);
 }
 
-/* The clip is structural: the type is sized to the band, and a wide glyph or a
-   fallback face with different metrics would otherwise widen the document. */
-.wf-markwrap {
-  overflow: hidden;
-  margin: 10px 0 22px;
-  line-height: 0.82;
+/* THE SEALED RECORD.
+
+   --raised, and that is a statement rather than a shade: it means COMMITTED
+   ON-CHAIN everywhere else in the product, so the panel is claiming membership
+   of that set. It is also opaque, which is why the text inside it may use the
+   full ink ramp - the hatch behind cannot reach it, and --text-faint is 6.39:1
+   here against 4.92 on the bare plate. */
+.wf-seal {
+  position: relative;
+  background: var(--raised);
+  border: 1px solid var(--border);
+  padding: 22px 24px 20px;
+  max-width: 720px;
 }
 
-.wf-mark {
-  display: block;
+.wf-seal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 18px;
+}
+
+/* The name, set in the display face at a size that carries the panel without
+   turning the footer into a poster. This is the one place it is solid rather
+   than outlined - a sealed thing is not a ghost. */
+.wf-name {
+  margin: 0;
   font-family: var(--font-sans);
-  /* Fallback for engines without container queries. */
-  font-size: clamp(64px, 17vw, 232px);
-  font-variation-settings: "wdth" 125;
+  font-size: clamp(34px, 5.4vw, 52px);
+  font-variation-settings: "wdth" 112;
   font-weight: 700;
-  letter-spacing: -0.035em;
-  color: transparent;
-  /* Outline only, like the hero ghost. --ghost-stroke is 3.37:1 on the plate,
-     which clears the 3:1 graphic floor by measurement. */
-  -webkit-text-stroke: 1.5px var(--ghost-stroke);
-  user-select: none;
-  white-space: nowrap;
+  letter-spacing: -0.045em;
+  line-height: 1;
+  color: var(--text);
 }
 
-@supports (container-type: inline-size) {
-  /* 17cqw sets RUBRIC at roughly 82% of the band at every width, so it keeps
-     its margins on a phone and on a wide monitor instead of drifting with vw. */
-  .wf-mark { font-size: 17cqw; }
+/* The exact string that was hashed. Quoted, because the quotation marks are
+   doing real work: they mark where the input starts and stops, which is what
+   makes the digest reproducible rather than merely plausible. */
+.wf-claim {
+  margin: 10px 0 20px;
+  font-size: 15px;
+  line-height: 1.5;
+  color: var(--text-2);
+}
+
+.wf-claim::before { content: "\201C"; }
+.wf-claim::after { content: "\201D"; }
+
+.wf-seal-grid {
+  display: grid;
+  grid-template-columns: 92px minmax(0, 1fr);
+  gap: 10px 16px;
+  margin: 0;
+  padding-top: 16px;
+  border-top: 1px solid var(--hairline);
+  align-items: start;
+}
+
+.wf-seal-grid dt { padding-top: 2px; }
+.wf-seal-grid dd { margin: 0; color: var(--text); }
+
+/* Two fixed lines of 32, in groups of 8. Fixed, so the break lands in the same
+   place every time and two copies can be compared by eye. */
+.wf-digest {
+  display: grid;
+  gap: 2px;
+  font-size: 12px;
+  font-variation-settings: "wdth" 87.5;
+  line-height: 1.45;
+  word-break: normal;
+}
+
+.wf-note {
+  margin: 18px 0 0;
+  max-width: 62ch;
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--text-muted);
 }
 
 .wf-facts {
@@ -2196,6 +2248,4 @@ select,
 
 @media (max-width: 700px) {
   .wf-inner { padding: 24px 16px 20px; }
-  .wf-markwrap { margin: 8px 0 18px; }
-  .wf-mark { -webkit-text-stroke-width: 1.25px; }
-}
+    }
