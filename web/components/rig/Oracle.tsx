@@ -169,7 +169,7 @@ const SPIN_ARC = 0.9;
 const SPINUP_MS = 620;
 
 /** Steady yaw after spin-up, radians per millisecond. */
-const SETTLED_YAW_RATE = 0.00016; // ~39 seconds per revolution
+const SETTLED_YAW_RATE = 0.0003; // ~21 seconds per revolution
 const HELD_YAW_RATE = 0.00009;
 
 /** How far the pointer may nudge the object, in radians. */
@@ -277,16 +277,36 @@ interface Behaviour {
  * wallpaper, so the rig's settled ink is the volume identity colour instead.
  */
 const BEHAVIOUR: Record<OracleState, Behaviour> = {
-  // Resolved and locked. One axis, one steady rate: a turntable, not a tumble.
+  /* Resolved and locked - and it TUMBLES rather than sitting on a turntable.
+     This was one axis at 39 seconds a revolution, which is a lathe: correct
+     about being calibrated, and so restrained that the object read as a still
+     image with a slow drift. The reference tumbles on two axes at about 21
+     seconds and breathes on a 3.14-second sine, and that is what makes it read
+     as a thing suspended in a field rather than a diagram of one.
+
+     The nutation is what supplies the second axis. It is deliberately NOT a
+     second constant rate: two constant rates are a fixed compound rotation and
+     the object still repeats on a short period, whereas a slow sine on pitch
+     against a constant yaw never quite retraces the same path.
+
+     Everything here is still phased to start at sin(0) = 0, so the terminal
+     instant is scale 1 at the resting pitch in every state - which is what
+     keeps the SSR poster a single fixed drawing rather than one frame of an
+     animation. */
   SETTLED: {
     yawRate: SETTLED_YAW_RATE,
     wander: 0,
     wanderPeriodMs: 1,
-    nutation: 0,
-    nutationPeriodMs: 1,
-    pulseScale: 0,
-    pulseGlow: 0,
-    pulsePeriodMs: 1,
+    nutation: 0.13,
+    nutationPeriodMs: 15700,
+    // The reference pulses 5%. 3.5% here, because that shell carries a dashed
+    // generation and a ring gauge: at 5% the dash pitch visibly breathes with
+    // it, and a dash pattern in this product means "inferred", so it may not
+    // wobble for decorative reasons.
+    pulseScale: 0.035,
+    pulseGlow: 0.14,
+    // 3140ms - the reference's sin(Date.now() * 0.002), matched exactly.
+    pulsePeriodMs: 3140,
     shellNear: "--marker",
     shellFar: "--rig-solved",
     core: "--marker",

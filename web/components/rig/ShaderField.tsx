@@ -100,6 +100,17 @@ const MOVE_SPAN_MS = 1600;
 const MOVE_MIN_MS = 220;
 const MOVE_MAX_MS = 1600;
 
+/**
+ * Orbit angular rate for the plate, radians per second.
+ *
+ * 0.16 gives a horizontal sweep of roughly 39 seconds. The reference runs at 1
+ * rad/s - a six-second lap - which is right for a small hero panel and far too
+ * busy stretched across a whole page: at full-bleed the eye tracks it as
+ * something moving rather than as a surface, and it competes with the text it
+ * is sitting under.
+ */
+const ORBIT_RATE = 0.16;
+
 /** Rest between legs. The probe is sampling, not patrolling. */
 const DWELL_MS = 1100;
 
@@ -241,7 +252,7 @@ function readPalette(el: Element, variant: FieldVariant): Palette | null {
  * that is too strong.
  */
 const VARIANT_TUNING = {
-  volume: { gain: 0.3, scanDepth: 0.018 },
+  volume: { gain: 0.3, scanDepth: 0.018, orbit: false },
   // 0.18, not 0.09. At 0.09 the field swings luminance by 0.052 - present,
   // but close enough to invisible that the motion does not read. 0.18 doubles
   // that to 0.107, which is a drift you can actually see.
@@ -253,7 +264,17 @@ const VARIANT_TUNING = {
   // field pixel must stay clearly below --surface at 0.8579 or the panels stop
   // reading as raised. 0.18 peaks at 0.8157 and keeps 0.042 of that gap, and
   // the peak only occurs at the glow centre; most of the page sits far below it.
-  plate: { gain: 0.18, scanDepth: 0.006 },
+  //
+  // ORBIT, not a station tour. The two variants move differently on purpose.
+  //
+  // In the bounded panel the probe hops between stations and dwells: it is an
+  // instrument sampling a small field, and the pauses are the point. Full-bleed
+  // that reading collapses - across a whole page a hop-and-dwell reads as a
+  // stutter rather than as deliberation, because the eye has no frame to
+  // measure the pauses against. So the plate takes the reference's motion: one
+  // light source drifting continuously, never arriving. Same shader, same
+  // uniform; only what drives u_probe changes.
+  plate: { gain: 0.18, scanDepth: 0.006, orbit: true },
 } as const;
 
 /* ==========================================================================
@@ -852,7 +873,21 @@ export function ShaderField({ className, variant = "volume" }: ShaderFieldProps)
       gl.uniform2f(res.uResolution, canvas.width, canvas.height);
       // The one place the y convention flips: planner space is y-down, GL
       // texture space is y-up.
-      gl.uniform2f(res.uProbe, pl.x, 1 - pl.y);
+      // The orbit is a Lissajous rather than a circle: the reference uses
+      // sin(t) and cos(t) at the SAME rate, which is a closed circle that
+      // repeats exactly once per period and is visibly a loop. Detuning the
+      // vertical axis to 0.61 of the horizontal makes the path close only
+      // after a very long time, so at page scale it never reads as a cycle.
+      if (tuning.orbit) {
+        const t = elapsedRef.current / 1000;
+        gl.uniform2f(
+          res.uProbe,
+          0.5 + 0.36 * Math.sin(t * ORBIT_RATE),
+          0.5 + 0.28 * Math.cos(t * ORBIT_RATE * 0.61)
+        );
+      } else {
+        gl.uniform2f(res.uProbe, pl.x, 1 - pl.y);
+      }
       gl.uniform1f(res.uScan, SCAN_PERIOD_CSS_PX * dpr);
       gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
 
