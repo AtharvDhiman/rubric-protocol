@@ -180,8 +180,15 @@ const SEEDS: Seed[] = [
     decidedSecondsAfter: 52,
     submission:
       "Matched 186 of 200 addresses to company numbers. The remaining 14 are ambiguous — several companies share the same registered office and the register does not disambiguate them.",
+    // What the real judge would actually have written here. verifier.ts emits
+    // `Confidence N is below the T threshold required to settle automatically.`
+    // when the gate trips, and prisma/seed.ts already carried that sentence -
+    // this one had drifted into a restatement of the STATE instead of a reason
+    // for it, word for word identical to the paragraph the task page already
+    // prints above it. The demo therefore showed the same sentence twice, the
+    // second time in --warning, spending the one held colour on boilerplate.
     heldReason:
-      "The judge was not confident enough to settle this automatically, so the escrow is untouched and a person will review it. Nobody has been paid and nobody has been refunded.",
+      "Confidence 54 is below the 70 threshold required to settle automatically.",
     verdict: {
       approved: false,
       confidence: 54,
