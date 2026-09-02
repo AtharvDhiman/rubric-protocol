@@ -17,9 +17,15 @@ any UI. If a screen drifts from this file, the screen is wrong, not the file.
 
 ## The concept
 
-The page is an **instrumented capture volume**: a light metrology plate with
-bounded dark viewports cut into it, in which a rig is visibly measuring
+The page is an **instrumented capture volume**: a light metrology plate, lit by
+one field that runs behind every screen, on which a rig is visibly measuring
 something real.
+
+The volume is the whole plate now, not a rectangle cut into it. The bounded dark
+viewport was one way of drawing the measured region; an object drawn straight
+onto the page is held by the same instrument everything else sits on, which is a
+stronger claim than a decorated box making the same one. A capture volume is the
+region the instruments can see — it was never defined by being a dark box.
 
 This is not a costume. Rubric's actual mechanic is that acceptance criteria are
 sealed on-chain *before* work starts, and a judge then measures a submission
@@ -243,7 +249,8 @@ readouts sit in the same mono face as figures the user is asked to verify. So:
 - No decorative `01 / 02 / 03` numbering. Numbers are **join keys**: the balloons
   on the skeleton and the columns below share indices, and the test is
   falsifiable — remove the drawing and the numbers stop making sense.
-- No third dark panel. The volume appears on exactly two screens.
+- No dark panel. The plate is the only ground, and the `.volume` scope has zero
+  call sites — a bounded black panel anywhere means this system has reverted.
 - No second accent colour.
 
 ---

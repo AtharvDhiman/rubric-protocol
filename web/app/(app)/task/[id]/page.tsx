@@ -4,7 +4,7 @@
  * The screen the whole product is for: the sealed clauses on the left, what was
  * delivered and how it was judged on the right, and a receipt at the bottom.
  * Everything a person might want to check themselves — the PDA, the clause
- * hash, the transaction signature — is in Plex Mono and copyable.
+ * hash, the transaction signature — is in Martian Mono and copyable.
  */
 
 import Link from "next/link";

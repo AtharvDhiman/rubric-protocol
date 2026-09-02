@@ -5,12 +5,13 @@ import { useEffect, useRef } from "react";
 import { servoMs } from "@/lib/rig";
 
 /**
- * THE LANDING FIELD.
+ * THE PAGE FIELD.
  *
- * A bounded dark viewport in which a single sensing probe traverses a faint,
- * directional energy field. It replaces the mocap skeleton as the landing hero,
- * and it is deliberately quieter: the skeleton printed figures, this one prints
- * nothing at all.
+ * A faint, directional energy field traversed by a single sensing probe. It is
+ * mounted ONCE, in the root layout, as the full-bleed page ground behind every
+ * screen - not as a panel and not as a landing hero, which is what it was when
+ * it replaced the mocap skeleton. It is deliberately quiet: the skeleton
+ * printed figures, this one prints nothing at all.
  *
  * Six decisions drive the whole file, and they are about honesty and about not
  * breaking the page, rather than about graphics.

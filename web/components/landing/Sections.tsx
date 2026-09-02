@@ -92,7 +92,7 @@ export function HowItWorks() {
             <div style={{ display: "flex", alignItems: "baseline", gap: 14 }}>
               {/* Step number. This used to carry a section mark; the owner asked
                   for that symbol gone from the site, so the numeral does the work
-                  on its own - same Plex Mono, same single purple. */}
+                  on its own - same Martian Mono, same single accent. */}
               <span
                 className="data"
                 style={{

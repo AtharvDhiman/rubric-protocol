@@ -153,10 +153,16 @@ describe("volume inks on volume grounds", () => {
 describe("the cross-family pairs stay dangerous, which is why .volume exists", () => {
   /**
    * These assertions look backwards - they require the ratio to be BAD. That is
-   * the point. The whole architecture rests on volume inks being unusable on
-   * paper and light inks being unusable in a volume; if someone tunes a token
-   * until it works in both, the scoping rule becomes decoration and the next
-   * person will reasonably conclude the scope is unnecessary and remove it.
+   * the point. The two ink families cannot be merged, and these pairs are why.
+   *
+   * NO SCREEN CURRENTLY MOUNTS A VOLUME. The last one went when the verdict
+   * oracle moved onto the plate, so the scope is dormant - and a dormant scope
+   * is precisely what a later reader deletes on sight. These assertions are
+   * what make that deletion a decision rather than an accident: while they
+   * hold, reintroducing a bounded dark viewport is a class change and not a
+   * redesign. If someone tunes a token until it works on both grounds, the
+   * scoping rule becomes decoration and the next person will reasonably
+   * conclude the scope is unnecessary and remove it.
    *
    * If one of these fails, do not relax the assertion. Either the token moved
    * by accident, or the system has genuinely collapsed into one flat palette,

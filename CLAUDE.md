@@ -118,8 +118,8 @@ above in this file - asks for IBM Plex, Azeret Mono, Instrument Serif, a section
 mark as a clause motif, paper texture, a brass fence, a lock drawing, a
 left-margin rail, a folio, or an off-straight element, it is out of date.
 
-The current system is **CAPTURE VOLUME**: a light metrology plate with bounded
-dark viewports cut into it, in which a rig is visibly measuring something real.
+The current system is **CAPTURE VOLUME**: a light metrology plate carrying one
+full-bleed instrument field, on which a rig is visibly measuring something real.
 The short version:
 
 - Type is Archivo + Martian Mono via `next/font/google`, and nothing else. The
@@ -128,9 +128,13 @@ The short version:
   prose face only lands on paragraphs, a figure cannot leak into it - which is
   what makes "every verifiable figure is monospace" a structural property of the
   stylesheet instead of something a person has to remember.
-- Light instrument-grey plate (`#d8dcda` page / `#edefec` surface); the dark
-  ground is never the page, only a bounded inset panel, and it appears on
-  exactly two screens.
+- Light instrument-grey plate (`#d8dcda` page / `#edefec` surface), and nothing
+  else. **The dark ground is retired.** Every rig draws straight onto the plate
+  in remapped inks, `.volume` has zero call sites, and a bounded black panel
+  anywhere means this system has reverted. The volume tokens and their scope are
+  kept dormant on purpose - `web/lib/contrast.test.ts` crosses them to prove the
+  two ink families are still mutually unusable, which is what would make
+  reintroducing a viewport a decision rather than an accident.
 - Borders, never shadows. **Radius 0 everywhere.** Nothing rotates but the stamp.
 - **Acceptable states are achromatic.** A passing clause is ink, not green.
   Colour is spent on one alarm, one held state, and one money-moved event - so a
@@ -141,12 +145,12 @@ The short version:
   `web/lib/contrast.test.ts` parses the real stylesheet and fails the build on
   any pair under its floor.
 
-Screens: `/` landing (the volume panel with the mocap skeleton, then a pipeline
-latency row, how-it-works, and the spec + verdict ledger), `/docket` (a real
+Screens: `/` landing (the judge oracle drawn on the plate over the full-bleed
+field, then how-it-works and the spec + verdict ledger), `/docket` (a real
 record table, not cards), `/create` (the tolerance sheet, with a confirmation
 modal showing the exact canonical clause text and its hash before sealing),
-`/task/[id]` (the verdict sheet with the inspection arm - build this first, it
-is the demo).
+`/task/[id]` (the verdict sheet with the verdict oracle beside the solve block -
+this is the demo).
 
 ### Motion (this supersedes the earlier "CSS keyframes only" rule)
 
@@ -157,13 +161,19 @@ cannot be driven by keyframes alone. What changed and what did not:
 - **Allowed now:** vanilla `requestAnimationFrame` driving inline SVG attributes.
 - **Still forbidden, unchanged:** framer-motion, GSAP, three.js, and any new
   npm dependency. That was the rule the keyframes line existed to protect.
-- **Still inline SVG, never canvas.** Canvas cannot server-render, and both the
-  reduced-motion frame and the no-JS frame must exist in the HTML.
+- **The server-rendered frame is always inline SVG.** This started as "never
+  canvas", which the rigs no longer honour literally: the live frame is a WebGL
+  canvas. The rule it existed to protect is intact and is the one that binds -
+  a canvas cannot server-render, so every rig ships an SVG **poster** in the
+  HTML and layers the canvas over it. The reduced-motion frame and the no-JS
+  frame are that poster, and both still exist in the document.
 
-Two rigs share one language: an ambient **mocap skeleton** on the landing, and an
-**inspection arm** on `/task/[id]` that traverses the real sealed clauses and
-rules on each. The kinematics and easing live in `web/lib/rig.ts` and are unit
-tested.
+One rig, in two placements: the **judge oracle** - a wireframe shell with a lit
+core - ambient on the landing, and on `/task/[id]` driven by the real verdict,
+where a settled matter resolves and turns steadily, a refund arrests and stops
+dead, and a held matter drifts and never arrives. The earlier mocap skeleton and
+inspection arm are retired. The kinematics and easing live in `web/lib/rig.ts`
+and are unit tested.
 
 The easing is the point, and it is not a cubic-bezier. A bezier scales its whole
 curve with the duration; a real motion controller has a ramp bounded by torque,

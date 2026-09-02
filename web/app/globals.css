@@ -132,12 +132,15 @@
   --ghost-vol: #687478;     /* inside a volume only */
 
   /* =======================================================================
-     THE CAPTURE VOLUME.
-     The d-* names are REMAPPED, not deleted: they stop meaning "the dark
-     landing page" and start meaning "inside the volume". A volume is always a
-     BOUNDED inset panel, never the page itself, and it appears on exactly two
-     screens - the landing stage and the /task arm gutter. A third dark panel
-     anywhere means this system has failed.
+     THE CAPTURE VOLUME - RETIRED GROUND.
+     The d-* names were remapped once already, from "the dark landing page" to
+     "inside the volume". There is now no volume either: the last bounded dark
+     panel, the oracle cell on /task/[id], was moved onto the plate, and
+     .volume has zero call sites. These tokens and the scope below are kept
+     deliberately DORMANT rather than deleted, because contrast.test.ts crosses
+     them to prove the dark and light ink families are still mutually unusable
+     - which is what makes reintroducing a viewport a decision rather than an
+     accident. A bounded dark panel anywhere means this system has reverted.
        --d-text 14.57 worst  --d-muted 8.49  --d-faint 6.08  --d-border 4.19
      FORBIDDEN: every d-* ink on every light ground.
      ======================================================================= */
@@ -659,11 +662,12 @@ select.field option {
    LANDING PAGE
    --------------------------------------------------------------------------- */
 
-/* .on-dark is gone. It meant "the dark landing page", and there is no
-   longer such a thing: the page is a light plate, and the only dark ground
-   in the product is .volume, which redefines the ground and ink tokens for
-   itself. Kept as a no-op alias so a stray usage degrades to the plate
-   rather than to unreadable dark ink on a dark ground. */
+/* .on-dark is gone. It meant "the dark landing page", and there is no longer
+   such a thing - nor is there a dark ground anywhere else: the page is a light
+   plate and so is everything on it. .volume, which redefined the ground and ink
+   tokens for itself, has no call sites left. Kept as a no-op alias so a stray
+   usage degrades to the plate rather than to unreadable dark ink on a dark
+   ground, which is now the whole reason the alias exists. */
 .on-dark,
 .plate-section {
   background: var(--surface);
@@ -1631,7 +1635,7 @@ select.field option {
   --rule-strong: var(--d-border);
 
   /* Identity inside a volume is --marker, never --accent: --accent-strong is
-     1.85:1 on --d-panel and is banned here. */
+     1.56:1 on --d-panel and is banned here. */
   --accent: var(--marker);
   --accent-strong: var(--marker);
 

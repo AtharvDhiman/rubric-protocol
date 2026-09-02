@@ -27,8 +27,8 @@ import {
 /**
  * THE VERDICT ORACLE - the rig on /task/[id].
  *
- * A wireframe shell with a lit core, in a bounded dark viewport. It replaces
- * the inspection arm, and the arm set the bar: it traversed the REAL sealed
+ * A wireframe shell with a lit core, drawn as a technical drawing straight onto
+ * the light plate. It replaces the inspection arm, and the arm set the bar: it traversed the REAL sealed
  * clauses and came to rest on the one that blocked the escrow. A decorative orb
  * on the page that decides whether someone gets paid would be a downgrade, so
  * every visible property of this object is a property of the verdict.
