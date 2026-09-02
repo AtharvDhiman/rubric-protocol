@@ -269,6 +269,48 @@ const SPIN_BOOST_MAX = 0.0012;
  * rewind - a wheel spun harder ends up further round, it does not snap back.
  */
 const SPIN_DECAY_TAU_MS = 170;
+
+/**
+ * Below this pointer speed the rig considers the cursor stopped.
+ *
+ * Not zero, and not a "did an event arrive" check. A hand resting on a mouse
+ * still emits tiny moves, and a gesture that pauses for a frame mid-sweep has
+ * not stopped. A small positive floor is what separates held-still from
+ * between-two-movements.
+ */
+const IDLE_SPEED_THRESHOLD = 0.05;
+
+/**
+ * How quickly the idle state comes and goes.
+ *
+ * Deliberately slower than the spin decay, because the delay is what makes the
+ * pulse read as the object SETTLING rather than as a second thing that fires
+ * whenever you pause. Two gates have to open in order: the measured speed has
+ * to decay past IDLE_SPEED_THRESHOLD first, which takes ~660ms after a brisk
+ * sweep, and only then does this ramp.
+ *
+ * Modelled from the real constants: half depth at ~910ms after the cursor
+ * stops, full depth at ~1520ms. A 300ms or even a 600ms hesitation mid-gesture
+ * reaches exactly 0.000, because the speed gate has not opened yet - the pause
+ * guard is the speed decay, not this ramp.
+ *
+ * It leaves immediately on the next movement.
+ */
+const IDLE_TAU_MS = 380;
+
+/**
+ * Extra depth on the core's emission while the cursor is still.
+ *
+ * Rides the SAME oscillator as the shell's breathing rather than introducing a
+ * second period. Two independent periods would drift against each other and
+ * read as two mechanisms disagreeing; sharing one means the core simply
+ * breathes deeper as the rig comes to rest, which is one mechanism with two
+ * states.
+ */
+const IDLE_PULSE_DEPTH = 0.3;
+
+/** A touch of size on the same beat, so the core breathes rather than blinks. */
+const IDLE_PULSE_RADIUS = 0.06;
 /**
  * Time constant of the pointer filter.
  *
@@ -1364,7 +1406,8 @@ export function Oracle(props: OracleProps) {
       ms: number,
       yawOffset = 0,
       pitchOffset = 0,
-      spin = 0
+      spin = 0,
+      idle = 0
     ): void => {
       if (!resources) return;
       const base = poseAt(ms, behaviour);
@@ -1387,7 +1430,29 @@ export function Oracle(props: OracleProps) {
 
       // ---- the core's emission, first, so the wireframe sits on top of it ----
       const coreToken = behaviour.core;
-      const intensity = behaviour.glow * pose.glowMul;
+
+      /* THE RESTING PULSE.
+
+         `pulse` is the same oscillator `poseAt` already uses for the shell's
+         breathing, recovered here rather than re-derived so the two cannot
+         drift apart. `idle` is 0 while the cursor is moving and 1 once it has
+         settled, so this term simply is not there until the rig comes to rest.
+
+         Phase matters: sin() is zero at the terminal instant, so the pulse
+         contributes exactly nothing to the pose the SSR poster and the
+         reduced-motion frame are drawn from. It can only ever be an addition
+         made by a running clock. */
+      const pulse =
+        behaviour.pulsePeriodMs > 1
+          ? Math.sin(
+              (2 * Math.PI * Math.max(0, ms - SPINUP_MS)) /
+                behaviour.pulsePeriodMs
+            )
+          : 0;
+      const idlePulse = idle * pulse;
+
+      const intensity =
+        behaviour.glow * pose.glowMul * (1 + IDLE_PULSE_DEPTH * idlePulse);
       if (coreToken && intensity > 0.001) {
         const ink = palette[coreToken];
         gl.enable(gl.BLEND);
@@ -1398,7 +1463,13 @@ export function Oracle(props: OracleProps) {
         gl.vertexAttribPointer(resources.glow.aCorner, 2, gl.FLOAT, false, 0, 0);
         gl.uniform2f(resources.glow.uExtent, metrics.extentX, metrics.extentY);
         gl.uniform3f(resources.glow.uColour, ink[0], ink[1], ink[2]);
-        gl.uniform1f(resources.glow.uRadius, metrics.glowRadius);
+        // Size on the same beat as the brightness, so it breathes instead of
+        // blinking. Clamped positive: a negative radius is a divide-by-zero in
+        // the falloff and paints the whole quad.
+        gl.uniform1f(
+          resources.glow.uRadius,
+          Math.max(0.01, metrics.glowRadius * (1 + IDLE_PULSE_RADIUS * idlePulse))
+        );
         gl.uniform1f(resources.glow.uIntensity, intensity);
         gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
         gl.disableVertexAttribArray(resources.glow.aCorner);
@@ -1631,6 +1702,9 @@ export function Oracle(props: OracleProps) {
     let lastY = 0;
     let lastMoveAt = 0;
 
+    /** 0 while the cursor is moving, 1 once it has been still for a moment. */
+    let idleGain = 0;
+
     const onPointerMove = (event: PointerEvent): void => {
       // Coarse pointers do not hover, so a touch would snap the object rather
       // than ease it. Fine pointers only - and on a touch device this listener
@@ -1710,9 +1784,21 @@ export function Oracle(props: OracleProps) {
         const boost =
           SPIN_BOOST_MAX * Math.min(1, pointerSpeed / SPIN_SPEED_REF);
         spinRef.current += boost * dt;
+
+        // Idle is derived from the same decaying speed, so "stopped" means the
+        // movement has actually died away rather than that no event arrived in
+        // the last frame.
+        const idleTarget = pointerSpeed < IDLE_SPEED_THRESHOLD ? 1 : 0;
+        idleGain += (idleTarget - idleGain) * (1 - Math.exp(-dt / IDLE_TAU_MS));
       }
 
-      draw(elapsedRef.current, trackedYaw, trackedPitch, spinRef.current);
+      draw(
+        elapsedRef.current,
+        trackedYaw,
+        trackedPitch,
+        spinRef.current,
+        idleGain
+      );
 
       // A state that reaches a genuinely frozen pose stops asking for frames.
       // REFUNDED is arrested: once the spin-up move has landed and the pointer
