@@ -2085,8 +2085,8 @@ select,
 
    background is stated, and stated as transparent, so the next reader does not
    have to prove the absence of a paint. The ground it inherits is <main>'s
-   --page, which is also what the canvas clears to, so the cell interior is one
-   flat #d8dcda either way. Deliberately NOT --raised: that plane is reserved
+   --page - and the canvas over it clears transparent too, so what fills this
+   cell is that one opaque paint and nothing else. Deliberately NOT --raised: that plane is reserved
    for state committed on-chain, and a held or refunded matter has committed
    nothing - the same reason .solve beside it declines it.
 

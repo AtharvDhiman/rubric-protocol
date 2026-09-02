@@ -316,8 +316,10 @@ const IDLE_PULSE_RADIUS = 0.11;
  * The core's emission is scaled down on the light plate, and this is what makes
  * the pulse possible rather than what dims it.
  *
- * The glow is ADDITIVE - blendFunc(ONE, ONE) - so it adds to whatever the canvas
- * cleared to. On the near-black volume ground there is room to add almost
+ * The glow is ADDITIVE - blendFunc(ONE, ONE) - so it adds to whatever is behind
+ * it: the ground the canvas cleared to in a volume, and on the plate the PAGE
+ * itself, since the buffer is cleared transparent and the compositor does the
+ * addition. On the near-black volume ground there is room to add almost
  * anything: --marker saturates at an intensity of 1.106 and the peak reaches
  * 0.718, so nothing clips.
  *
@@ -822,7 +824,24 @@ void main() {
   // uExtent normalises clip space against the SHORTER side, so the falloff is
   // circular in pixels rather than stretched with the panel.
   float d = length(vCorner * uExtent) / uRadius;
-  gl_FragColor = vec4(uColour * exp(-d * d * 2.4) * uIntensity, 1.0);
+
+  /* ALPHA 0, and it is not a typo.
+
+     This pass is additive - blendFunc(ONE, ONE) - so both colour AND alpha
+     accumulate. Emitting 1.0 here would drive alpha to 1 across the WHOLE
+     quad, including the vast majority of it where the exponential falloff has
+     taken colour to nearly zero. On the transparent plate buffer that
+     composites as premultiplied (0,0,0,1): an opaque BLACK rectangle exactly
+     the size of the glow quad. Measured in a browser, not reasoned about.
+
+     Emitting 0 gives the compositor rgb with no coverage, and source-over
+     (result = src + dst * (1 - src_a)) then reduces to result = src + dst,
+     which is exactly the additive light this pass is for. Superluminous
+     premultiplied values are well defined in every engine tested.
+
+     It is also a no-op in a volume, where the buffer was already cleared to
+     alpha 1 and adding 0 leaves it there. */
+  gl_FragColor = vec4(uColour * exp(-d * d * 2.4) * uIntensity, 0.0);
 }
 `;
 
@@ -1149,13 +1168,18 @@ const ORACLE_CSS = `
   overflow: hidden;
 }
 /* On the plate there is no panel at all: no ground, no border, no clip - the
-   object is drawn straight onto the page.
+   object is drawn straight onto the page, and the canvas over it now clears
+   TRANSPARENT rather than to --page, so this rule finally means what it says.
 
-   What does NOT happen, despite this rule: the full-bleed field does not drift
-   through it. The stage is transparent but the canvas on top of it is cleared
-   OPAQUE to --page (see the clearColor call), and on an app screen AppShell
-   paints --page over the fixed field anyway. The object sits on a flat plate,
-   which is what every contrast figure here is computed against. */
+   What is behind it therefore depends on the screen. On the landing that is the
+   full-bleed field, which the object is drawn over. On an app screen AppShell
+   paints an opaque --page over the fixed field, so it is flat there.
+
+   The contrast figures hold on both. The field only ADDS to the ground, and
+   adding light under dark ink raises contrast; its one darkening term, the scan
+   line, subtracts 0.006 sRGB, which takes --page from luminance 0.7085 to
+   0.6974 and leaves the tightest ink - --hairline - at 3.10:1 against a 3:1
+   floor. */
 .cv-oracle--plate .cvo-stage {
   background: transparent;
   border: 0;
@@ -1292,20 +1316,23 @@ export function Oracle(props: OracleProps) {
     const canvas = canvasRef.current;
     if (!stage || !canvas) return;
 
+    // Hand the poster back BEFORE anything can fail. Five early returns sit
+    // between here and the definition of showCanvas - no WebGL, a lost context,
+    // an unreadable cascade, a failed shader build - and a re-run that takes one
+    // of them after a previous run had hidden the poster would otherwise leave
+    // nothing on screen at all. The visible poster is the correct resting state
+    // for this effect; only a canvas that has actually drawn may take it away.
+    {
+      const parked = stage.querySelector<SVGElement>(".cvo-poster");
+      if (parked) parked.style.visibility = "";
+    }
+
     const options: WebGLContextAttributes = {
       // Opaque inside a volume, where the canvas paints the ground itself and
-      // every contrast figure is therefore exact.
-      //
-      // On the plate this asks for a transparent drawing buffer - but read the
-      // clearColor call before believing that it gets one. The clear passes
-      // alpha 1 unconditionally, so the buffer is filled with the ground
-      // colour, which on the plate resolves through PLATE_INK to --page. The
-      // result is right (no black rectangle over the page) for a reason this
-      // request is not responsible for: the rectangle is simply the same colour
-      // as the plate. Honouring the request would need clearColor(0,0,0,0) on
-      // the plate, and that is a VISIBLE change on the landing, where the
-      // full-bleed field is genuinely behind the object and is currently
-      // occluded by that opaque fill. Left alone deliberately, not overlooked.
+      // every contrast figure is therefore exact. Transparent on the plate, and
+      // the clear now honours it - for a while this asked for a transparent
+      // buffer and then filled it anyway, which is why the landing field was
+      // being covered by a --page-coloured rectangle across the whole hero.
       alpha: surface === "plate",
       antialias: true,
       depth: false,
@@ -1365,11 +1392,35 @@ export function Oracle(props: OracleProps) {
     let resources = createResources(gl);
     if (!resources) return;
 
+    /* THE POSTER, and why it now has to be hidden explicitly.
+
+       The canvas used to hide it by being opaque. On the plate it no longer is,
+       so without this the server-rendered poster would show THROUGH the live
+       render - a second, static, 120-edge wireframe frozen at the terminal pose
+       sitting behind the moving 480-edge one.
+
+       Tied to the two helpers that already gate the canvas, so the two cannot
+       drift apart: every failure path routes through hideCanvas, and each one
+       hands the poster back on the way. visibility rather than display, because
+       it is the cheaper of the two for the compositor to toggle and this runs
+       next to a rAF loop.
+
+       The poster is never conditionally RENDERED - it is always in the server
+       HTML, which is what makes no-JS, no-WebGL, an unreadable cascade, a failed
+       shader and a lost context all fall back to a real drawing. A
+       reduced-motion reader does not get the poster: that path draws one canvas
+       frame at the resting pose and returns before scheduling anything, which is
+       the same render function at its terminal state rather than a second
+       drawing that could disagree with it. */
+    const poster = stage.querySelector<SVGElement>(".cvo-poster");
+
     const showCanvas = (): void => {
       canvas.style.display = "";
+      if (poster) poster.style.visibility = "hidden";
     };
     const hideCanvas = (): void => {
       canvas.style.display = "none";
+      if (poster) poster.style.visibility = "";
     };
 
     const projection = new Float32Array(16);
@@ -1457,9 +1508,25 @@ export function Oracle(props: OracleProps) {
         scale: base.scale,
         glowMul: base.glowMul,
       };
+      /* THE CLEAR, and the one place the two surfaces genuinely differ.
+
+         In a volume the canvas paints its own ground, so it clears OPAQUE and
+         every contrast figure is exact against a colour this code chose.
+
+         On the plate it clears to nothing at all. The context has always asked
+         for a transparent buffer and never got one: this call used to pass
+         alpha 1 unconditionally, which filled the buffer with --page and made
+         the canvas an opaque rectangle. On /task/[id] that was invisible - the
+         rectangle was the same colour as the plate behind it - but on the
+         landing it covered the full-bleed field across the whole hero, and the
+         field's motion died inside it. */
       const ground = palette["--d-ground"];
 
-      gl.clearColor(ground[0], ground[1], ground[2], 1);
+      if (surface === "plate") {
+        gl.clearColor(0, 0, 0, 0);
+      } else {
+        gl.clearColor(ground[0], ground[1], ground[2], 1);
+      }
       gl.clear(gl.COLOR_BUFFER_BIT);
       // No depth buffer: the whole wireframe is visible, and the near/far ink
       // step is what carries which half of it is facing the reader.
