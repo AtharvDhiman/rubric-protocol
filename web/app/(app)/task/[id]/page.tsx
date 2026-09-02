@@ -388,8 +388,23 @@ export default async function TaskPage({
                   it say the same thing in mono - which is the redundancy rule
                   the whole status system runs on, applied to the rig. */}
               <div className="verdict-oracle">
-                <div className="volume oracle-cell">
+                {/* Drawn on the PLATE, not in a dark viewport.
+
+                    surface="plate" is not a background swap. The volume inks
+                    are unusable on paper - --marker measures 1.26:1 on --page -
+                    so a panel that merely lost its black would lose the object
+                    with it. PLATE_INK remaps every ink at read time to its
+                    light-ground equivalent, and each one clears 3:1 as a line
+                    on --page: --accent 5.36, --text-faint 4.92, --hairline
+                    3.14, --negative 5.25, --warning 6.69.
+
+                    The cell keeps a 1px solid --border and no background of its
+                    own, which is exactly SolveBlock's framing beside it - so
+                    the pair reads as two windows onto one statement rather than
+                    as a black tile next to an outlined one. */}
+                <div className="oracle-cell">
                   <Oracle
+                    surface="plate"
                     confidence={verdict.confidence}
                     threshold={confidenceThreshold()}
                     clauseCount={task.clauses.length}

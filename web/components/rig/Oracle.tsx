@@ -1148,8 +1148,14 @@ const ORACLE_CSS = `
   border: 1px solid var(--border);
   overflow: hidden;
 }
-/* On the plate there is no panel at all: no ground, no border, no clip. The
-   object is drawn onto the page and the full-bleed field drifts through it. */
+/* On the plate there is no panel at all: no ground, no border, no clip - the
+   object is drawn straight onto the page.
+
+   What does NOT happen, despite this rule: the full-bleed field does not drift
+   through it. The stage is transparent but the canvas on top of it is cleared
+   OPAQUE to --page (see the clearColor call), and on an app screen AppShell
+   paints --page over the fixed field anyway. The object sits on a flat plate,
+   which is what every contrast figure here is computed against. */
 .cv-oracle--plate .cvo-stage {
   background: transparent;
   border: 0;
@@ -1176,7 +1182,7 @@ const ORACLE_CSS = `
 .cv-oracle .cvo-core-dot { fill: var(--cvo-core); stroke: none; }
 .cv-oracle .cvo-ring-track {
   fill: none;
-  stroke: var(--rig-solved);
+  stroke: var(--cvo-track);
   stroke-width: 1;
 }
 .cv-oracle .cvo-ring-arc {
@@ -1220,7 +1226,12 @@ function cancelLoss(event: Event): void {
 }
 
 export function Oracle(props: OracleProps) {
-  const surface: OracleSurface = props.surface ?? "volume";
+  // Defaults to the surface that actually ships. It used to default to
+  // "volume", which meant a new mount that simply forgot the prop got a black
+  // panel - the dead branch reachable by omission, which is the worst kind of
+  // default. Both live mounts pass "plate" explicitly, so this changes nothing
+  // that renders today.
+  const surface: OracleSurface = props.surface ?? "plate";
   const { confidence, threshold, clauseCount, passedCount, state, className } =
     props;
 
@@ -1283,10 +1294,18 @@ export function Oracle(props: OracleProps) {
 
     const options: WebGLContextAttributes = {
       // Opaque inside a volume, where the canvas paints the ground itself and
-      // every contrast figure is therefore exact. On the plate it MUST be
-      // transparent: an opaque canvas clears to its ground colour and would
-      // paint a rectangle over the page, which is the black background this
-      // variant exists to remove.
+      // every contrast figure is therefore exact.
+      //
+      // On the plate this asks for a transparent drawing buffer - but read the
+      // clearColor call before believing that it gets one. The clear passes
+      // alpha 1 unconditionally, so the buffer is filled with the ground
+      // colour, which on the plate resolves through PLATE_INK to --page. The
+      // result is right (no black rectangle over the page) for a reason this
+      // request is not responsible for: the rectangle is simply the same colour
+      // as the plate. Honouring the request would need clearColor(0,0,0,0) on
+      // the plate, and that is a VISIBLE change on the landing, where the
+      // full-bleed field is genuinely behind the object and is currently
+      // occluded by that opaque fill. Left alone deliberately, not overlooked.
       alpha: surface === "plate",
       antialias: true,
       depth: false,
@@ -1944,6 +1963,14 @@ export function Oracle(props: OracleProps) {
       ? `var(${inkToken(behaviour.core, surface)})`
       : "transparent",
     "--cvo-arc": `var(${inkToken(behaviour.ringArc, surface)})`,
+    // The ring TRACK, which used to be the one ink that escaped this object.
+    // It was written straight into the stylesheet as var(--rig-solved), so on
+    // the plate the poster stroked the raw volume ink while the canvas stroked
+    // the remapped one - the poster and the canvas disagreeing about a colour,
+    // which is exactly what the comment above promises cannot happen. Both
+    // values clear 3:1 (#6c7772 is 3.36 on --page, --hairline 3.14), so this
+    // was never a contrast bug; it was a hydration flash and an untested ink.
+    "--cvo-track": `var(${inkToken("--rig-solved", surface)})`,
   } as CSSProperties;
 
   const coreRadius = CORE_RADIUS * POSTER_PX_PER_WORLD;

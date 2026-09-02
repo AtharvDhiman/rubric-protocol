@@ -53,3 +53,8 @@ Thumbs.db
 .idea/
 .vscode/*
 !.vscode/extensions.json
+
+# Agent worktrees. A nested checkout inside the repo: never commit it, and
+# keep linters and `git add -A` from walking into a second copy of every file.
+.claude/worktrees/
+web/.claude/worktrees/

@@ -767,7 +767,11 @@ export interface ShaderFieldProps {
   /**
    * "volume" is the bounded dark viewport - a 16:9 panel cut into the plate.
    * "plate" is the full-bleed page ground: fixed, behind everything, painted in
-   * the light tokens at instrument amplitude. Defaults to "volume".
+   * the light tokens at instrument amplitude.
+   *
+   * Defaults to "plate", which is the only variant mounted anywhere. The
+   * default used to be "volume" - the unmounted branch, reachable by simply
+   * forgetting the prop.
    */
   variant?: FieldVariant;
 }
@@ -782,7 +786,7 @@ const LABEL =
   "sensing glow low on the left, a faint directional wash shifting from teal " +
   "to pale blue across it, and fine horizontal scan lines.";
 
-export function ShaderField({ className, variant = "volume" }: ShaderFieldProps) {
+export function ShaderField({ className, variant = "plate" }: ShaderFieldProps) {
   const stageRef = useRef<HTMLDivElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
