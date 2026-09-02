@@ -307,10 +307,31 @@ const IDLE_TAU_MS = 380;
  * breathes deeper as the rig comes to rest, which is one mechanism with two
  * states.
  */
-const IDLE_PULSE_DEPTH = 0.3;
+const IDLE_PULSE_DEPTH = 0.5;
 
-/** A touch of size on the same beat, so the core breathes rather than blinks. */
-const IDLE_PULSE_RADIUS = 0.06;
+/** Size on the same beat, so the core breathes rather than blinks. */
+const IDLE_PULSE_RADIUS = 0.11;
+
+/**
+ * The core's emission is scaled down on the light plate, and this is what makes
+ * the pulse possible rather than what dims it.
+ *
+ * The glow is ADDITIVE - blendFunc(ONE, ONE) - so it adds to whatever the canvas
+ * cleared to. On the near-black volume ground there is room to add almost
+ * anything: --marker saturates at an intensity of 1.106 and the peak reaches
+ * 0.718, so nothing clips.
+ *
+ * The light plate has almost no room. --accent over --page saturates at 0.368,
+ * and the UNPULSED intensity was already 0.42. The core was clipped to white at
+ * rest, which meant the top half of every breath was cropped flat: turning the
+ * depth up made the trough deeper and could not make the peak brighter, because
+ * the peak had nowhere to go.
+ *
+ * At 0.5 the peak lands on 0.359, just under the ceiling, and the swing goes
+ * from about 1.1x of visible range to 4.0x. The core is dimmer at rest and the
+ * breath is far stronger, which is the trade that was actually being asked for.
+ */
+const GLOW_PLATE_SCALE = 0.5;
 /**
  * Time constant of the pointer filter.
  *
@@ -1451,8 +1472,14 @@ export function Oracle(props: OracleProps) {
           : 0;
       const idlePulse = idle * pulse;
 
+      // Scaled on the plate only: see GLOW_PLATE_SCALE. The dark volume has
+      // headroom to spare and is left alone.
+      const glowScale = surface === "plate" ? GLOW_PLATE_SCALE : 1;
       const intensity =
-        behaviour.glow * pose.glowMul * (1 + IDLE_PULSE_DEPTH * idlePulse);
+        behaviour.glow *
+        glowScale *
+        pose.glowMul *
+        (1 + IDLE_PULSE_DEPTH * idlePulse);
       if (coreToken && intensity > 0.001) {
         const ink = palette[coreToken];
         gl.enable(gl.BLEND);
