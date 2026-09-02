@@ -2090,15 +2090,18 @@ select,
    for state committed on-chain, and a held or refunded matter has committed
    nothing - the same reason .solve beside it declines it.
 
-   The 1px rule stays, and outside .volume it resolves to --border (#101418)
-   rather than --d-border, which is the SAME rule SolveBlock draws beside it -
-   so the pair reads as two windows onto one statement. Not borderless like
-   .vh-volume on the landing: that panel has the .vh-frame corner ticks and the
-   ghost wordmark framing it, and there is no such fixture here. */
+   NO BORDER. The frame went with the ground it used to hold. Once the panel
+   is the same colour as the page, a rule around it is drawing a box that
+   contains nothing - it was the edge of a viewport, and there is no viewport
+   left. This follows .vh-volume on the landing, which has carried the same
+   object unframed all along.
+
+   overflow: hidden stays even though nothing visible clips at it. It is the
+   guarantee that the figure cannot push into the column beside it if the
+   object's extent ever changes - a layout bound, not a frame. */
 .oracle-cell {
   position: relative;
   aspect-ratio: 1;
-  border: 1px solid var(--border);
   background: transparent;
   overflow: hidden;
 }
