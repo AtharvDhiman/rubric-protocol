@@ -219,17 +219,29 @@ const HELD_YAW_RATE = 0.00009;
 const PARALLAX = 0.16;
 
 /**
- * The core leans by this fraction of the shell's lean.
+ * The core leans by this fraction of the shell's lean, and the SIGN is the
+ * point: it is negative, so the core turns slightly AGAINST the shell.
  *
- * This is the whole effect. If both layers took the same offset the object
- * would rotate as one rigid body and the cursor would just be turning a
- * turntable. At 0.3 the outer shell swings three times further than the core,
- * so the two separate as the pointer moves and the shell reads as a cage AROUND
- * something rather than as a texture painted on it - which is the parallax the
- * reference got from translating its mesh, without walking the object off
- * centre to get it.
+ * If both layers took the same offset the object would rotate as one rigid
+ * body and the cursor would just be turning a turntable. Making the core lag
+ * (a positive fraction) already separates them; making it counter-rotate
+ * separates them roughly twice as far for a third of the movement, because the
+ * two contributions add instead of cancelling:
+ *
+ *     lag       at +0.3   ->  0.160 - 0.048  =  0.112 rad of separation
+ *     counter   at -0.3   ->  0.160 + 0.048  =  0.208 rad
+ *
+ * So the core moves only ~2.8 degrees - slight, as asked - while the visible
+ * gap between the two shells nearly doubles. Counter-motion is also what the
+ * eye actually reads as depth: two things drifting the same way look like one
+ * thing sliding, and two things drifting apart look like one thing INSIDE
+ * another.
+ *
+ * It stays small deliberately. Past about -0.5 the core stops reading as
+ * suspended and starts reading as a second object with its own agenda, which
+ * is a different drawing.
  */
-const CORE_PARALLAX_RATIO = 0.3;
+const CORE_PARALLAX_RATIO = -0.3;
 /**
  * Time constant of the pointer filter.
  *
@@ -1351,8 +1363,8 @@ export function Oracle(props: OracleProps) {
       const rot = rotation3(pose.pitch, pose.yaw);
       modelView(bodyMatrix, rot, CAMERA_DIST);
 
-      // The core takes the base pose plus only a FRACTION of the pointer lean,
-      // so it trails the shell instead of turning with it.
+      // The core takes the base pose plus a small NEGATIVE fraction of the
+      // pointer lean, so it turns against the shell rather than with it.
       const coreRot = rotation3(
         base.pitch + pitchOffset * CORE_PARALLAX_RATIO,
         base.yaw + yawOffset * CORE_PARALLAX_RATIO
@@ -1401,7 +1413,8 @@ export function Oracle(props: OracleProps) {
 
       // THE CORE. Solid: it is the ruling itself, and the ruling is a fact.
       if (plan.coreVisible && coreToken) {
-        // Trailing matrix: this is what separates the core from the shell.
+        // Counter-rotating matrix: this is what separates the core from the
+        // shell, and the opposition is what reads as one being inside the other.
         gl.uniformMatrix4fv(L.uModelView, false, coreMatrix);
         const ink = palette[coreToken];
         gl.uniform1f(L.uBodyRadius, CORE_RADIUS);
