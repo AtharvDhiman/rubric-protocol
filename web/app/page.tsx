@@ -1,10 +1,10 @@
 import { VolumeHero } from "@/components/landing/VolumeHero";
+import { SiteFooter } from "@/components/SiteFooter";
 import {
   Figures,
   FinalCta,
   HowItWorks,
   Marquee,
-  SiteFooter,
   VerdictLog,
 } from "@/components/landing/Sections";
 

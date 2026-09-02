@@ -12,6 +12,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { SolanaMark } from "./SolanaMark";
 import { ConnectWallet } from "./ConnectWallet";
+import { SiteFooter } from "@/components/SiteFooter";
 
 const NAV = [
   { href: "/docket", label: "Docket" },
@@ -131,6 +132,10 @@ export function AppShell({
       >
         {children}
       </main>
+
+      {/* Every page closes the same way. The app screens had no footer at
+          all before this, so the docket simply stopped at the last row. */}
+      <SiteFooter />
     </div>
   );
 }

@@ -346,36 +346,3 @@ export function FinalCta() {
   );
 }
 
-export function SiteFooter() {
-  return (
-    <footer
-      className="plate-section"
-      style={{
-        background: "var(--page)",
-        borderTop: "1px solid var(--border)",
-        padding: "28px 56px",
-        display: "flex",
-        justifyContent: "space-between",
-        alignItems: "center",
-        gap: 24,
-        flexWrap: "wrap",
-      }}
-    >
-      <span style={{ display: "flex", alignItems: "center", gap: 10 }}>
-        <SolanaMark size={14} />
-        <span
-          className="label label-11"
-          style={{ color: "var(--text-faint)", letterSpacing: "0.16em" }}
-        >
-          BUILT ON SOLANA · USDC ESCROW
-        </span>
-      </span>
-      <span
-        className="label label-11"
-        style={{ color: "var(--text-faint)", letterSpacing: "0.16em" }}
-      >
-        RUBRIC PROTOCOL
-      </span>
-    </footer>
-  );
-}

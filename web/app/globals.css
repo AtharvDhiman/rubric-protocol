@@ -2096,3 +2096,106 @@ select,
     aspect-ratio: 1;
   }
 }
+
+/* ===========================================================================
+   THE WORDMARK FOOTER
+
+   The page closes on the same gesture it opens with: the name as outline type,
+   at a different scale. Full-bleed on purpose - a band that stops at the
+   content gutter reads as a panel, and this is meant to read as the edge of
+   the sheet.
+   =========================================================================== */
+
+.wf {
+  position: relative;
+  overflow: hidden;
+  background: var(--page);
+  border-top: 1px solid var(--border);
+  /* Sized against the band, not the viewport - the wordmark below is set in
+     cqw so it holds the same proportion at every width. */
+  container-type: inline-size;
+}
+
+/* Diagonal hatching. 16% of --hairline and no more: it darkens the ground that
+   footer text sits on, so its strength is bounded by contrast rather than by
+   taste. See the note in SiteFooter.tsx.
+
+   On an engine without color-mix the layer simply does not paint and the band
+   falls back to a clean --page, which is dimmer than intended and never wrong. */
+.wf-hatch {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image: repeating-linear-gradient(
+    45deg,
+    transparent 0 7px,
+    color-mix(in srgb, var(--hairline) 16%, transparent) 7px 8px
+  );
+}
+
+.wf-inner {
+  position: relative;
+  max-width: 1240px;
+  margin: 0 auto;
+  padding: 30px 32px 26px;
+}
+
+.wf-eyebrow {
+  margin: 0;
+  color: var(--text-muted);
+}
+
+/* The clip is structural: the type is sized to the band, and a wide glyph or a
+   fallback face with different metrics would otherwise widen the document. */
+.wf-markwrap {
+  overflow: hidden;
+  margin: 10px 0 22px;
+  line-height: 0.82;
+}
+
+.wf-mark {
+  display: block;
+  font-family: var(--font-sans);
+  /* Fallback for engines without container queries. */
+  font-size: clamp(64px, 17vw, 232px);
+  font-variation-settings: "wdth" 125;
+  font-weight: 700;
+  letter-spacing: -0.035em;
+  color: transparent;
+  /* Outline only, like the hero ghost. --ghost-stroke is 3.37:1 on the plate,
+     which clears the 3:1 graphic floor by measurement. */
+  -webkit-text-stroke: 1.5px var(--ghost-stroke);
+  user-select: none;
+  white-space: nowrap;
+}
+
+@supports (container-type: inline-size) {
+  /* 17cqw sets RUBRIC at roughly 82% of the band at every width, so it keeps
+     its margins on a phone and on a wide monitor instead of drifting with vw. */
+  .wf-mark { font-size: 17cqw; }
+}
+
+.wf-facts {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px 24px;
+  flex-wrap: wrap;
+  padding-top: 16px;
+  border-top: 1px solid var(--hairline);
+  color: var(--text-muted);
+}
+
+.wf-fact {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.wf-facts .label { color: var(--text-muted); }
+
+@media (max-width: 700px) {
+  .wf-inner { padding: 24px 16px 20px; }
+  .wf-markwrap { margin: 8px 0 18px; }
+  .wf-mark { -webkit-text-stroke-width: 1.25px; }
+}
