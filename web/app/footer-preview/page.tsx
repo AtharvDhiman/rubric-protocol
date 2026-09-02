@@ -3,6 +3,7 @@ import { FooterKinetic } from "@/components/footers/FooterKinetic";
 import { FooterGrid } from "@/components/footers/FooterGrid";
 import { FooterSignature } from "@/components/footers/FooterSignature";
 import { FooterCitation } from "@/components/footers/FooterCitation";
+import { FooterStatement } from "@/components/footers/FooterStatement";
 import { SiteFooter } from "@/components/SiteFooter";
 
 /**
@@ -48,6 +49,12 @@ const OPTIONS = [
     name: "The citation",
     note: "One real refusal, quoted in full: the sealed clause, the submission, and the ruling that connects them.",
     render: () => <FooterCitation />,
+  },
+  {
+    key: "G",
+    name: "The statement",
+    note: "Full screen height, twelve columns, revealed by the page sliding off it. Scale rather than a device.",
+    render: () => <FooterStatement />,
   },
   {
     key: "E",
