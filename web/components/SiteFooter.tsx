@@ -1,10 +1,8 @@
-import Link from "next/link";
-
 import { demoTasks } from "@/lib/demo";
 import { FooterReveal } from "@/components/FooterReveal";
 
 /**
- * THE STATEMENT - the site footer, on every page.
+ * THE STATEMENT - the landing page footer.
  *
  * A full-viewport-height closing panel on a twelve-column grid, with its blocks
  * staggered in as it arrives.
@@ -37,8 +35,16 @@ import { FooterReveal } from "@/components/FooterReveal";
  * bottom of a page is actually good at.
  *
  * A full screen of height still has to be earned, so it is not an empty panel
- * with a wordmark in it: the left column carries the claim at reading size, the
- * right carries the record, and the baseline carries the routes.
+ * with a wordmark in it: the left column carries the claim at reading size and
+ * the right carries the record.
+ *
+ * It is on the landing page ONLY. It was briefly mounted in AppShell, which put
+ * a full screen of closing argument underneath the docket - and somebody
+ * scanning a table of matters is on a task, not being persuaded.
+ *
+ * The name rises out of a mask rather than fading in, and there are no links in
+ * the baseline: the header already carries the whole nav, and three more copies
+ * of it under a 168px wordmark was a sitemap arguing with a statement.
  *
  * NOTHING IS WRITTEN INTO IT
  * --------------------------
@@ -119,10 +125,27 @@ const FOOTER_CSS = `
 .fs-fig dt { color: var(--text-muted); }
 .fs-fig dd { margin: 0; font-size: 19px; color: var(--text); }
 
-/* The name, at the size a full-height panel exists to allow. */
-.fs-name {
+/* THE NAME, AND ITS RISE.
+
+   The wrapper is the mask. It clips, and the word inside starts below the clip
+   line and travels up into place - so the letters are revealed by the edge
+   rather than faded in. That is why the wrapper exists at all; without
+   overflow: hidden the word would simply slide up from the figures above it,
+   which reads as a slip rather than as a reveal.
+
+   The bottom padding is not spacing. line-height 0.86 pulls the line box
+   tighter than the capitals, so at 168px the glyph bottoms sit within a pixel
+   or two of the box edge and the mask shaves them. 0.08em of clearance puts the
+   clip line just below the baseline where it belongs. */
+.fs-namewrap {
   grid-column: 1 / -1;
   margin: 56px 0 0;
+  overflow: hidden;
+  padding-bottom: 0.08em;
+}
+
+.fs-name {
+  display: block;
   font-family: var(--font-sans);
   /* clamp(), never raw vw. A viewport unit ignores the root font size, so a
      reader who has zoomed the page gets no larger type at all. */
@@ -132,31 +155,70 @@ const FOOTER_CSS = `
   letter-spacing: -0.05em;
   line-height: 0.86;
   color: var(--text);
+
 }
+
+/* THE RISE.
+
+   data-reveal goes on the NAME, not on the mask around it, and that placement
+   is the fix for a real bug rather than a preference. Arming the wrapper and
+   animating the child meant two elements had to agree about one move: the
+   attribute landed on one, the transition lived on the other, and the arm and
+   release of FooterReveal's own cycle raced against it. The symptom was a
+   CSSTransition stuck in playState "running" forever with the word parked
+   137px below the clip and never coming back. Arming the element that actually
+   moves removes the coupling, so there is nothing left to race.
+
+   Only the DISTANCE is overridden here. Everything else - when it arms, when it
+   releases, the stagger index, the reduced-motion escape - stays with
+   FooterReveal, which already gets all of it right. */
+
+/* Parked below the mask. Opacity stays 1: this block reveals by masking, and a
+   fade on top of that reads as two effects applied to one object. 104% rather
+   than 100% because at this letter-spacing the glyph box and the ink do not
+   quite agree, and a whole 100% still leaves a hairline of the R at the clip. */
+.fr-host .fs-name[data-reveal][data-fr-armed] {
+  opacity: 1;
+  transform: translateY(104%);
+  /* Arming is INSTANT, and this line is not optional. FooterReveal sets the
+     same thing on its own armed rule; because this override wins the cascade
+     for transform, it has to carry the transition rule with it or the parking
+     inherits the 760ms released transition and ANIMATES. The symptom is the
+     word visibly sliding DOWN out of view as the reader approaches the footer,
+     which reads as a bug because it is one. Hiding happens while it is still
+     off screen; only the rise is animated. */
+  transition: none;
+}
+
+/* The released state. Transform only - never a height or a margin - so the move
+   runs on the compositor and cannot reflow the page behind it. Slower than the
+   520ms the other blocks use, because a taller object travelling further at the
+   same duration reads as flung rather than lifted. */
+.fr-host .fs-name[data-reveal] {
+  opacity: 1;
+  transform: translateY(0);
+  transition: transform 760ms cubic-bezier(0.33, 0, 0.2, 1)
+    calc(var(--fr-i, 0) * 90ms);
+}
+
+/* FooterReveal carries its own reduced-motion escape, and it applies to
+   [data-reveal] - which is now this element - so the name is covered by it
+   without a second copy here. */
 
 .fs-base {
   grid-column: 1 / -1;
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  /* The links are gone, so the colophon sits at the end of the rule on its own
+     rather than drifting to the left of a full-width line. */
+  justify-content: flex-end;
   gap: 14px 28px;
   flex-wrap: wrap;
   margin-top: 28px;
   padding-top: 18px;
   border-top: 1px solid var(--border);
 }
-.fs-links { display: flex; gap: 22px; flex-wrap: wrap; }
-.fs-links a {
-  color: var(--accent);
-  text-decoration: none;
-  border-bottom: 1px solid var(--hairline);
-}
-.fs-links a:hover { border-bottom-color: var(--accent); }
 .fs-base .label { color: var(--text-muted); }
-
-@media (max-width: 760px), (pointer: coarse) {
-  .fs-links a { min-height: 44px; display: inline-flex; align-items: center; }
-}
 
 @media (max-width: 900px) {
   /* Seven columns of claim beside four of record leaves both too narrow to
@@ -236,16 +298,13 @@ export function SiteFooter() {
             </dl>
           </div>
 
-          <p className="fs-name" data-reveal>
-            RUBRIC
-          </p>
+          <div className="fs-namewrap">
+            <p className="fs-name" data-reveal>
+              RUBRIC
+            </p>
+          </div>
 
           <div className="fs-base" data-reveal>
-            <span className="fs-links">
-              <Link href="/docket">The docket</Link>
-              <Link href="/create">Create a task</Link>
-              <Link href="/my-work">My work</Link>
-            </span>
             <span className="label">
               BUILT ON SOLANA · USDC ESCROW · SEEDED SAMPLE
             </span>
