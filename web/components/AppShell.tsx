@@ -12,7 +12,6 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { SolanaMark } from "./SolanaMark";
 import { ConnectWallet } from "./ConnectWallet";
-import { SiteFooter } from "@/components/SiteFooter";
 
 const NAV = [
   { href: "/docket", label: "Docket" },
@@ -133,9 +132,14 @@ export function AppShell({
         {children}
       </main>
 
-      {/* Every page closes the same way. The app screens had no footer at
-          all before this, so the docket simply stopped at the last row. */}
-      <SiteFooter />
+      {/* No footer on the app screens, deliberately.
+
+          The statement footer is a full screen of height and a closing
+          argument, which is right at the end of the landing page and wrong
+          underneath a working docket: somebody scanning a table of matters is
+          on a task, not being persuaded. <main> already carries a
+          min-height of the viewport less the header, so these pages still fill
+          the screen without one. */}
     </div>
   );
 }
