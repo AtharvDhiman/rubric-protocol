@@ -428,33 +428,24 @@ h3 {
 
 /* ---------------------------------------------------------------------------
    BUTTONS
-   The purple->green gradient appears exactly twice per screen: the Solana mark
-   and this button. Nowhere else.
+
+   A control is a labelled rectangle bounded by a 1px rule. There is no lit
+   surface here: no gradient body, no inset highlight, no specular sweep. Those
+   belonged to the retired liquid-glass system, and the sweep had already
+   stopped existing before this - the ::after it animated was never given
+   `content`, so .btn:hover::after, .btn-primary::after and .btn:disabled::after
+   were three rules transitioning a box that never rendered. position/isolation/
+   overflow went with them; they were only ever there to clip that sweep.
    --------------------------------------------------------------------------- */
 
-/* Liquid glass. Every button is a lit surface: a gradient body, an inset
-   highlight along the top edge, and a specular sweep that crosses on hover.
-   The sweep is a pseudo-element rather than a background-position animation so
-   it composites on its own layer and never repaints the label. */
 .btn {
-  position: relative;
-  isolation: isolate;
-  overflow: hidden;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   height: 44px;
   padding: 0 20px;
-  border-radius: 6px;
-  border: 1px solid rgba(16, 18, 27, 0.16);
-  background: linear-gradient(
-    135deg,
-    rgba(255, 255, 255, 0.95),
-    rgba(240, 242, 247, 0.85) 50%,
-    rgba(226, 231, 240, 0.9)
-  );
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9),
-    0 1px 2px rgba(16, 18, 27, 0.06);
+  border: 1px solid var(--border);
+  background: var(--raised);
   color: var(--text);
   font-family: var(--font-sans);
   font-size: 14px;
@@ -464,67 +455,40 @@ h3 {
   white-space: nowrap;
   cursor: pointer;
   text-decoration: none;
-  transition: background 0.35s ease, border-color 0.35s ease,
-    box-shadow 0.35s ease, color 0.35s ease, filter 0.35s ease;
+  /* Colour only, and quick. The old 0.35s transition included box-shadow and
+     filter, neither of which this button has any more. */
+  transition: background-color 0.15s ease, border-color 0.15s ease,
+    color 0.15s ease;
 }
 
-
-.btn:hover:not(:disabled)::after {
-  transform: translateX(130%);
-}
-
+/* Hover is a plane change and nothing else - the same move a record row makes.
+   Nothing lifts, because there is no shadow to lift out of. */
 .btn:hover:not(:disabled) {
-  background: linear-gradient(
-    135deg,
-    rgba(255, 255, 255, 1),
-    rgba(238, 242, 251, 0.95) 48%,
-    rgba(219, 227, 243, 0.95)
-  );
-  border-color: rgba(47, 75, 216, 0.38);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 1),
-    0 2px 10px rgba(47, 75, 216, 0.14);
+  background: var(--row-hover);
 }
 
-/* The primary action is the only element on any screen that reads as metal
-   rather than glass: white, lit from above, and opaque. One per screen. */
-/* Inverted from the dark system: there, the primary was the only white object
-   on a black page. Here it is the only near-black object on a white one. Same
-   idea - the primary action is the one solid, opaque thing on the screen. */
+/* The primary action is the one solid object on the screen, and this is the
+   only place the accent is a fill rather than a mark. The pairing is the
+   measured one already recorded in the token block: --raised on
+   --accent-strong is 9.66. The focus section further down is written against
+   this same assumption - it says the primary fill IS --accent-strong, and
+   picks --text for the ring so the ring can never equal what it surrounds. */
 .btn-primary {
-  background: linear-gradient(180deg, #2c2f39 0%, #17191f 48%, #0c0d12 100%);
-  color: #ffffff;
-  border: 1px solid rgba(12, 13, 18, 0.9);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.16),
-    0 1px 2px rgba(16, 18, 27, 0.18);
-  font-weight: 500;
+  background: var(--accent-strong);
+  border-color: var(--accent-strong);
+  color: var(--raised);
 }
 
+/* One step along the accent ramp rather than a lightening filter. --raised on
+   --accent measures 6.96, so the label keeps its floor while the fill moves. */
 .btn-primary:hover:not(:disabled) {
-  background: linear-gradient(180deg, #373b48 0%, #1d2028 48%, #101219 100%);
-  border-color: rgba(47, 75, 216, 0.75);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.22),
-    0 4px 16px rgba(47, 75, 216, 0.28);
-  filter: none;
-}
-
-/* The primary's sweep is the one that stays light: a highlight travelling
-   across dark metal. */
-.btn-primary::after {
-  background: linear-gradient(
-    115deg,
-    transparent 20%,
-    rgba(255, 255, 255, 0.28) 48%,
-    transparent 76%
-  );
+  background: var(--accent);
+  border-color: var(--accent);
 }
 
 .btn:disabled {
   opacity: 0.42;
   cursor: not-allowed;
-}
-
-.btn:disabled::after {
-  display: none;
 }
 
 .btn-text {
@@ -543,8 +507,7 @@ h3 {
 
 /* The landing used to override the buttons because the old system had a
    separate light-app / dark-landing split. There is one ground now, so the
-   buttons are already correct here and an override only fights them. The
-   primary keeps its white metal face and dark label on both. */
+   buttons are already correct here and an override only fights them. */
 
 /* ---------------------------------------------------------------------------
    FORM CONTROLS
@@ -1327,7 +1290,6 @@ select.field option {
   display: inline-block;
   padding: 7px 14px;
   border: 1.5px solid var(--positive);
-  border-radius: 4px;
   color: var(--positive);
   font-size: 12px;
   font-weight: 500;
@@ -1687,22 +1649,36 @@ select.field option {
    which was used where.
    --------------------------------------------------------------------------- */
 
-/* Radius zero, stated at real specificity rather than in :where().
-   :where() contributes ZERO specificity, which is usually the polite choice -
-   but here it meant every component rule with a class selector silently beat
-   it, and 2px and 4px radii survived the reset. A system-wide invariant should
-   win by default and be overridden deliberately, not the other way round. */
+/* The reset below is deliberately SMALL, and it is not the thing that enforces
+   the rule.
+
+   It used to be a :where() block. :where() contributes ZERO specificity, so
+   every component rule with a class selector silently beat it and 4px and 6px
+   radii survived the reset. Raising the specificity is the obvious repair and
+   it is the wrong one, because it only fixes the smaller half: most of the
+   radii that actually shipped were inline `style={{ borderRadius: 2 }}` props,
+   and an inline declaration outranks every author rule in the cascade however
+   specific the selector is. No selector wins that argument. The only CSS that
+   would is !important, which would also flatten the 50% status dots and leave
+   no way to make a deliberate exception again.
+
+   So the invariant is enforced where it actually can be: lib/radius.test.ts
+   reads these real source files and fails the build on any radius that is not
+   0 or 50% - in this stylesheet, in an inline style prop, or as a Tailwind
+   `rounded` utility. That covers everything we write, which is why the
+   enumeration of project classes that used to live here (.btn, .panel, .plate,
+   [class*="card"] and friends) is gone: it duplicated a guarantee the test now
+   makes, and a hand-maintained list of class names rots the moment one of them
+   is renamed - silently, because a selector that matches nothing looks exactly
+   like a selector with nothing to do.
+
+   What remains is the one job a test cannot do: neutralising the radius the
+   BROWSER'S own stylesheet puts on form controls. That is not our source, so
+   it is not something we can grep. */
 button,
 input,
 textarea,
-select,
-.btn,
-.field,
-.panel,
-.record-row,
-.plate,
-.stamp,
-[class*="card"] {
+select {
   border-radius: 0;
 }
 

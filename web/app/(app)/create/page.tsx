@@ -480,7 +480,6 @@ export default function CreatePage() {
               style={{
                 background: "var(--raised)",
                 border: "1px solid var(--border-strong)",
-                borderRadius: 2,
                 padding: 16,
                 marginTop: 20,
                 fontFamily: "var(--font-mono)",
