@@ -104,4 +104,15 @@ pub enum RubricError {
     /// The fee destination passed in is not the one recorded in Config.
     #[msg("Fee destination does not match the configured fee destination.")]
     FeeDestinationMismatch,
+
+    // ---- Added after the first deploy ----
+    //
+    // APPEND ONLY. Anchor numbers these from 6000 in declaration order and those
+    // numbers are part of the deployed ABI - clients, explorers and the web app's
+    // error handling all see them. A variant inserted above this line silently
+    // renumbers every error below it. tests/rubric.ts pins every existing code.
+    /// `set_fee_destination` was given the all-zero key, which is not a wallet
+    /// anyone controls. Fees sent to its token account could never be recovered.
+    #[msg("The fee destination must be a real account, not the all-zero key.")]
+    InvalidFeeDestination,
 }

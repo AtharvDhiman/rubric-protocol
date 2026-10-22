@@ -88,6 +88,18 @@ pub mod rubric {
         instructions::set_verifier_authority::set_verifier_authority_handler(ctx, new_verifier_authority)
     }
 
+    /// Point the protocol fee at a different wallet. Admin only.
+    ///
+    /// Exists because the fee destination was immutable and the asset it is paid
+    /// in is freezable: one frozen fee account would revert every approval, and the
+    /// only remedy was redeploying under a new program id.
+    pub fn set_fee_destination(
+        ctx: Context<SetFeeDestination>,
+        new_fee_destination: Pubkey,
+    ) -> Result<()> {
+        instructions::set_fee_destination::set_fee_destination_handler(ctx, new_fee_destination)
+    }
+
     /// Seal a rubric and fund its escrow. The poster signs.
     pub fn create_task(
         ctx: Context<CreateTask>,

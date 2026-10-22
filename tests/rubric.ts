@@ -49,6 +49,8 @@ import {
   mintTo,
 } from "@solana/spl-token";
 import { assert, expect } from "chai";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import type { Rubric } from "../target/types/rubric";
 
 // ---------------------------------------------------------------------------
@@ -1265,5 +1267,160 @@ describe("rubric", () => {
       rent - 10_000,
       "the worker recovered the rent, less one transaction fee"
     );
+  });
+
+  // =========================================================================
+  // set_fee_destination (review finding R-03)
+  // =========================================================================
+
+  /** set_fee_destination, signed by the admin (the provider wallet) unless told otherwise. */
+  function setFeeDestinationCall(newDestination: PublicKey, signer?: Keypair) {
+    const call = program.methods
+      .setFeeDestination(newDestination)
+      .accounts({
+        admin: (signer ?? admin).publicKey,
+        config: configPda,
+      });
+    return signer ? call.signers([signer]) : call;
+  }
+
+  /**
+   * Put the fee destination back if a test left it changed.
+   *
+   * These tests mutate the shared Config. If a guard they exercise is ever broken,
+   * the attack succeeds and the destination really does change - and every later
+   * test would then fail for a reason that is not its own. Restoring in `finally`
+   * keeps one broken guard from reading as several.
+   */
+  async function restoreFeeDestination() {
+    const config = await program.account.config.fetch(configPda);
+    if (config.feeDestination.toBase58() !== feeDestination.publicKey.toBase58()) {
+      await setFeeDestinationCall(feeDestination.publicKey).rpc();
+    }
+  }
+
+  it("32. only the admin can change the fee destination -> NotAdmin", async () => {
+    const before = await program.account.config.fetch(configPda);
+
+    try {
+      await expectError(
+        setFeeDestinationCall(attacker.publicKey, attacker).rpc(),
+        "NotAdmin"
+      );
+
+      const after = await program.account.config.fetch(configPda);
+      assert.equal(
+        after.feeDestination.toBase58(),
+        before.feeDestination.toBase58(),
+        "the fee destination is unchanged"
+      );
+    } finally {
+      await restoreFeeDestination();
+    }
+  });
+
+  it("33. the fee destination cannot be set to the all-zero key -> InvalidFeeDestination", async () => {
+    // What an uninitialised client field looks like. Fees paid to it would be
+    // unrecoverable, so a typo must not be able to burn the protocol's revenue.
+    try {
+      await expectError(
+        setFeeDestinationCall(PublicKey.default).rpc(),
+        "InvalidFeeDestination"
+      );
+      const config = await program.account.config.fetch(configPda);
+      assert.equal(config.feeDestination.toBase58(), feeDestination.publicKey.toBase58());
+    } finally {
+      await restoreFeeDestination();
+    }
+  });
+
+  it("34. after set_fee_destination, fees are paid to the NEW wallet and the old one is refused", async () => {
+    // The scenario this exists for: the account fees go to has become unusable
+    // (e.g. frozen), and without this every approval would revert.
+    const newFee = Keypair.generate();
+    const newFeeAta = await createAssociatedTokenAccount(
+      connection,
+      admin,
+      mint,
+      newFee.publicKey
+    );
+    const before = await program.account.config.fetch(configPda);
+
+    await setFeeDestinationCall(newFee.publicKey).rpc();
+    try {
+      const after = await program.account.config.fetch(configPda);
+      assert.equal(after.feeDestination.toBase58(), newFee.publicKey.toBase58());
+      // Nothing else moved: this instruction must touch the one field.
+      assert.equal(after.admin.toBase58(), before.admin.toBase58());
+      assert.equal(after.verifierAuthority.toBase58(), before.verifierAuthority.toBase58());
+      assert.equal(after.bountyMint.toBase58(), before.bountyMint.toBase58());
+      assert.equal(after.feeBps, before.feeBps);
+
+      // An approval now pays the fee to the new wallet.
+      const bounty = 20 * ONE_USDC;
+      const expectedFee = (bounty * FEE_BPS) / 10_000;
+      const { task } = await createTask({ bounty });
+      await submitWork(task);
+      const newBefore = await balanceOf(newFeeAta);
+      const oldBefore = await balanceOf(feeAta);
+      await verdictCallWith(task, true, {
+        feeDestination: newFee.publicKey,
+        feeDestinationTokenAccount: newFeeAta,
+      }).rpc();
+      assert.equal(await balanceOf(newFeeAta), newBefore + expectedFee, "new wallet got the fee");
+      assert.equal(await balanceOf(feeAta), oldBefore, "old wallet got nothing");
+
+      // And the OLD destination is now refused, so nobody can keep paying it.
+      const { task: second } = await createTask();
+      await submitWork(second);
+      await expectError(verdictCallWith(second, true).rpc(), "FeeDestinationMismatch");
+    } finally {
+      // Restore, so the rest of the suite is unaffected even if an assertion above fails.
+      await restoreFeeDestination();
+    }
+    const restored = await program.account.config.fetch(configPda);
+    assert.equal(restored.feeDestination.toBase58(), feeDestination.publicKey.toBase58());
+  });
+
+  it("35. every error code that existed at first deploy keeps its number", async () => {
+    // Anchor numbers errors from 6000 in declaration order, and those numbers are
+    // part of the deployed ABI: the web app, explorers and any client see them.
+    // New errors must be APPENDED. Inserting one above an existing variant
+    // silently renumbers everything beneath it and nothing else would notice.
+    const firstDeploy = [
+      "FeeTooHigh",
+      "AmountZero",
+      "AmountTooLarge",
+      "MathOverflow",
+      "EscrowUnderfunded",
+      "DeadlineInPast",
+      "DeadlineTooFar",
+      "DeadlinePassed",
+      "DeadlineNotPassed",
+      "InvalidState",
+      "NotVerifierAuthority",
+      "NotAdmin",
+      "WorkerMismatch",
+      "CreatorMismatch",
+      "MissingWorker",
+      "ConfidenceOutOfRange",
+      "EmptyHash",
+      "MintMismatch",
+      "FeeDestinationMismatch",
+    ];
+    // Read the generated IDL FILE, not `program.idl`: Anchor's TS client re-cases
+    // names on the in-memory copy, and the file is the artefact that is actually
+    // published and synced into web/lib/idl.
+    const errors = JSON.parse(
+      readFileSync(join(process.cwd(), "target", "idl", "rubric.json"), "utf8")
+    ).errors as Array<{ code: number; name: string }>;
+    firstDeploy.forEach((name, index) => {
+      const found = errors.find((e) => e.name === name);
+      assert.isDefined(found, `${name} is missing from the IDL`);
+      assert.equal(found!.code, 6000 + index, `${name} must stay at ${6000 + index}`);
+    });
+    // And nothing sits inside the original range that is not one of them.
+    const inRange = errors.filter((e) => e.code < 6000 + firstDeploy.length);
+    assert.equal(inRange.length, firstDeploy.length);
   });
 });
