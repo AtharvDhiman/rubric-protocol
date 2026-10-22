@@ -14,6 +14,7 @@ import { useWallet } from "@solana/wallet-adapter-react";
 import { MetaRow } from "@/components/MetaRow";
 import { Stamp, stampForState } from "@/components/Stamp";
 import { formatUsdc } from "@/lib/solana";
+import { formatRecordNumber } from "@/lib/task-id";
 
 interface Row {
   id: string;
@@ -94,7 +95,7 @@ export default function MyWorkPage() {
               className="data"
               style={{ width: 56, flex: "0 0 56px", color: "var(--accent)", fontSize: 13 }}
             >
-              {row.onchainTaskId.padStart(4, "0")}
+              {formatRecordNumber(row.onchainTaskId)}
             </span>
             <span style={{ flex: 1, fontSize: 15, fontWeight: 500 }}>{row.title}</span>
             <span className="data" style={{ fontSize: 13 }}>

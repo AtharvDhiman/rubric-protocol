@@ -21,6 +21,7 @@ import { Oracle, type OracleState } from "@/components/rig/Oracle";
 import { InspectionTable } from "@/components/InspectionTable";
 import { SolveBlock } from "@/components/SolveBlock";
 import { explorerTxUrl } from "@/lib/env";
+import { formatRecordNumber } from "@/lib/task-id";
 import {
   formatUsdc,
 
@@ -121,7 +122,7 @@ export default async function TaskPage({
     );
   }
 
-  const recordNumber = task.onchainTaskId.toString().padStart(4, "0");
+  const recordNumber = formatRecordNumber(task.onchainTaskId);
   const verdict = task.verdictJson as null | {
     approved: boolean;
     confidence: number;

@@ -7,7 +7,9 @@
  * and signs, never the server.
  */
 
+import { randomInt } from "node:crypto";
 import { NextResponse } from "next/server";
+import { TASK_ID_RANDOM_BITS, nextOnchainTaskId } from "@/lib/task-id";
 import { DEMO_MODE, DEMO_WRITE_MESSAGE, demoTasks } from "@/lib/demo";
 import { prisma } from "@/lib/db";
 import { serializeBigInts } from "@/lib/db";
@@ -102,15 +104,27 @@ export async function POST(request: Request) {
   // confirm step re-reads the account and checks that it did.
   const rubricHash = hashRubricHex({ title, clauses });
 
-  // The on-chain task id must be unique per creator. Take the next one after
-  // whatever this creator already has, so a poster's ids stay dense and
-  // predictable.
+  // The on-chain task id must be unique per creator, and it must not be GUESSABLE.
+  //
+  // A task's escrow token account is derived from its id, and anyone can create a
+  // token account at that address first, which makes the poster's `create_task`
+  // fail. When ids were `latest + 1` any reader of the public docket could do
+  // that to a chosen poster. So the id is the poster's next record number in the
+  // high bits and 24 CSPRNG bits in the low bits - see lib/task-id.ts.
+  //
+  // The unique index on (creatorAddress, onchainTaskId) still catches an exact
+  // collision. Two creates by the SAME wallet within milliseconds can now share a
+  // record number with different ids; that is cosmetic, and far rarer than the
+  // attack it removes.
   const latest = await prisma.task.findFirst({
     where: { creatorAddress },
     orderBy: { onchainTaskId: "desc" },
     select: { onchainTaskId: true },
   });
-  const onchainTaskId = (latest?.onchainTaskId ?? 0n) + 1n;
+  const onchainTaskId = nextOnchainTaskId(
+    latest?.onchainTaskId ?? null,
+    BigInt(randomInt(0, 2 ** Number(TASK_ID_RANDOM_BITS)))
+  );
 
   const task = await prisma.task.create({
     data: {

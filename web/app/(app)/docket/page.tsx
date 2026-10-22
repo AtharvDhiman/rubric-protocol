@@ -13,6 +13,7 @@ import { DEMO_MODE, demoTasks, isSampleTask } from "@/lib/demo";
 import { MetaRow } from "@/components/MetaRow";
 import { Stamp, stampForState } from "@/components/Stamp";
 import { formatUsdc } from "@/lib/task-view";
+import { formatRecordNumber } from "@/lib/task-id";
 import { CATEGORIES } from "@/lib/constants";
 
 export const dynamic = "force-dynamic";
@@ -236,7 +237,7 @@ export default async function DocketPage({
                   fontSize: 13,
                 }}
               >
-                {task.onchainTaskId.toString().padStart(4, "0")}
+                {formatRecordNumber(task.onchainTaskId)}
               </span>
               <span style={{ flex: 1, fontSize: 15, fontWeight: 500 }}>
                 {task.title}
