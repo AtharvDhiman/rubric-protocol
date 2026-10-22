@@ -1423,4 +1423,154 @@ describe("rubric", () => {
     const inRange = errors.filter((e) => e.code < 6000 + firstDeploy.length);
     assert.equal(inRange.length, firstDeploy.length);
   });
+
+  // =========================================================================
+  // THE GRACE-PERIOD ESCAPE HATCH (review finding R-07)
+  //
+  // reclaim_expired out of `Submitted` is what stops a lost verifier key freezing
+  // every escrow. Its failure path (test 19) was tested; its SUCCESS path never
+  // was, because the grace period is a 7-day constant and the validator's clock
+  // cannot be moved mid-test. A build with `--features short-grace` shortens it to
+  // six seconds, and RUBRIC_SHORT_GRACE=1 tells the suite it is running against
+  // one. See `npm run test:grace`.
+  // =========================================================================
+
+  it("36. the short-grace feature is OFF by default and enables nothing else", async () => {
+    // A binary built with short-grace lets a poster reclaim a bounty seconds after
+    // the deadline from work the verifier has not ruled on yet. It exists only so
+    // the suite can run the escape hatch to completion, and it must be impossible
+    // to turn on by accident: not a default, and not pulled in by another feature.
+    const cargo = readFileSync(
+      join(process.cwd(), "programs", "rubric", "Cargo.toml"),
+      "utf8"
+    );
+    const featuresBlock = cargo.split(/^\[features\]\s*$/m)[1]?.split(/^\[/m)[0];
+    assert.isString(featuresBlock, "Cargo.toml has a [features] table");
+
+    const live = featuresBlock!
+      .split("\n")
+      .filter((line) => !line.trim().startsWith("#"));
+    const mentions = live.filter((line) => line.includes("short-grace"));
+    assert.deepEqual(
+      mentions.map((l) => l.trim()),
+      ["short-grace = []"],
+      "short-grace appears once, as an empty feature, and nowhere else"
+    );
+    const defaults = /^default\s*=\s*\[(.*?)\]/m.exec(featuresBlock!);
+    assert.isNotNull(defaults, "there is a default feature list");
+    assert.notInclude(defaults![1], "short-grace");
+  });
+
+  /** reclaim_expired by the creator. */
+  const reclaimCall = (task: PublicKey) =>
+    program.methods
+      .reclaimExpired()
+      .accounts({
+        creator: creator.publicKey,
+        task,
+        mint,
+        escrow: escrowFor(task),
+        creatorTokenAccount: creatorAta,
+        tokenProgram: TOKEN_PROGRAM_ID,
+      })
+      .signers([creator]);
+
+  /**
+   * Reclaim, and turn the one confusing failure into a clear one: if the suite was
+   * told it is running against a short-grace build but the program was built the
+   * normal way, the reclaim fails with DeadlineNotPassed. That is a harness
+   * mistake, not a program bug, and it should say so.
+   */
+  async function reclaimOrExplain(task: PublicKey) {
+    try {
+      await reclaimCall(task).rpc();
+    } catch (err: any) {
+      const code = err?.error?.errorCode?.code ?? String(err?.message ?? err);
+      if (String(code).includes("DeadlineNotPassed")) {
+        assert.fail(
+          "RUBRIC_SHORT_GRACE=1 but the grace period has not elapsed: was the " +
+            "program built WITHOUT `--features short-grace`? Use `npm run test:grace`."
+        );
+      }
+      throw err;
+    }
+  }
+
+  const graceIt = process.env.RUBRIC_SHORT_GRACE === "1" ? it : it.skip;
+
+  graceIt("37. [short-grace build] reclaim_expired releases a Submitted task once the grace period has passed", async () => {
+    const bounty = 25 * ONE_USDC;
+    const { task } = await createTask({ bounty, deadlineOffsetSeconds: 2 });
+    await submitWork(task);
+    const creatorBefore = await balanceOf(creatorAta);
+    const workerBefore = await balanceOf(workerAta);
+
+    // deadline (2s) + grace (6s) + margin for the validator's slot-time lag.
+    await sleep(2_000 + 6_000 + 4_000);
+    await reclaimOrExplain(task);
+
+    assert.equal(
+      await balanceOf(creatorAta),
+      creatorBefore + bounty,
+      "the poster got the whole bounty back"
+    );
+    assert.equal(await balanceOf(workerAta), workerBefore, "the worker was not paid");
+    assert.isNull(
+      await connection.getAccountInfo(escrowFor(task)),
+      "the escrow was closed"
+    );
+    const account = await program.account.task.fetch(task);
+    assert.deepEqual(Object.keys(account.state), ["refunded"]);
+    assert.isNull(
+      account.verdict,
+      "nobody ruled, and the record must not pretend someone did"
+    );
+  });
+
+  graceIt("38. [short-grace build] a verdict that arrives after a grace-period reclaim is refused and the worker is not paid", async () => {
+    // The price of verifier downtime, made explicit: once the poster has
+    // reclaimed, the task is terminal and the worker's approval comes too late.
+    const { task } = await createTask({ deadlineOffsetSeconds: 2 });
+    await submitWork(task);
+    await sleep(2_000 + 6_000 + 4_000);
+    await reclaimOrExplain(task);
+
+    const workerBefore = await balanceOf(workerAta);
+    // The escrow no longer exists, so the failure may surface as the missing
+    // account before the handler's own InvalidState check is reached. Either way
+    // nothing may be paid.
+    await expectError(verdictCall(task, true, 95).rpc(), [
+      "AccountNotInitialized",
+      "InvalidState",
+    ]);
+    assert.equal(await balanceOf(workerAta), workerBefore, "the worker was not paid");
+    assert.deepEqual(
+      Object.keys((await program.account.task.fetch(task)).state),
+      ["refunded"]
+    );
+  });
+
+  it("39. a verdict still settles a task whose deadline has passed, inside the grace window", async () => {
+    // reclaim_expired's own comments promise this - "submit_verdict has no
+    // deadline check, so the verifier can still rule normally at any point inside
+    // the grace window" - and it is the property that makes the grace period safe
+    // for the worker. It was never tested. 4s is past the 2s deadline and inside
+    // the window in BOTH builds (6s short, 7 days normal).
+    const bounty = 25 * ONE_USDC;
+    const { task } = await createTask({ bounty, deadlineOffsetSeconds: 2 });
+    await submitWork(task);
+    await sleep(4_000);
+
+    const workerBefore = await balanceOf(workerAta);
+    const feeBefore = await balanceOf(feeAta);
+    await verdictCall(task, true, 95).rpc();
+
+    const fee = (bounty * FEE_BPS) / 10_000;
+    assert.equal(await balanceOf(workerAta), workerBefore + bounty - fee, "worker paid");
+    assert.equal(await balanceOf(feeAta), feeBefore + fee, "fee paid");
+    assert.deepEqual(
+      Object.keys((await program.account.task.fetch(task)).state),
+      ["settled"]
+    );
+  });
 });

@@ -21,6 +21,13 @@ idl-build = ["anchor-lang/idl-build", "anchor-spl/idl-build"]
 anchor-debug = []
 custom-heap = []
 custom-panic = []
+# !!! TEST BUILDS ONLY - NEVER ENABLE FOR A DEPLOYED BINARY !!!
+# Shortens VERDICT_GRACE_SECONDS from seven days to six seconds so the grace-period
+# reclaim can be exercised to completion by the integration suite. A binary built
+# with this lets a poster reclaim a bounty seconds after the deadline from work the
+# verifier has not yet ruled on. `default = []` above is pinned by a test; see
+# programs/rubric/src/constants.rs.
+short-grace = []
 
 [dependencies]
 # Anchor 1.1.2 (released 2026-06-26) is the current stable line. 2.0.0-rc.1

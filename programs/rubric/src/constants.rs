@@ -38,7 +38,26 @@ pub const MAX_WORK_WINDOW_SECONDS: i64 = 30 * 24 * 60 * 60;
 /// would lock every escrow in the protocol forever. Seven days is long enough
 /// that it never fires in normal operation - a verdict takes seconds - and short
 /// enough that capital is not hostage to one key indefinitely.
+#[cfg(not(feature = "short-grace"))]
 pub const VERDICT_GRACE_SECONDS: i64 = 7 * 24 * 60 * 60;
+
+/// !!! TEST BUILDS ONLY. NEVER DEPLOY A BINARY BUILT WITH `short-grace`. !!!
+///
+/// Six seconds instead of seven days. That is the only way to run the grace-period
+/// escape hatch to completion in a test: the validator's clock cannot be moved
+/// mid-test, and nobody waits a week.
+///
+/// The danger is the exact opposite of the one the real constant guards against.
+/// With this window, a poster could reclaim a bounty seconds after the deadline
+/// from work a worker had submitted and the verifier simply had not ruled on yet -
+/// the escrow of an honest worker, taken back almost immediately. Shipping this by
+/// accident would silently break the protocol's central promise.
+///
+/// So it is a non-default Cargo feature, `default = []` is pinned by a test, the
+/// feature's name says what it does, and the mainnet checklist compares the
+/// deployed bytes against a verifiable default-features build.
+#[cfg(feature = "short-grace")]
+pub const VERDICT_GRACE_SECONDS: i64 = 6;
 
 /// A hash of all zeroes. Used to reject "I didn't actually commit to anything"
 /// values for both the rubric hash and the submission hash.
