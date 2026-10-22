@@ -25,6 +25,15 @@ wallet = "~/.config/solana/id.json"
 [scripts]
 test = "npx ts-mocha -p ./tsconfig.json -t 1000000 tests/**/*.ts"
 
+[test]
+# The program under test MUST be deployed upgradeable. `initialize_config` accepts
+# only the program's upgrade authority as signer - that is the fix for the init
+# land-grab - so a program deployed immutable has no authority at all, nothing can
+# ever initialise it, and the whole suite dies in `before all` with a baffling
+# NotAdmin. anchor-cli 1.1.2 deploys immutable unless this is set, and a missing
+# [test] table counts as "not set". (docs/security-review.md, R-12)
+upgradeable = true
+
 [test.validator]
 url = "https://api.devnet.solana.com"
 

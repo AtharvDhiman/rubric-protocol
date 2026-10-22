@@ -1,12 +1,25 @@
 /**
  * Rubric program integration tests.
  *
- * Five happy paths and fourteen attack/edge cases. The attack cases are the point:
- * each one must fail, and must fail with the SPECIFIC error we expect. A test
- * that passes because the transaction failed for some unrelated reason is worse
- * than no test at all, so every negative assertion checks the error code by name.
+ * Five happy paths, and a large set of attack and edge cases. The attack cases are
+ * the point: each one must fail, and must fail with the SPECIFIC error we expect.
+ * A test that passes because the transaction failed for some unrelated reason is
+ * worse than no test at all, so every negative assertion checks the error code by
+ * name - except where the defence sits below Anchor's error layer, and then the
+ * assertion is that nothing changed.
  *
- * Run with:  anchor test
+ * Run with:  anchor test --validator legacy
+ *
+ *   - `--validator legacy` because anchor-cli 1.x defaults to surfpool, which is
+ *     not installed here, and the run dies before a single test with
+ *     "Failed to spawn surfpool".
+ *   - Anchor.toml must have `[test] upgradeable = true`. `initialize_config` only
+ *     accepts the program's upgrade authority, and an immutable test program has
+ *     none, so without it the suite dies in `before all` with NotAdmin.
+ *
+ * ORDER MATTERS. The first `describe` proves the initialize_config refusals, which
+ * can only be shown while no Config exists, so it must stay ahead of the main
+ * suite, whose `before` hook initialises the protocol.
  *
  * The suite spins up a mock SPL mint with 6 decimals to stand in for USDC, so no
  * devnet faucet or real token is involved.
@@ -19,12 +32,17 @@ import {
   LAMPORTS_PER_SOL,
   PublicKey,
   SystemProgram,
+  Transaction,
+  sendAndConfirmTransaction,
 } from "@solana/web3.js";
 import {
   ASSOCIATED_TOKEN_PROGRAM_ID,
   TOKEN_PROGRAM_ID,
+  closeAccount,
   createAccount,
   createAssociatedTokenAccount,
+  createAssociatedTokenAccountIdempotentInstruction,
+  createAssociatedTokenAccountInstruction,
   createMint,
   getAccount,
   getAssociatedTokenAddressSync,
@@ -56,6 +74,143 @@ const SUBMISSION_HASH = Array.from({ length: 32 }, (_, i) => (i + 64) % 256);
 const REASONING_HASH = Array.from({ length: 32 }, (_, i) => (i + 128) % 256);
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+/**
+ * Assert that a transaction fails with a specific Anchor error code NAME.
+ * Prints the code it actually got, so a mismatch is immediately diagnosable.
+ */
+async function expectError(
+  promise: Promise<unknown>,
+  expectedCode: string | string[]
+): Promise<void> {
+  const expected = Array.isArray(expectedCode) ? expectedCode : [expectedCode];
+  try {
+    await promise;
+  } catch (err: any) {
+    const code =
+      err?.error?.errorCode?.code ??
+      err?.errorCode?.code ??
+      // Constraint failures thrown during simulation land in the logs.
+      (String(err?.message ?? err).match(/Error Code: (\w+)/)?.[1] as string) ??
+      String(err?.message ?? err);
+    assert.include(
+      expected,
+      code,
+      `expected one of [${expected.join(", ")}] but got "${code}"`
+    );
+    return;
+  }
+  assert.fail(
+    `expected the transaction to fail with ${expected.join(" | ")}, but it succeeded`
+  );
+}
+
+/**
+ * Assert a transaction fails, without pinning the error name.
+ *
+ * Used only where the defence sits BELOW Anchor's custom-error layer - for
+ * example when an account address is derived by the framework, so a
+ * substituted account is rejected during account resolution and never reaches
+ * a constraint. The security assertion in those tests is the balance/state
+ * check that follows, not the error string.
+ */
+async function expectFailure(promise: Promise<unknown>): Promise<string> {
+  try {
+    await promise;
+  } catch (err: any) {
+    const code =
+      err?.error?.errorCode?.code ??
+      (String(err?.message ?? err).match(/Error Code: (\w+)/)?.[1] as string) ??
+      String(err?.message ?? err).slice(0, 90);
+    return code;
+  }
+  assert.fail("expected the transaction to fail, but it succeeded");
+}
+
+/**
+ * THE INIT GATE, proved BEFORE the suite initialises anything.
+ *
+ * `initialize_config` can succeed exactly once per deployment, so its refusals
+ * can only be demonstrated while no Config exists yet. Mocha runs `describe`
+ * blocks in the order they are defined, so this one runs first and the main
+ * suite's `before` hook initialises afterwards.
+ *
+ * Both tests also assert that the refused attempt left NO account behind. That
+ * is not decoration: a refused attempt that still created the config would make
+ * the legitimate initialisation below fail for the wrong reason, and would mean
+ * the gate had let the land-grab through.
+ *
+ * Until these existed, nothing in the suite proved that anyone other than the
+ * upgrade authority is turned away - the most heavily commented fix in the
+ * program was only ever exercised as setup.
+ */
+describe("rubric: initialize_config gate (runs before setup)", () => {
+  const provider = anchor.AnchorProvider.env();
+  anchor.setProvider(provider);
+  const program = ((anchor.workspace as any).rubric ??
+    (anchor.workspace as any).Rubric) as Program<Rubric>;
+  const connection = provider.connection;
+  const upgradeAuthority = (provider.wallet as anchor.Wallet).payer;
+
+  const [configPda] = PublicKey.findProgramAddressSync(
+    [CONFIG_SEED],
+    program.programId
+  );
+  const [programDataPda] = PublicKey.findProgramAddressSync(
+    [program.programId.toBuffer()],
+    BPF_LOADER_UPGRADEABLE
+  );
+  const anyKey = () => Keypair.generate().publicKey;
+  const initAccounts = (signer: PublicKey) => ({
+    admin: signer,
+    config: configPda,
+    program: program.programId,
+    programData: programDataPda,
+    systemProgram: SystemProgram.programId,
+  });
+
+  it("20. initialize_config by anyone but the upgrade authority -> NotAdmin, and creates nothing", async () => {
+    // A stranger who would install themselves as admin and verifier if the gate
+    // were missing. They can pay for the transaction; they must not be allowed.
+    const stranger = Keypair.generate();
+    const sig = await connection.requestAirdrop(
+      stranger.publicKey,
+      2 * LAMPORTS_PER_SOL
+    );
+    const bh = await connection.getLatestBlockhash();
+    await connection.confirmTransaction({ signature: sig, ...bh }, "confirmed");
+
+    await expectError(
+      program.methods
+        .initializeConfig(stranger.publicKey, anyKey(), FEE_BPS, stranger.publicKey)
+        .accounts(initAccounts(stranger.publicKey))
+        .signers([stranger])
+        .rpc(),
+      "NotAdmin"
+    );
+
+    assert.isNull(
+      await connection.getAccountInfo(configPda),
+      "the refused attempt must not leave a config behind"
+    );
+  });
+
+  it("21. initialize_config with a fee above the 10% ceiling -> FeeTooHigh, and creates nothing", async () => {
+    // The caller here IS the upgrade authority, so only the fee check can refuse.
+    await expectError(
+      program.methods
+        .initializeConfig(anyKey(), anyKey(), 1_001, anyKey())
+        .accounts(initAccounts(upgradeAuthority.publicKey))
+        .rpc(),
+      "FeeTooHigh"
+    );
+
+    assert.isNull(
+      await connection.getAccountInfo(configPda),
+      "the refused attempt must not leave a config behind"
+    );
+  });
+});
 
 describe("rubric", () => {
   const provider = anchor.AnchorProvider.env();
@@ -100,58 +255,6 @@ describe("rubric", () => {
 
   const balanceOf = async (ata: PublicKey) =>
     Number((await getAccount(connection, ata)).amount);
-
-  /**
-   * Assert that a transaction fails with a specific Anchor error code NAME.
-   * Prints the code it actually got, so a mismatch is immediately diagnosable.
-   */
-  async function expectError(
-    promise: Promise<unknown>,
-    expectedCode: string | string[]
-  ): Promise<void> {
-    const expected = Array.isArray(expectedCode) ? expectedCode : [expectedCode];
-    try {
-      await promise;
-    } catch (err: any) {
-      const code =
-        err?.error?.errorCode?.code ??
-        err?.errorCode?.code ??
-        // Constraint failures thrown during simulation land in the logs.
-        (String(err?.message ?? err).match(/Error Code: (\w+)/)?.[1] as string) ??
-        String(err?.message ?? err);
-      assert.include(
-        expected,
-        code,
-        `expected one of [${expected.join(", ")}] but got "${code}"`
-      );
-      return;
-    }
-    assert.fail(
-      `expected the transaction to fail with ${expected.join(" | ")}, but it succeeded`
-    );
-  }
-
-  /**
-   * Assert a transaction fails, without pinning the error name.
-   *
-   * Used only where the defence sits BELOW Anchor's custom-error layer - for
-   * example when an account address is derived by the framework, so a
-   * substituted account is rejected during account resolution and never reaches
-   * a constraint. The security assertion in those tests is the balance/state
-   * check that follows, not the error string.
-   */
-  async function expectFailure(promise: Promise<unknown>): Promise<string> {
-    try {
-      await promise;
-    } catch (err: any) {
-      const code =
-        err?.error?.errorCode?.code ??
-        (String(err?.message ?? err).match(/Error Code: (\w+)/)?.[1] as string) ??
-        String(err?.message ?? err).slice(0, 90);
-      return code;
-    }
-    assert.fail("expected the transaction to fail, but it succeeded");
-  }
 
   /** Fund a keypair with SOL so it can pay rent and fees. */
   async function airdrop(to: PublicKey, sol = 2) {
@@ -764,6 +867,403 @@ describe("rubric", () => {
       config.verifierAuthority.toBase58(),
       verifier.publicKey.toBase58(),
       "verifier authority is unchanged"
+    );
+  });
+
+  // =========================================================================
+  // GUARDS THE ORIGINAL SUITE NEVER EXERCISED
+  //
+  // Each of these is a constraint the program's own comments call the fix for a
+  // real bug, and until now each could have been deleted without a single test
+  // failing. See docs/security-review.md, finding R-06.
+  // =========================================================================
+
+  /**
+   * A create_task call with every account defaulted. Tests override only the one
+   * thing they attack, so a failure can be attributed to that thing alone.
+   */
+  function createTaskCall(
+    opts: {
+      deadline?: number;
+      bounty?: number;
+      /** Swap the whole token context for another mint, consistently. */
+      otherMint?: { mint: PublicKey; creatorAta: PublicKey };
+    } = {}
+  ) {
+    const taskId = newTaskId();
+    const task = taskPda(creator.publicKey, taskId);
+    const now = Math.floor(Date.now() / 1000);
+    const m = opts.otherMint?.mint ?? mint;
+    return {
+      taskId,
+      task,
+      call: program.methods
+        .createTask(
+          taskId,
+          RUBRIC_HASH,
+          new BN(opts.bounty ?? ONE_USDC),
+          new BN(opts.deadline ?? now + 3600)
+        )
+        .accounts({
+          creator: creator.publicKey,
+          config: configPda,
+          task,
+          mint: m,
+          creatorTokenAccount: opts.otherMint?.creatorAta ?? creatorAta,
+          escrow: getAssociatedTokenAddressSync(m, task, true),
+          tokenProgram: TOKEN_PROGRAM_ID,
+          associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
+          systemProgram: SystemProgram.programId,
+        })
+        .signers([creator]),
+    };
+  }
+
+  /** A submit_verdict call with every account defaulted and the ones under attack overridable. */
+  function verdictCallWith(
+    task: PublicKey,
+    approved: boolean,
+    overrides: Partial<{
+      worker: PublicKey;
+      workerTokenAccount: PublicKey;
+      creator: PublicKey;
+      creatorTokenAccount: PublicKey;
+      feeDestination: PublicKey;
+      feeDestinationTokenAccount: PublicKey;
+    }> = {}
+  ) {
+    return program.methods
+      .submitVerdict(approved, 95, REASONING_HASH)
+      .accounts({
+        verifier: verifier.publicKey,
+        config: configPda,
+        task,
+        mint,
+        escrow: escrowFor(task),
+        worker: overrides.worker ?? worker.publicKey,
+        workerTokenAccount: overrides.workerTokenAccount ?? workerAta,
+        creator: overrides.creator ?? creator.publicKey,
+        creatorTokenAccount: overrides.creatorTokenAccount ?? creatorAta,
+        feeDestination: overrides.feeDestination ?? feeDestination.publicKey,
+        feeDestinationTokenAccount:
+          overrides.feeDestinationTokenAccount ?? feeAta,
+        tokenProgram: TOKEN_PROGRAM_ID,
+      })
+      .signers([verifier]);
+  }
+
+  /** After a refused verdict the task must be exactly as it was: Submitted and funded. */
+  async function assertStillSubmittedAndFunded(task: PublicKey, funded: number) {
+    const account = await program.account.task.fetch(task);
+    assert.deepEqual(Object.keys(account.state), ["submitted"]);
+    assert.equal(await balanceOf(escrowFor(task)), funded);
+  }
+
+  it("22. initialize_config cannot run a second time, and the config is unchanged", async () => {
+    const before = await program.account.config.fetch(configPda);
+
+    // Fails below Anchor's error layer (the account already exists), so the
+    // security assertion is that nothing changed, not the error string.
+    await expectFailure(
+      program.methods
+        .initializeConfig(attacker.publicKey, mint, FEE_BPS, attacker.publicKey)
+        .accounts({
+          admin: admin.publicKey,
+          config: configPda,
+          program: program.programId,
+          programData: programDataPda,
+          systemProgram: SystemProgram.programId,
+        })
+        .rpc()
+    );
+
+    const after = await program.account.config.fetch(configPda);
+    assert.equal(after.admin.toBase58(), before.admin.toBase58());
+    assert.equal(
+      after.verifierAuthority.toBase58(),
+      before.verifierAuthority.toBase58()
+    );
+    assert.equal(
+      after.feeDestination.toBase58(),
+      before.feeDestination.toBase58()
+    );
+  });
+
+  it("23. create_task with a deadline in the past -> DeadlineInPast", async () => {
+    const { task, call } = createTaskCall({
+      deadline: Math.floor(Date.now() / 1000) - 10,
+    });
+    await expectError(call.rpc(), "DeadlineInPast");
+    assert.isNull(await connection.getAccountInfo(task), "no task was created");
+  });
+
+  it("24. create_task with a deadline beyond the 30-day window -> DeadlineTooFar", async () => {
+    const thirtyOneDays = 31 * 24 * 60 * 60;
+    const { task, call } = createTaskCall({
+      deadline: Math.floor(Date.now() / 1000) + thirtyOneDays,
+    });
+    await expectError(call.rpc(), "DeadlineTooFar");
+    assert.isNull(await connection.getAccountInfo(task), "no task was created");
+  });
+
+  it("25. create_task with any mint but the configured one -> MintMismatch", async () => {
+    // A consistent, fully-funded context for a DIFFERENT mint, so that the only
+    // thing that can refuse the call is the pin on config.bounty_mint. This is
+    // the constraint that makes MAX_BOUNTY mean 50 USDC and not 50 million of a
+    // token the attacker minted.
+    const otherMint = await createMint(
+      connection,
+      admin,
+      admin.publicKey,
+      null,
+      0 // a 0-decimal mint: "50_000_000 base units" would be 50 million tokens
+    );
+    const otherAta = await createAssociatedTokenAccount(
+      connection,
+      admin,
+      otherMint,
+      creator.publicKey
+    );
+    await mintTo(connection, admin, otherMint, otherAta, admin, 1_000_000);
+
+    const { task, call } = createTaskCall({
+      bounty: 1_000_000,
+      otherMint: { mint: otherMint, creatorAta: otherAta },
+    });
+    await expectError(call.rpc(), "MintMismatch");
+
+    assert.isNull(await connection.getAccountInfo(task), "no task was created");
+    assert.equal(await balanceOf(otherAta), 1_000_000, "the other token never moved");
+  });
+
+  it("26. a verdict naming a different worker -> WorkerMismatch", async () => {
+    // The payout must go to whoever `submit_work` recorded, and nobody else.
+    const { task } = await createTask();
+    await submitWork(task);
+    // Compared against its own starting balance, not zero: if this guard ever
+    // fails, the attack succeeds and leaves funds behind, which must not make the
+    // NEXT tests fail for a reason that is not theirs.
+    const attackerBefore = await balanceOf(attackerAta);
+
+    await expectError(
+      verdictCallWith(task, true, {
+        worker: attacker.publicKey,
+        workerTokenAccount: attackerAta,
+      }).rpc(),
+      "WorkerMismatch"
+    );
+
+    await assertStillSubmittedAndFunded(task, 25 * ONE_USDC);
+    assert.equal(await balanceOf(attackerAta), attackerBefore, "the attacker was not paid");
+  });
+
+  it("27. a verdict naming a different creator -> CreatorMismatch", async () => {
+    // A refund must go to the poster recorded at creation, not to whoever the
+    // transaction builder names.
+    const { task } = await createTask();
+    await submitWork(task);
+    const attackerBefore = await balanceOf(attackerAta);
+
+    await expectError(
+      verdictCallWith(task, false, {
+        creator: attacker.publicKey,
+        creatorTokenAccount: attackerAta,
+      }).rpc(),
+      "CreatorMismatch"
+    );
+
+    await assertStillSubmittedAndFunded(task, 25 * ONE_USDC);
+    assert.equal(
+      await balanceOf(attackerAta),
+      attackerBefore,
+      "the attacker was not refunded"
+    );
+  });
+
+  it("28. a verdict naming a different fee destination -> FeeDestinationMismatch", async () => {
+    // "Fees cannot be diverted, not even by the verifier." Prove it.
+    const { task } = await createTask();
+    await submitWork(task);
+    const attackerBefore = await balanceOf(attackerAta);
+
+    await expectError(
+      verdictCallWith(task, true, {
+        feeDestination: attacker.publicKey,
+        feeDestinationTokenAccount: attackerAta,
+      }).rpc(),
+      "FeeDestinationMismatch"
+    );
+
+    await assertStillSubmittedAndFunded(task, 25 * ONE_USDC);
+    assert.equal(await balanceOf(attackerAta), attackerBefore, "the attacker took no fee");
+  });
+
+  it("29. a Task account is exactly 239 bytes (layout guard)", async () => {
+    // Changing Task's layout orphans every task already on chain: the new struct
+    // would no longer deserialise them. This turns that from something a refactor
+    // does by accident into something a person has to decide to do.
+    const { task } = await createTask({ bounty: 5 * ONE_USDC });
+    const info = await connection.getAccountInfo(task);
+    assert.equal(info!.data.length, 239);
+    assert.equal(
+      info!.lamports,
+      await connection.getMinimumBalanceForRentExemption(239),
+      "rent-exempt, to the lamport"
+    );
+  });
+
+  // =========================================================================
+  // KNOWN HAZARDS - characterisation tests.
+  //
+  // These assert behaviour that is UNDESIRABLE but currently true, so that the
+  // day someone fixes it the suite says so instead of staying quietly green.
+  // If one of these starts failing because a hazard was removed, delete the test
+  // and update docs/security-review.md in the same change. Do not "fix the test".
+  // =========================================================================
+
+  it("30. KNOWN HAZARD (R-08): a pre-created escrow account blocks create_task for that id", async () => {
+    const taskId = newTaskId();
+    const task = taskPda(creator.publicKey, taskId);
+    const escrow = escrowFor(task);
+
+    // All an attacker needs is the PDA address: a pure function of the creator's
+    // key and the task id. They create the escrow's token account first.
+    await sendAndConfirmTransaction(
+      connection,
+      new Transaction().add(
+        createAssociatedTokenAccountInstruction(
+          attacker.publicKey,
+          escrow,
+          task,
+          mint
+        )
+      ),
+      [attacker]
+    );
+    const tokenAccountRent = await connection.getMinimumBalanceForRentExemption(165);
+    assert.equal(
+      (await connection.getAccountInfo(escrow))!.lamports,
+      tokenAccountRent,
+      "the attacker locked exactly one token-account rent"
+    );
+
+    const before = await balanceOf(creatorAta);
+    await expectFailure(
+      program.methods
+        .createTask(
+          taskId,
+          RUBRIC_HASH,
+          new BN(10 * ONE_USDC),
+          new BN(Math.floor(Date.now() / 1000) + 3600)
+        )
+        .accounts({
+          creator: creator.publicKey,
+          config: configPda,
+          task,
+          mint,
+          creatorTokenAccount: creatorAta,
+          escrow,
+          tokenProgram: TOKEN_PROGRAM_ID,
+          associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
+          systemProgram: SystemProgram.programId,
+        })
+        .signers([creator])
+        .rpc()
+    );
+
+    assert.isNull(await connection.getAccountInfo(task), "no task exists");
+    assert.equal(await balanceOf(creatorAta), before, "creator funds untouched");
+  });
+
+  it("31. KNOWN HAZARD (R-04): a worker who closes their own USDC account blocks even a REJECTION; the verifier's workaround pays rent the worker then recovers", async () => {
+    const poster = Keypair.generate();
+    const griefer = Keypair.generate();
+    await Promise.all([airdrop(poster.publicKey), airdrop(griefer.publicKey)]);
+    const posterAta = await createAssociatedTokenAccount(
+      connection,
+      admin,
+      mint,
+      poster.publicKey
+    );
+    const grieferAta = await createAssociatedTokenAccount(
+      connection,
+      admin,
+      mint,
+      griefer.publicKey
+    );
+    await mintTo(connection, admin, mint, posterAta, admin, 100 * ONE_USDC);
+
+    const taskId = newTaskId();
+    const task = taskPda(poster.publicKey, taskId);
+    await program.methods
+      .createTask(
+        taskId,
+        RUBRIC_HASH,
+        new BN(10 * ONE_USDC),
+        new BN(Math.floor(Date.now() / 1000) + 3600)
+      )
+      .accounts({
+        creator: poster.publicKey,
+        config: configPda,
+        task,
+        mint,
+        creatorTokenAccount: posterAta,
+        escrow: escrowFor(task),
+        tokenProgram: TOKEN_PROGRAM_ID,
+        associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
+        systemProgram: SystemProgram.programId,
+      })
+      .signers([poster])
+      .rpc();
+    await submitWork(task, griefer, grieferAta);
+
+    // The worker claims the task, then closes their own (empty) account.
+    await closeAccount(connection, griefer, grieferAta, griefer.publicKey, griefer);
+
+    const rejection = () =>
+      verdictCallWith(task, false, {
+        worker: griefer.publicKey,
+        workerTokenAccount: grieferAta,
+        creator: poster.publicKey,
+        creatorTokenAccount: posterAta,
+      });
+
+    // 1. As the program stands, even a REJECTION reverts - and a rejection never
+    //    touches the worker's account at all.
+    await expectError(rejection().rpc(), "AccountNotInitialized");
+    assert.deepEqual(
+      Object.keys((await program.account.task.fetch(task)).state),
+      ["submitted"]
+    );
+
+    // 2. What web/lib/server/program.ts does about it: recreate the account in
+    //    the SAME transaction, paid for by the verifier.
+    const rent = await connection.getMinimumBalanceForRentExemption(165);
+    const verifierBefore = await connection.getBalance(verifier.publicKey);
+    await rejection()
+      .preInstructions([
+        createAssociatedTokenAccountIdempotentInstruction(
+          verifier.publicKey,
+          grieferAta,
+          griefer.publicKey,
+          mint
+        ),
+      ])
+      .rpc();
+    const verifierSpent =
+      verifierBefore - (await connection.getBalance(verifier.publicKey));
+    assert.equal(await balanceOf(posterAta), 100 * ONE_USDC, "poster refunded");
+    assert.isAtLeast(verifierSpent, rent, "the verifier paid the rent");
+
+    // 3. The worker closes the recreated account again and keeps the rent.
+    const grieferBefore = await connection.getBalance(griefer.publicKey);
+    await closeAccount(connection, griefer, grieferAta, griefer.publicKey, griefer);
+    const grieferGained =
+      (await connection.getBalance(griefer.publicKey)) - grieferBefore;
+    assert.isAtLeast(
+      grieferGained,
+      rent - 10_000,
+      "the worker recovered the rent, less one transaction fee"
     );
   });
 });
