@@ -13,9 +13,15 @@
  *   3. Re-derive the rubric hash from the stored clauses and require it to
  *      equal the sealed hash. If the clauses we would judge against are not the
  *      clauses that were sealed, we must not judge at all.
- *   4. Only then run the judge.
- *   5. If the judge held the task, record HELD and DO NOT touch the chain.
- *   6. Otherwise sign and send the verdict, then record the result.
+ *   4. PREFLIGHT the verifier: is the key one the chain trusts, and can the
+ *      wallet pay? The judge is the expensive step - API quota and up to five
+ *      minutes - and its decision is thrown away if the settlement then cannot be
+ *      paid for. On failure the task is left EXACTLY as it was, not marked held.
+ *   5. Only then run the judge.
+ *   6. If the judge held the task, record HELD and DO NOT touch the chain.
+ *   7. Otherwise sign and send the verdict, then record the result. If THAT fails
+ *      the task is held for an OPERATIONAL reason (lib/holds.ts), which is not a
+ *      ruling on the work and is shown as such.
  */
 
 import { NextResponse } from "next/server";
@@ -30,12 +36,9 @@ import {
   hashVerdictHex,
 } from "@/lib/hash";
 import { runVerdict } from "@/lib/verifier";
-import {
-  fetchConfig,
-  fetchTask,
-  sendVerdict,
-} from "@/lib/server/program";
-import { checkVerifierMatchesConfig } from "@/lib/server/verifier-keypair";
+import { fetchTask, sendVerdict } from "@/lib/server/program";
+import { getVerifierHealth } from "@/lib/server/verifier-health";
+import { operationalHold } from "@/lib/holds";
 
 export const runtime = "nodejs";
 /** The judge can take a while to think. Do not let the platform cut it off. */
@@ -130,21 +133,28 @@ export async function POST(
     );
   }
 
-  // A mismatched verifier key means every verdict we sign will bounce. Say so
-  // now rather than after paying for a judge run.
-  try {
-    const config = await fetchConfig();
-    const check = checkVerifierMatchesConfig(config.verifierAuthority);
-    if (!check.ok) {
-      return NextResponse.json(
-        { error: "The verifier key is not the one this program trusts." },
-        { status: 500 }
-      );
-    }
-  } catch (error) {
-    console.error("[verify] could not read config:", error);
+  // PREFLIGHT. Can the verifier actually settle what the judge is about to decide?
+  //
+  // Everything above is cheap. The judge is not: it spends API quota and up to five
+  // minutes, and its decision is discarded if the settlement transaction then
+  // cannot be paid for or signed. So ask first - is there a configured key the
+  // chain trusts, and can the wallet pay a fee?
+  //
+  // On failure the task is deliberately left EXACTLY as it was: still Submitted,
+  // nothing marked held. An empty wallet says nothing about the work, so it must not
+  // be recorded as a hold on the work, and leaving the row alone means it is simply
+  // picked up again once the wallet is funded (scripts/retry-stuck.ts). The wallet
+  // being low is NOT a failure here - only being unable to settle is.
+  const health = await getVerifierHealth();
+  if (!health.canSettle) {
+    console.error(`[verify] NOT JUDGING task ${task.id}: ${health.message}`);
     return NextResponse.json(
-      { error: "Could not read the protocol config from the chain." },
+      {
+        error:
+          "Judging is temporarily unavailable. Nothing was decided and this task is unchanged.",
+        code: "VERIFIER_UNAVAILABLE",
+        level: health.level,
+      },
       { status: 503 }
     );
   }
@@ -228,21 +238,33 @@ export async function POST(
   } catch (error) {
     // Never leak the SDK error to the caller - it can contain RPC internals.
     console.error("[verify] submit_verdict failed:", error);
+
+    // Say WHY when we can. An empty wallet, an untrusted key and a flaky RPC need
+    // very different fixes, and the reader of the page is not the person who can
+    // apply any of them. The health message holds amounts and PUBLIC keys only.
+    const cause = await getVerifierHealth().catch(() => null);
+
+    // Held for an OPERATIONAL reason, and recorded as exactly that: the judge ran,
+    // but nothing was decided on-chain. Deliberately NOT stored: the verdict, its
+    // hash, its confidence, or a decision time. A retry re-runs the judge and may
+    // rule differently, so showing this run's verdict would display a ruling that
+    // may not survive - and "decided at" would claim a decision that did not land.
     await prisma.task.update({
       where: { id },
       data: {
         state: "HELD",
-        verdictJson: verdict.published as unknown as Prisma.InputJsonValue,
-        verdictReasoningHash: reasoningHashHex,
-        confidence: verdict.confidence,
-        heldReason:
-          "The judge reached a decision but the settlement transaction did not " +
-          "land. The escrow is untouched and a human needs to retry it.",
-        decidedAt: new Date(),
+        heldReason: operationalHold(
+          "The judge ran, but the settlement transaction did not land, so nothing was decided on-chain. " +
+            (cause && !cause.ok ? `Likely cause: ${cause.message} ` : "") +
+            "This is not a ruling on the work: the escrow is untouched and judging will be re-run."
+        ),
       },
     });
     return NextResponse.json(
-      { error: "The verdict could not be settled on-chain. The task is held." },
+      {
+        error: "The verdict could not be settled on-chain. The task is held and will be retried.",
+        code: "SETTLEMENT_FAILED",
+      },
       { status: 502 }
     );
   }

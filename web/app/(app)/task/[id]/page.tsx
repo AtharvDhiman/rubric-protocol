@@ -22,6 +22,7 @@ import { InspectionTable } from "@/components/InspectionTable";
 import { SolveBlock } from "@/components/SolveBlock";
 import { explorerTxUrl } from "@/lib/env";
 import { formatRecordNumber } from "@/lib/task-id";
+import { holdDetail, isOperationalHold } from "@/lib/holds";
 import {
   formatUsdc,
 
@@ -359,11 +360,32 @@ export default async function TaskPage({
           {held && (
             <div style={{ marginTop: 32 }}>
               <Stamp variant="held" />
-              <p style={{ fontSize: 14, color: "var(--text-2)", marginTop: 16 }}>
-                The judge was not confident enough to settle this automatically,
-                so the escrow is untouched and a person will review it. Nobody has
-                been paid and nobody has been refunded.
-              </p>
+              {/* TWO kinds of hold, and they must not read alike.
+
+                  A JUDGEMENT hold is a statement about the work: the judge could
+                  not decide, or the evidence does not match what was sealed. An
+                  OPERATIONAL hold is a statement about OUR infrastructure: the
+                  judge ran but settlement could not land, e.g. the verifier's
+                  wallet was empty. Nothing about the work was decided. Saying
+                  "the judge was not confident enough" about the second tells a
+                  poster and a worker their work was found wanting when it has not
+                  been ruled on at all - and hides the cause from whoever could
+                  fix it. (lib/holds.ts) */}
+              {isOperationalHold(task.heldReason) ? (
+                <p style={{ fontSize: 14, color: "var(--text-2)", marginTop: 16 }}>
+                  <strong>This is not a ruling on the work.</strong> The judge
+                  could not finish settling this task for a reason on our side, so
+                  nothing has been decided. The escrow is untouched, nobody has
+                  been paid and nobody has been refunded, and judging will be
+                  re-run.
+                </p>
+              ) : (
+                <p style={{ fontSize: 14, color: "var(--text-2)", marginTop: 16 }}>
+                  This was not settled automatically, so the escrow is untouched
+                  and a person will review it. Nobody has been paid and nobody has
+                  been refunded.
+                </p>
+              )}
               {task.heldReason && (
                 <p
                   style={{
@@ -372,7 +394,7 @@ export default async function TaskPage({
                     marginTop: 8,
                   }}
                 >
-                  {task.heldReason}
+                  {holdDetail(task.heldReason)}
                 </p>
               )}
             </div>
