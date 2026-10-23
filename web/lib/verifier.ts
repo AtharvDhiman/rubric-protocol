@@ -27,6 +27,15 @@ import { GoogleGenAI } from "@google/genai";
 import * as z from "zod/v4";
 
 import { DEFAULT_CONFIDENCE_THRESHOLD } from "./constants";
+import {
+  fallbackModelFromEnv,
+  resilienceConfigFromEnv,
+  runWithFallback,
+  type FailureCause,
+  type JudgeRoute,
+  type ResilienceConfig,
+  type RouteResponse,
+} from "./judge-resilience";
 
 /**
  * WHICH MODEL JUDGES.
@@ -131,6 +140,19 @@ export type ClauseRuling = z.infer<typeof ClauseRulingSchema>;
 
 export type VerdictOutcome = "approved" | "rejected" | "needs_manual_review";
 
+/**
+ * WHY a task was held, because the two need opposite handling.
+ *
+ *  - "judgement":   the judge looked at the work and could not settle it (unsure,
+ *                   refused, contradicted itself, or produced nothing usable). A
+ *                   person is needed, and asking again buys the same answer.
+ *  - "operational": the judge could not be ASKED (out of quota, too slow, down). It
+ *                   formed no view of the work at all. This is not a ruling and must
+ *                   not look like one: it stores no verdict, shows no confidence, and
+ *                   is judged again later (lib/holds.ts, scripts/retry-stuck.ts).
+ */
+export type HoldKind = "judgement" | "operational";
+
 export interface VerdictResult {
   outcome: VerdictOutcome;
   /** True only when outcome === "approved". Never trust the model's field alone. */
@@ -140,6 +162,8 @@ export interface VerdictResult {
   summary: string;
   /** Populated when the outcome is needs_manual_review: why a human is needed. */
   heldReason?: string;
+  /** Set exactly when outcome is needs_manual_review. */
+  holdKind?: HoldKind;
   model: string;
   /**
    * The exact object that gets published and hashed into `reasoning_hash`
@@ -322,6 +346,21 @@ export interface RunVerdictOptions {
   threshold?: number;
   model?: string;
   provider?: JudgeProvider;
+  /**
+   * The model to ask if the primary gives NO ANSWER (quota, timeout, down, unusable
+   * output). Gemini only. Defaults to JUDGE_FALLBACK_MODEL; pass null to disable.
+   *
+   * It is never consulted because of what the primary SAID: a low-confidence or
+   * rejecting ruling, or a refusal, is an answer and stands. Asking again until
+   * something agrees would be judge-shopping. See lib/judge-resilience.ts.
+   */
+  fallbackModel?: string | null;
+  /** Test seams: replace the model call, the sleep, the clock and the jitter. */
+  ask?: (provider: JudgeProvider, model: string, userMessage: string) => Promise<JudgeResponse>;
+  sleep?: (ms: number) => Promise<void>;
+  now?: () => number;
+  random?: () => number;
+  resilience?: Partial<ResilienceConfig>;
 }
 
 /**
@@ -331,7 +370,7 @@ export interface RunVerdictOptions {
  * schema, so the two providers cannot drift apart, and the caller re-validates
  * with zod regardless of which one answered.
  */
-type JudgeResponse =
+export type JudgeResponse =
   | { kind: "ok"; value: unknown }
   | { kind: "refused" }
   | { kind: "unusable"; reason: string };
@@ -389,58 +428,9 @@ function withDeadline<T>(promise: Promise<T>, ms: number): Promise<T> {
   });
 }
 
-/**
- * Is this "you are out of quota" rather than "something went wrong"?
- *
- * The distinction matters because retrying a quota error is pointless - the
- * second call fails for exactly the same reason - and the operator needs to be
- * told to top up the key rather than to go looking for a bug.
- */
-function isQuotaError(error: unknown): boolean {
-  if (error instanceof Anthropic.APIError && error.status === 429) return true;
-  const status = (error as { status?: number })?.status;
-  if (status === 429) return true;
-  const text = `${(error as { name?: string })?.name ?? ""} ${
-    error instanceof Error ? error.message : ""
-  }`;
-  return /429|RESOURCE_EXHAUSTED|RateLimitError|exceeded your current quota/i.test(
-    text
-  );
-  // Deliberately NOT matched here: "Unexpected HTTP client error: TypeError:
-  // unusable". The SDK emits that when it re-sends a request whose body stream
-  // has already been consumed, and it shows up both when rate limited and when
-  // not. Classifying it as a quota problem was wrong twice over: it reported a
-  // fixable transport error to the operator as "out of quota", and it skipped
-  // the retry that would have revealed the real cause. Let it fall through to
-  // the ordinary retry - attempt two returns either a clean 429 or a verdict.
-}
-
-/**
- * How long the API asked us to wait, in ms, or null if it did not say.
- *
- * A 429 is not always "you are out of quota for the day". Gemini's free tier is
- * a rate, so a burst can be told to come back in a fraction of a second - the
- * message carries "Please retry in 145.486818ms". Holding a task for human
- * review over a 145ms rate limit would be absurd, so the number is worth
- * reading rather than throwing away.
- */
-function retryHintMs(error: unknown): number | null {
-  const text = error instanceof Error ? error.message : String(error);
-  const match = text.match(/retry in\s+([\d.]+)\s*(ms|s)/i);
-  if (!match) return null;
-  const value = Number(match[1]);
-  if (!Number.isFinite(value)) return null;
-  return match[2].toLowerCase() === "s" ? value * 1000 : value;
-}
-
-/**
- * The longest we will sit waiting out a rate limit before giving up and holding
- * the task. Short enough that a person is not left staring at a dead screen,
- * long enough to ride out the sub-second limits the free tier actually emits.
- */
-const QUOTA_RETRY_MAX_WAIT_MS = Number(
-  process.env.JUDGE_QUOTA_RETRY_MAX_WAIT_MS ?? 6_000
-);
+// Classifying a thrown error (quota, timeout, unreachable) and reading a rate
+// limit's own "retry in 145ms" hint now live in lib/judge-resilience.ts, next to the
+// loop that acts on them.
 
 async function askGemini(
   userMessage: string,
@@ -521,13 +511,52 @@ function stripCodeFence(text: string): string {
     .trim();
 }
 
+/** A plain-English reason for each way the judge can fail to answer. */
+function unavailableReason(
+  cause: FailureCause,
+  budgetExhausted: boolean,
+  lastUnusableReason: string | null
+): string {
+  switch (cause) {
+    case "quota":
+      return (
+        "The judge service is out of API quota, so this submission was not ruled on " +
+        "and nothing has been decided."
+      );
+    case "timeout":
+      return (
+        "The judge service did not answer in time, so this submission was not ruled on " +
+        "and nothing has been decided." +
+        (budgetExhausted ? " Judging ran out of its time allowance." : "")
+      );
+    case "unreachable":
+      return (
+        "The judge service could not be reached, so this submission was not ruled on " +
+        "and nothing has been decided."
+      );
+    case "unusable":
+      return lastUnusableReason ?? "The judge did not return a usable ruling.";
+  }
+}
+
 /**
  * Judge a submission against a sealed rubric.
  *
  * Never throws for a model-side problem: an API error, a refusal, an unparseable
- * response or a schema violation all become `needs_manual_review` after one
- * retry. It throws only for a programming error (missing API key, empty rubric),
- * because those must not be silently swallowed into a held task.
+ * response or a schema violation all become `needs_manual_review`. It throws only for
+ * a programming error (missing API key, empty rubric), because those must not be
+ * silently swallowed into a held task.
+ *
+ * TWO KINDS OF HOLD (see `HoldKind`). If the judge could not be ASKED - out of quota,
+ * too slow, down - the result is an "operational" hold: no view of the work was
+ * formed, and the caller must not present it as a ruling. If the judge was asked and
+ * could not settle it - unsure, refused, contradicted itself, or kept producing
+ * unusable output - it is a "judgement" hold and a person is needed.
+ *
+ * RETRY AND FALLBACK live in lib/judge-resilience.ts. The one rule worth repeating
+ * here: a second model is asked only when the first gave NO ANSWER. A ruling - even a
+ * low-confidence one, even a rejection - stands, and so does a refusal, so the
+ * fallback can never be used to shop for a more agreeable judge.
  */
 export async function runVerdict(
   rubric: RubricInput,
@@ -545,99 +574,113 @@ export async function runVerdict(
   const nonce = makeNonce();
   const userMessage = buildUserMessage(rubric, submission, nonce);
 
-  const held = (heldReason: string, partial?: Partial<JudgePayload>): VerdictResult =>
+  const held = (
+    kind: HoldKind,
+    heldReason: string,
+    onModel: string = model
+  ): VerdictResult =>
     finalize(
       {
         approved: false,
-        confidence: partial?.confidence ?? 0,
-        clauses: partial?.clauses ?? [],
+        confidence: 0,
+        clauses: [],
         summary:
-          partial?.summary ??
-          "This submission could not be judged automatically and is held for human review.",
+          kind === "operational"
+            ? "The judge could not be reached, so this submission has not been judged."
+            : "This submission could not be judged automatically and is held for human review.",
       },
       "needs_manual_review",
       heldReason,
-      model,
-      rubric
+      onModel,
+      rubric,
+      kind
     );
 
-  let lastFailure = "The judge did not return a usable ruling.";
+  const defaultAsk = (p: JudgeProvider, m: string, message: string) =>
+    p === "gemini" ? askGemini(message, m) : askAnthropic(message, m, options.client);
+  const ask = options.ask ?? defaultAsk;
 
-  // One attempt, then exactly one retry. Not a loop - a judge that fails twice
-  // is a judge we should not be trusting with this task right now.
-  // Three attempts rather than two, because one of them may be spent waiting
-  // out a sub-second rate limit that says nothing about the submission.
-  const MAX_ATTEMPTS = 3;
-  for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
-    try {
-      const response =
-        provider === "gemini"
-          ? await askGemini(userMessage, model)
-          : await askAnthropic(userMessage, model, options.client);
-
-      // A safety refusal is a legitimate signal, not a crash. Hold the task.
-      if (response.kind === "refused") {
-        return held(
-          "The judge declined to rule on this submission's content. A human needs to look at it."
+  /** One (provider, model) the judge can be asked on. */
+  const makeRoute = (p: JudgeProvider, m: string): JudgeRoute<JudgePayload> => ({
+    label: `${p}:${m}`,
+    ask: async (): Promise<RouteResponse<JudgePayload>> => {
+      let response: JudgeResponse;
+      try {
+        response = await ask(p, m, userMessage);
+      } catch (error) {
+        // Log for the operator; never surface an SDK error object to a user.
+        console.error(
+          `[verifier] ${p}:${m} failed:`,
+          error instanceof Error ? error.message : error
         );
+        throw error;
       }
-      if (response.kind === "unusable") {
-        lastFailure = response.reason;
-        continue;
-      }
+      // A refusal or an unusable response passes through as it is.
+      if (response.kind !== "ok") return response;
 
-      // The provider may already have enforced the schema. This module must
-      // not depend on that for a money decision, so it validates regardless.
+      // The provider may already have enforced the schema. This module must not
+      // depend on that for a money decision, so it validates regardless.
       const validated = JudgePayloadSchema.safeParse(response.value);
       if (!validated.success) {
-        lastFailure = "The judge's response failed schema validation.";
-        continue;
+        return { kind: "unusable", reason: "The judge's response failed schema validation." };
       }
+      return { kind: "ok", value: validated.data };
+    },
+  });
 
-      const { outcome, heldReason } = applyVerdictGuards(
-        validated.data,
-        rubric.clauses.length,
-        threshold
-      );
-
-      return finalize(validated.data, outcome, heldReason, model, rubric);
-    } catch (error) {
-      // Log for the operator; never surface an SDK error object to a user.
-      console.error(
-        `[verifier] attempt ${attempt + 1} failed:`,
-        error instanceof Error ? error.message : error
-      );
-      if (isQuotaError(error)) {
-        const waitMs = retryHintMs(error);
-        // A rate limit the API itself says will clear in under a few seconds is
-        // worth waiting out. Anything longer, or an unstated wait, is a real
-        // quota problem: stop, and say plainly what is wrong. Either way this is
-        // an operator problem rather than a bad submission, and the task is
-        // never settled on the strength of it.
-        if (
-          waitMs !== null &&
-          waitMs <= QUOTA_RETRY_MAX_WAIT_MS &&
-          attempt < MAX_ATTEMPTS - 1
-        ) {
-          console.warn(
-            `[verifier] rate limited; the API asked for ${Math.round(waitMs)}ms, waiting.`
-          );
-          await new Promise((resolve) => setTimeout(resolve, waitMs + 100));
-          continue;
-        }
-        return held(
-          "The judge service is out of API quota, so this submission was not ruled on. " +
-            "It is held until an operator restores quota and re-runs the verdict."
-        );
-      }
-      lastFailure =
-        error instanceof Anthropic.APIError
-          ? "The judge service returned an error."
-          : "The judge could not be reached.";
-    }
+  const models = [model];
+  const routes = [makeRoute(provider, model)];
+  const fallback =
+    options.fallbackModel === undefined
+      ? fallbackModelFromEnv(process.env, model)
+      : options.fallbackModel;
+  // The fallback is another Gemini model: same key, its own quota. Opt-in.
+  if (provider === "gemini" && fallback && fallback !== model) {
+    routes.push(makeRoute("gemini", fallback));
+    models.push(fallback);
   }
 
-  return held(lastFailure);
+  const result = await runWithFallback(
+    routes,
+    { ...resilienceConfigFromEnv(process.env, JUDGE_TIMEOUT_MS), ...options.resilience },
+    {
+      sleep: options.sleep ?? ((ms) => new Promise((resolve) => setTimeout(resolve, ms))),
+      now: options.now ?? Date.now,
+      random: options.random ?? Math.random,
+      onEvent: (message) => console.warn(`[verifier] ${message}`),
+    }
+  );
+
+  // A safety refusal is a legitimate signal, not a crash, and it is an ANSWER: it is
+  // never retried and never handed to another model. Hold the task for a person.
+  if (result.kind === "refused") {
+    return held(
+      "judgement",
+      "The judge declined to rule on this submission's content. A human needs to look at it.",
+      models[result.routeIndex]
+    );
+  }
+
+  if (result.kind === "unavailable") {
+    // Out of quota, too slow or down: we never formed a view of the work. Only if
+    // EVERY failure was unusable output is it treated as needing a person.
+    return held(
+      result.cause === "unusable" ? "judgement" : "operational",
+      unavailableReason(result.cause, result.budgetExhausted, result.lastUnusableReason)
+    );
+  }
+
+  const answeredBy = models[result.routeIndex];
+  if (result.routeIndex > 0) {
+    console.warn(`[verifier] the primary gave no answer; ruled by the fallback model ${answeredBy}.`);
+  }
+
+  const { outcome, heldReason } = applyVerdictGuards(
+    result.value,
+    rubric.clauses.length,
+    threshold
+  );
+  return finalize(result.value, outcome, heldReason, answeredBy, rubric);
 }
 
 function finalize(
@@ -645,7 +688,8 @@ function finalize(
   outcome: VerdictOutcome,
   heldReason: string | undefined,
   model: string,
-  rubric: RubricInput
+  rubric: RubricInput,
+  holdKind?: HoldKind
 ): VerdictResult {
   const approved = outcome === "approved";
   const clauses = payload.clauses
@@ -659,6 +703,9 @@ function finalize(
     clauses,
     summary: payload.summary,
     heldReason,
+    // A guard hold (unsure, contradicted itself) is a judgement hold unless the caller
+    // says otherwise; an approval or a rejection has no hold kind at all.
+    holdKind: outcome === "needs_manual_review" ? (holdKind ?? "judgement") : undefined,
     model,
     published: {
       outcome,

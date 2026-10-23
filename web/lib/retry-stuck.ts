@@ -167,8 +167,12 @@ export type AttemptResult =
   | { kind: "decided"; outcome: string }
   /** Nothing to do (already decided, not found, not judgeable). Costs nothing. */
   | { kind: "skipped"; reason: string }
-  /** The server refused to judge because the verifier cannot settle ANYTHING. */
-  | { kind: "unavailable"; level: string }
+  /**
+   * The server cannot judge ANYTHING right now, so the rest would fail the same way:
+   * either the verifier cannot settle (empty wallet, untrusted key), or the judge
+   * cannot be asked (out of quota, down).
+   */
+  | { kind: "unavailable"; subject: "verifier" | "judge"; level: string }
   /** Anything else that went wrong: a 5xx, a timeout, no network. */
   | { kind: "failed"; reason: string };
 
@@ -191,7 +195,10 @@ export function classifyResponse(status: number, body: unknown): AttemptResult {
   if (status === 409) return { kind: "skipped", reason: "already decided or not judgeable" };
   if (status === 503 && code === "VERIFIER_UNAVAILABLE") {
     const level = isRecord(body) && typeof body.level === "string" ? body.level : "unknown";
-    return { kind: "unavailable", level };
+    return { kind: "unavailable", subject: "verifier", level };
+  }
+  if (status === 503 && code === "JUDGE_UNAVAILABLE") {
+    return { kind: "unavailable", subject: "judge", level: "unavailable" };
   }
   if (status === 502 && code === "SETTLEMENT_FAILED") {
     return { kind: "failed", reason: "settlement did not land" };
@@ -216,7 +223,7 @@ export type StopReason =
   /** The per-run cap on judged tasks was reached. */
   | "limit"
   /** The server said the verifier cannot settle: nothing else would work either. */
-  | "verifier-unavailable"
+  | "unavailable"
   /** Too many failures in a row. */
   | "too-many-failures";
 
@@ -272,7 +279,7 @@ export async function runRetries<T>(
     deps.onResult?.(item, result);
 
     if (result.kind === "unavailable") {
-      return { results, stoppedBecause: "verifier-unavailable", notAttempted: items.length - i - 1 };
+      return { results, stoppedBecause: "unavailable", notAttempted: items.length - i - 1 };
     }
 
     if (result.kind === "skipped") {

@@ -254,10 +254,14 @@ describe("runVerdict (provider faked, always runs)", () => {
     },
   };
 
+  // `sleep` is instant: the retry loop now backs off between attempts, and a test
+  // that really waited would be slow for no reason.
   const run = (replies: Array<unknown | Error>) =>
     runVerdict(RUBRIC_2, SUB, {
       provider: "anthropic",
       client: fakeClient(replies),
+      sleep: async () => {},
+      random: () => 0.5,
     });
 
   it("approves when the fake judge passes every clause", async () => {

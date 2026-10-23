@@ -18,7 +18,10 @@
  *      minutes - and its decision is thrown away if the settlement then cannot be
  *      paid for. On failure the task is left EXACTLY as it was, not marked held.
  *   5. Only then run the judge.
- *   6. If the judge held the task, record HELD and DO NOT touch the chain.
+ *   6. If the judge held the task, record HELD and DO NOT touch the chain. A hold
+ *      because the judge could not be ASKED is recorded as operational and stores no
+ *      ruling; a hold because it could not settle is a judgement hold and stores its
+ *      verdict (see HoldKind in lib/verifier.ts).
  *   7. Otherwise sign and send the verdict, then record the result. If THAT fails
  *      the task is held for an OPERATIONAL reason (lib/holds.ts), which is not a
  *      ruling on the work and is shown as such.
@@ -202,6 +205,28 @@ export async function POST(
 
   // --- 5. Held: record it, touch nothing on-chain --------------------------
   if (verdict.outcome === "needs_manual_review") {
+    // The judge could not be ASKED (out of quota, too slow, down). It formed no view
+    // of the work, so there is no ruling to record: no verdict, no confidence, no
+    // decision time. Storing the empty placeholder ruling would show the reader "the
+    // judge was 0% sure", and would hide the task from scripts/retry-stuck.ts, which
+    // only retries operational holds. The state alone changes, and the reason says
+    // what happened.
+    if (verdict.holdKind === "operational") {
+      const reason = verdict.heldReason ?? "The judge could not be reached, so nothing was decided.";
+      console.error(`[verify] judge unavailable for task ${task.id}: ${reason}`);
+      await prisma.task.update({
+        where: { id },
+        data: { state: "HELD", heldReason: operationalHold(reason) },
+      });
+      return NextResponse.json(
+        {
+          error: "The judge could not be reached. Nothing was decided and this task is on hold.",
+          code: "JUDGE_UNAVAILABLE",
+        },
+        { status: 503 }
+      );
+    }
+
     const updated = await prisma.task.update({
       where: { id },
       data: {
@@ -256,7 +281,7 @@ export async function POST(
         heldReason: operationalHold(
           "The judge ran, but the settlement transaction did not land, so nothing was decided on-chain. " +
             (cause && !cause.ok ? `Likely cause: ${cause.message} ` : "") +
-            "This is not a ruling on the work: the escrow is untouched and judging will be re-run."
+            "This is not a ruling on the work: the escrow is untouched and judging can be run again."
         ),
       },
     });

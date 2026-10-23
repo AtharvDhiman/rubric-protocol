@@ -210,7 +210,7 @@ async function main() {
       case "skipped":
         return `skipped (${r.reason})`;
       case "unavailable":
-        return `REFUSED - verifier is ${r.level}`;
+        return r.subject === "judge" ? "REFUSED - the judge cannot be asked" : `REFUSED - verifier is ${r.level}`;
       case "failed":
         return `FAILED (${r.reason})`;
     }
@@ -238,9 +238,14 @@ async function main() {
   } else {
     // Both of the others mean something is wrong, so the exit code says so.
     process.exitCode = 1;
+    const last = summary.results[summary.results.length - 1]?.result;
+    const subject = last?.kind === "unavailable" ? last.subject : "verifier";
     console.error(
-      summary.stoppedBecause === "verifier-unavailable"
-        ? `Stopped: the verifier cannot settle. ${summary.notAttempted} not attempted. ` +
+      summary.stoppedBecause === "unavailable"
+        ? subject === "judge"
+          ? `Stopped: the judge cannot be asked (out of API quota, or down). ${summary.notAttempted} not attempted. ` +
+            `Wait for quota to return, then run again.\n`
+          : `Stopped: the verifier cannot settle. ${summary.notAttempted} not attempted. ` +
             `Check ${args.baseUrl}/api/health/verifier and docs/verifier-runbook.md.\n`
         : `Stopped after ${args.maxFailures} failure(s) in a row. ${summary.notAttempted} not attempted. ` +
             `Check the deployment's logs before trying again.\n`

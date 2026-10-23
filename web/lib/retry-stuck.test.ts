@@ -140,11 +140,22 @@ describe("classifyResponse", () => {
   it("a refusal because the verifier cannot settle is its own thing, with the level", () => {
     expect(classifyResponse(503, { code: "VERIFIER_UNAVAILABLE", level: "empty" })).toEqual({
       kind: "unavailable",
+      subject: "verifier",
       level: "empty",
     });
     expect(classifyResponse(503, { code: "VERIFIER_UNAVAILABLE" })).toEqual({
       kind: "unavailable",
+      subject: "verifier",
       level: "unknown",
+    });
+  });
+
+  it("a refusal because the JUDGE cannot be asked is unavailable too, and not mistaken for the verifier", () => {
+    // Out of quota or down: every other task would fail the same way, so stop at once.
+    expect(classifyResponse(503, { code: "JUDGE_UNAVAILABLE", error: "x" })).toEqual({
+      kind: "unavailable",
+      subject: "judge",
+      level: "unavailable",
     });
   });
 
@@ -197,7 +208,7 @@ describe("runRetries", () => {
   const decided: AttemptResult = { kind: "decided", outcome: "approved" };
   const failed: AttemptResult = { kind: "failed", reason: "HTTP 500" };
   const skipped: AttemptResult = { kind: "skipped", reason: "already decided or not judgeable" };
-  const unavailable: AttemptResult = { kind: "unavailable", level: "empty" };
+  const unavailable: AttemptResult = { kind: "unavailable", subject: "verifier", level: "empty" };
 
   /** Attempts return the scripted results in order. */
   const scripted = (results: AttemptResult[]) => {
@@ -231,7 +242,7 @@ describe("runRetries", () => {
   it("stops at once when the verifier cannot settle: the rest would fail the same way", async () => {
     const deps = scripted([unavailable]);
     const out = await runRetries(["a", "b", "c", "d"], opts, deps);
-    expect(out.stoppedBecause).toBe("verifier-unavailable");
+    expect(out.stoppedBecause).toBe("unavailable");
     expect(out.notAttempted).toBe(3);
     expect(deps.attempt).toHaveBeenCalledTimes(1);
   });
