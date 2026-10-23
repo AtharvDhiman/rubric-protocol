@@ -29,6 +29,7 @@ the reasoning is public and its hash is on-chain.
 | API routes + Prisma schema | Written; compile and typecheck clean |
 | Frontend (4 screens) | Built. `next build` passes |
 | Devnet deploy | **Live** at `F2Uo5JUfGQtho8s9ZbwcpWBd8iJ4XvBqamUaqdjcrRxz`, config initialized |
+| Verifier operations: a wallet health check, a keyless retry script, key rotation with no gap, and a planner for the admin multisig | Built and tested. See [docs/verifier-runbook.md](docs/verifier-runbook.md). **The alert needs an external monitor you set up** — nothing here sends one |
 
 **Verified by running it:**
 
@@ -37,7 +38,8 @@ the reasoning is public and its hash is on-chain.
   `solana-test-validator`; the 2 pending run under `npm run test:grace`, which builds
   the test-only `short-grace` feature. Plain `anchor test` does not work on
   anchor-cli 1.x: it defaults to surfpool, which is not installed.
-- `next build`, `tsc --noEmit` and `eslint` all clean; 37 web tests pass
+- `next build`, `tsc --noEmit` and `eslint` all clean; 451 web tests pass (7 more
+  call the live judge API and run only when opted in)
 - `.next/static` contains no reference to `VERIFIER_SECRET_KEY` or `ANTHROPIC_API_KEY`
 
 All four screens render against a real Postgres, and the Task PDA shown on
@@ -448,11 +450,12 @@ Read this section before putting real money anywhere near this.
 **1. A single verifier key is the centralization point.** One key, held by this
 server, is the only account the program accepts a verdict from. Whoever holds it
 can approve or reject any submitted task, which means they can direct every
-escrowed bounty in the protocol. There is no multisig, no timelock, and no second
-opinion. v2 replaces it with multi-agent consensus; until then this is the
-protocol's single largest trust assumption and it is not hidden.
+escrowed bounty in the protocol. The admin can be a multisig; the verifier cannot —
+it is one hot key, with no timelock and no second opinion. v2 replaces it with
+multi-agent consensus; until then this is the protocol's single largest trust
+assumption and it is not hidden.
 
-Two things bound the damage:
+Three things bound the damage:
 - The bounty cap is held on-chain in `Limits`, launched at 50 USDC, and the admin
   can change it — but never above a 1,000 USDC ceiling that is compiled into the
   program. **It bounds one task, not the total:** anyone may claim any open task, so
@@ -461,8 +464,15 @@ Two things bound the damage:
   nothing else) if you need to stop the growth of exposure.
 - `set_verifier_authority` lets the admin revoke a leaked key in one transaction
   without redeploying.
+- The key can be **operated**, which is a different thing from trusted. A health
+  endpoint reports whether the wallet can still pay for verdicts (an empty wallet
+  used to look exactly like a broken judge), the app refuses to spend judge quota it
+  cannot settle, rotation has no window in which verdicts bounce, and a planner
+  checks an admin action against the chain before the multisig signs it. All of it is
+  in [docs/verifier-runbook.md](docs/verifier-runbook.md). The low-balance alert is
+  an **external monitor you must set up**; until you do, it does not exist.
 
-Neither of these makes it decentralized. They make it survivable.
+None of these makes it decentralized. They make it survivable.
 
 **2. The program is unaudited.** It compiles clean and passes 49 integration
 tests (51 with the test-only build), and it is deployed to devnet — but no third
@@ -521,6 +531,14 @@ is unusable.
 
 **11. Landing-page figures are targets, not measurements.** They are labelled as
 such in the UI and live in `web/lib/constants.ts`.
+
+**12. Nothing retries a stuck verdict on its own.** Verification is triggered once,
+by the worker's own browser tab. If that call fails or the tab is closed mid-judge,
+the task waits. `web/scripts/retry-stuck.ts` re-runs it, but a person (or a job you
+schedule) has to run it. Until then the worker waits, and if it is never judged the
+poster can `reclaim_expired` a week after the deadline and take the bounty back
+**even though the work was done and nobody read it**. The retry script needs no key
+and is built to stop rather than push on, but it is not an automatic safety net.
 
 ---
 

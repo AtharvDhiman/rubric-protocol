@@ -37,7 +37,11 @@
 export const LAMPORTS_PER_SIGNATURE = 5_000;
 const LAMPORTS_PER_SOL = 1_000_000_000;
 
-/** Warn below 0.05 SOL: about 10,000 typical verdicts, or ~33 under attack. */
+/**
+ * Warn below 0.05 SOL: about 10,000 typical verdicts, or about 11 at the worst case
+ * this module budgets for (all three token accounts recreated; an attacker controls
+ * two of them, and budgeting for three errs on the safe side).
+ */
 export const DEFAULT_WARN_LAMPORTS = 50_000_000;
 
 export type HealthLevel =

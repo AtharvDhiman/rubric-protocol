@@ -38,7 +38,7 @@ signed by the verifier. The exposure is elsewhere:
 | ID | Sev | Finding | Status |
 | --- | --- | --- | --- |
 | R-01 | **High** | The upgrade authority, not the PDA, is the root of trust | Operational — checklist |
-| R-02 | **High** | A compromised verifier **or admin** key can redirect every open escrow; the bounty cap bounds one task, not the system | **Mitigated, not removed**: cap now adjustable with a hard ceiling, plus a pause for new tasks. Key custody is launch-plan item 3 |
+| R-02 | **High** | A compromised verifier **or admin** key can redirect every open escrow; the bounty cap bounds one task, not the system | **Mitigated, not removed**: cap now adjustable with a hard ceiling, plus a pause for new tasks. Key custody is now *operable* (health check, rotation with no gap, retry, admin planner: [verifier-runbook.md](verifier-runbook.md)), but it is still one hot key |
 | R-03 | Medium | `fee_destination` is immutable and USDC is freezable → every approval can be bricked | **Fixed** — `set_fee_destination` |
 | R-04 | Medium | Every verdict needs three token accounts, two attacker-owned; the off-chain workaround lets an attacker drain the verifier's SOL | **Demonstrated**; pinned by a characterisation test; structural fix deferred to a design review |
 | R-05 | Medium | First signer to `submit_work` owns the task; one shot, no stake, no re-open | Design — launch-plan item 4 |
@@ -92,9 +92,10 @@ it install any verifier, and the admin can never be rotated or revoked.
 
 **Fix.** The program cannot detect a rogue-but-valid verifier. Mitigations: a
 **low launch cap** and a **kill switch** so exposure is chosen rather than
-inherited; admin as a **multisig from day zero** (there is no admin rotation);
-key-rotation runbook, balance and anomaly alerts for the verifier (launch-plan
-item 3). See §6 for the cap trade-off.
+inherited; admin as a **multisig from day zero** (there is no admin rotation); a
+key-rotation runbook and a balance alert for the verifier (built: §7, P7). **Anomaly**
+alerting (unusual approval patterns, a burst of verdicts) is *not* built. See §6 for
+the cap trade-off.
 
 ### R-03 — Medium — A frozen or lost fee account bricks every approval
 
@@ -397,6 +398,33 @@ proves nothing.
 | **P3** | `Limits`: configurable bounty cap, hard ceiling, pause switch, and its web client | `e9b7ae3` | 6 of 6 mutations caught; 51 tests pass on the short-grace build |
 | **P5** | Tooling and docs: `[test] upgradeable = true` (`4d49ad7`), the README, and correcting the program-keypair claim (this docs commit) | `4d49ad7`, docs commit | the keypair claim was tested, not assumed |
 | **P6** | `mainnet-init-plan.ts`, a planner that signs nothing | `e440d1a` | 24 unit tests; dry-run read-only against devnet |
+| **P7** | Verifier operations (launch-plan item 3), as five pieces: key rotation with no gap, a wallet health check, a preflight and operational holds, a retry script, and an admin-action planner. Runbook: [verifier-runbook.md](verifier-runbook.md) | `298c49b`, `d496b8b`, `4a11824`, `037cdf5`, `9e30174`, docs commit | see below |
+
+**P7 verification, and its limits.** The pure decisions are unit tested (rotation
+17, health 19, holds and stuck-task selection 19, retry 40, admin planner 50), and
+the guards in the last two were mutation-checked the same way as the program tests:
+17 of 17 and 25 of 25 mutations caught. Beyond that: the health endpoint was read
+live against devnet (`ok`, watching the real verifier key); the retry script was run
+end to end against a real throwaway Postgres and a mock app, covering the refusal
+before any judge call, the breaker, the cap, the skip and the age filter; and the
+admin planner was run read-only against the real devnet deployment, where it refused
+a wrong admin (showing the true `Config.admin`) and an unfunded rotation target, and
+its printed instruction data was decoded independently against the IDL.
+
+What P7 does **not** do, so nobody assumes it does:
+
+- **It sends no alert.** The health endpoint returns 503 below the warning line so an
+  *external* uptime monitor can page someone, but the monitor is yours to set up.
+- **Nothing retries a stuck verdict automatically.** The script is run by a person or
+  a job the operator schedules (README, limitation 12).
+- **No admin rotation was added.** `propose_admin` / `accept_admin` would be more
+  program surface to audit; the plan is a multisig from the first instruction. That
+  rests on the multisig's vault address surviving membership changes, which is for
+  the operator to confirm for the product they pick.
+- **How a specific multisig product ingests the printed instruction is unverified.**
+  The planner prints the program id, accounts and data; nothing was executed through
+  a real multisig.
+- **The verifier is still one hot key.** Operability is not trust.
 
 **P3 verification.** Six mutations were run against the new tests: deleting the
 admin check on `initialize_limits`, deleting the range check, deleting the pause

@@ -28,7 +28,7 @@ to each before starting.
 | D3 | **Fee destination wallet.** A dedicated multisig-controlled wallet, with its USDC account created beforehand. | USDC is freezable by Circle, and a frozen fee account makes every approval revert (finding R-03). The admin can now recover with `set_fee_destination`, but keep the fee wallet clean so it never needs to. |
 | D4 | **The launch bounty cap.** Now an on-chain `Limits` account the admin can change — but never above a compiled-in 1,000 USDC ceiling. Launch low (the scripts default to 50 USDC). | The cap bounds **one task, not the total**; size the launch around cap × open tasks. Raising the *ceiling* is a program upgrade. |
 | D5 | **Audit status you will state publicly.** | The program is unaudited. A UI notice and a low cap are the honest minimum. |
-| D6 | **Verifier custody.** A hot key on the server is unavoidable; decide the funding, alerting and rotation plan first. | Covered by item 3 of the launch plan; the program cannot help here. |
+| D6 | **Verifier custody.** A hot key on the server is unavoidable; decide the funding, alerting and rotation plan first. | The program cannot help here. The plan is [verifier-runbook.md](verifier-runbook.md): the health check and the **external monitor you must set up**, funding, rotation with no gap, and the order to follow for a leaked key. |
 
 ## Phase 1 — Code freeze and build
 
@@ -277,6 +277,12 @@ tasks. The planner prints `initialize_limits` for exactly that reason. It starts
   `reclaim_expired` returns it.
 - ☐ Watch the verifier wallet balance across these. Note what a verdict actually
   costs.
+- ☐ An external uptime monitor is pointed at `GET /api/health/verifier` and alerts a
+  human on any non-2xx. **Nothing in this repo sends that alert.** Prove it: let the
+  warning line cross (set `VERIFIER_MIN_SOL_WARN` above the wallet's balance for a
+  minute) and confirm the page actually arrives.
+- ☐ `web/scripts/retry-stuck.ts` run once in dry-run mode against production, and its
+  database host line read.
 
 ## Phase 6 — Limits you launch with
 
@@ -290,6 +296,10 @@ tasks. The planner prints `initialize_limits` for exactly that reason. It starts
   anyone claiming an existing open task** — against a compromised verifier,
   rotating it is the lever that matters. Rehearse the pause as a multisig
   transaction before launch, so the first time is not during an incident.
+  `web/scripts/admin-action-plan.ts` prepares each of these for the signers and
+  refuses the mistakes that matter (a rotation to an unfunded wallet, a proposal not
+  addressed to the real admin); the order for a leaked key is in
+  [verifier-runbook.md](verifier-runbook.md#5-emergency-a-leaked-key).
 - ☐ A banner stating the program is **unaudited** and capped.
 
 ## Phase 7 — Making it permanent ⚠⚠
@@ -311,7 +321,7 @@ immutable and the config does not exist.
 
 | Event | What you can do on-chain | What you cannot do |
 | --- | --- | --- |
-| Verifier key leaked | `set_verifier_authority` (admin) to a new key. | Recall anything already paid. |
+| Verifier key leaked | `set_verifier_authority` (admin) to a new key. Order matters: [runbook §5](verifier-runbook.md#5-emergency-a-leaked-key). | Recall anything already paid. |
 | Admin key lost / compromised | **Nothing.** Compromise lets an attacker rotate the verifier to themselves. | Rotate or revoke the admin. |
 | Fee account frozen | `set_fee_destination` (admin) to a clean wallet. Approvals revert until it lands; if it lands late, posters reclaim after the grace period. | Recover fees already stuck in the frozen account. |
 | Bug found in the program | `set_paused` now, to stop growth; upgrade, if the authority is not yet final. | Anything, if it is final. |
