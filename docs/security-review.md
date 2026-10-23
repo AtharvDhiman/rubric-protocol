@@ -178,7 +178,12 @@ refused, which is the same property seen from the other side.
 **Fix.** Needs a design decision, not a patch: poster-designated worker or
 allowlist; a worker stake forfeited on junk; or letting a rejected task return to
 `Open` until the deadline. It overlaps the dispute/appeal path in launch-plan item
-4, so I propose folding it in there rather than building it twice.
+4, so I proposed folding it in there rather than building it twice.
+
+**Status after item 4: NOT fixed.** The review path (§7, P8) helps a task the judge
+could not settle; it does not change who may claim a task, nor the single attempt per
+task, and a rejected task is still terminal. Item 4 deliberately made no program change,
+and every option above is one.
 
 ### R-06 — Medium — The guards are not guarded
 
@@ -398,7 +403,8 @@ proves nothing.
 | **P3** | `Limits`: configurable bounty cap, hard ceiling, pause switch, and its web client | `e9b7ae3` | 6 of 6 mutations caught; 51 tests pass on the short-grace build |
 | **P5** | Tooling and docs: `[test] upgradeable = true` (`4d49ad7`), the README, and correcting the program-keypair claim (this docs commit) | `4d49ad7`, docs commit | the keypair claim was tested, not assumed |
 | **P6** | `mainnet-init-plan.ts`, a planner that signs nothing | `e440d1a` | 24 unit tests; dry-run read-only against devnet |
-| **P7** | Verifier operations (launch-plan item 3), as five pieces: key rotation with no gap, a wallet health check, a preflight and operational holds, a retry script, and an admin-action planner. Runbook: [verifier-runbook.md](verifier-runbook.md) | `298c49b`, `d496b8b`, `4a11824`, `037cdf5`, `9e30174`, docs commit | see below |
+| **P7** | Verifier operations (launch-plan item 3), as five pieces: key rotation with no gap, a wallet health check, a preflight and operational holds, a retry script, and an admin-action planner. Runbook: [verifier-runbook.md](verifier-runbook.md) | `298c49b`, `d496b8b`, `4a11824`, `037cdf5`, `9e30174`, `a4d369c` | see below |
+| **P8** | Judge reliability and human review (launch-plan item 4): backoff, an opt-in fallback model, outages recorded as "not a ruling", HELD-versus-REJECTED made clear, and a reviewer path for held tasks. Design: [dispute-design.md](dispute-design.md) | `6be37bd`, `4ccc054`, `646640e`, docs commit | see **P8 verification** |
 
 **P7 verification, and its limits.** The pure decisions are unit tested (rotation
 17, health 19, holds and stuck-task selection 19, retry 40, admin planner 50), and
@@ -425,6 +431,46 @@ What P7 does **not** do, so nobody assumes it does:
   The planner prints the program id, accounts and data; nothing was executed through
   a real multisig.
 - **The verifier is still one hot key.** Operability is not trust.
+
+**P8 verification, and its limits.** Pure logic is unit tested (judge resilience 36,
+runVerdict under failure 27, ruling and reviewer logic 24, reviewer signatures 14, outcome
+and copy 20). The money-moving routes are tested with the database and chain mocked
+(review 32, verify 17), which is the first route-level coverage this project has. Guards
+were mutation-checked: 26 of 26 in the judge's resilience and wiring, and 40 of 40 across
+the review route, the shared checks, the signature binding and the ruling logic. Two of the
+40 survived the first run, and both were *weak tests*, not weak code (a dummy signature
+that happened to fail with the same status as the check under test); they were
+strengthened and then caught.
+
+Findings worth knowing, found while building P8:
+
+- **A reclaim was labelled a rejection.** A task becomes REFUNDED when the judge rejects it
+  and when the poster reclaims an undecided one, and a reclaim leaves the old verdict on the
+  row, so a held-then-reclaimed task was stamped REJECTED, animated as a refund, and headed
+  "VERDICT IN 47s": a permanent record that the work was found wanting when nobody ruled.
+  Fixed (`lib/outcome.ts`).
+- **The page promised a reviewer that did not exist** ("a person will review it"), and that
+  judging "will be re-run". Both removed; the wording is now tested never to promise either.
+- **An outage was stored as a ruling** (an empty verdict with confidence 0) and hidden from
+  the retry script. Fixed.
+- **A failed settlement could overwrite the truth.** If settlement failed because a
+  concurrent action had already decided the task, the route recorded a hold on a task the
+  chain had settled. It now asks the chain first and reconciles.
+
+What P8 does **not** do:
+
+- **It does not make review trustless.** A reviewer's wallet authenticates the request; the
+  verifier key signs the verdict, so a reviewer is as trusted as the verifier.
+- **A reviewer cannot be stopped from using a second wallet** to rule on their own task. The
+  allowlist is the control; the conflict check only stops the accidental case.
+- **A verdict that has landed still cannot be contested.** See dispute-design.md §4.
+- **The review panel has not been exercised with a real wallet.** It was rendered in demo
+  mode with its eligibility gate temporarily bypassed, and its logic is covered by tests,
+  but nobody has signed and submitted a ruling through it end to end.
+- **The fallback model has not been run live.** `JUDGE_FALLBACK_MODEL` is opt-in, and the
+  judge's live test suite was not re-run, since the system prompt did not change.
+- **The deployed Anthropic model id is unverified** (`claude-opus-5` in `lib/verifier.ts`);
+  the Gemini path is the one that has run live.
 
 **P3 verification.** Six mutations were run against the new tests: deleting the
 admin check on `initialize_limits`, deleting the range check, deleting the pause

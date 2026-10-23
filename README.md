@@ -30,6 +30,7 @@ the reasoning is public and its hash is on-chain.
 | Frontend (4 screens) | Built. `next build` passes |
 | Devnet deploy | **Live** at `F2Uo5JUfGQtho8s9ZbwcpWBd8iJ4XvBqamUaqdjcrRxz`, config initialized |
 | Verifier operations: a wallet health check, a keyless retry script, key rotation with no gap, and a planner for the admin multisig | Built and tested. See [docs/verifier-runbook.md](docs/verifier-runbook.md). **The alert needs an external monitor you set up** — nothing here sends one |
+| Judge resilience (backoff, opt-in fallback model, outages recorded as "not a ruling") and human review of held tasks | Built and tested; review is **off unless `REVIEWER_ADDRESSES` is set**. See [docs/dispute-design.md](docs/dispute-design.md). The review panel has not been exercised with a real wallet |
 
 **Verified by running it:**
 
@@ -38,7 +39,7 @@ the reasoning is public and its hash is on-chain.
   `solana-test-validator`; the 2 pending run under `npm run test:grace`, which builds
   the test-only `short-grace` feature. Plain `anchor test` does not work on
   anchor-cli 1.x: it defaults to surfpool, which is not installed.
-- `next build`, `tsc --noEmit` and `eslint` all clean; 451 web tests pass (7 more
+- `next build`, `tsc --noEmit` and `eslint` all clean; 622 web tests pass (7 more
   call the live judge API and run only when opted in)
 - `.next/static` contains no reference to `VERIFIER_SECRET_KEY` or `ANTHROPIC_API_KEY`
 
@@ -486,10 +487,16 @@ verdict will pay or refund the wrong party. There is no appeal mechanism on-chai
 
 **4. The judge's free tier is rate limited, and a limited judge holds tasks.**
 Gemini's free tier allows roughly 20 requests per minute. Past that the API
-returns 429, and `runVerdict` correctly refuses to guess: the task is held for
-manual review rather than settled either way. That is the safe failure, but
-during a busy demo it looks like the judge has stopped working. Two consequences
-worth knowing before you show this to anyone:
+returns 429. The judge now backs off with jitter, waits out a short rate limit
+the API itself names, and can fall back to a second Gemini model
+(`JUDGE_FALLBACK_MODEL`, off unless set). If it still cannot be asked, the task is
+held, and the page says **"This is not a ruling on the work"**: no verdict or
+confidence is recorded, and `scripts/retry-stuck.ts` can judge it again once quota
+returns. That is the safe failure, but it is a delay, and during a busy demo it can
+still look like the judge has stopped working. The fallback is asked only when the
+first model gave **no answer**, never because of what it said, so it cannot be used to
+shop for a more agreeable judge. Two consequences worth knowing before you show this
+to anyone:
 
 - Pick the model deliberately. The newest `gemini-3.x` flash models have the
   tightest free allowance; `gemini-2.5-flash` is the default here because its
@@ -498,8 +505,19 @@ worth knowing before you show this to anyone:
   quota failure in those tests is reported as a skip, not a failure, because a
   429 says nothing about whether the judge rules correctly.
 
-**5. No dispute or arbitration path.** Out of scope for the MVP. A rejected worker's
-only recourse is the public reasoning.
+**5. Disputes are minimal.** A task the judge could not settle is HELD, and a
+**reviewer** (a wallet on `REVIEWER_ADDRESSES`; off unless set) can rule on it: they
+mark each sealed clause pass or fail with a reason, the outcome follows from the
+clauses, and the ruling is published, hashed on-chain and labelled as human. But a
+reviewer is exactly as trusted as the verifier key, which signs the on-chain verdict,
+so this is operational dispute handling and **not decentralisation**. There is no
+assignment, no quorum, no notification, and no appeal of a human ruling. And a verdict
+that has already landed **cannot be contested**: `Settled` and `Refunded` are terminal
+in the program, and a challenge window would need either an off-chain delay the chain
+does not enforce or new on-chain instructions that deserve their own audit
+([docs/dispute-design.md](docs/dispute-design.md)). If a held task is never ruled on,
+the poster can reclaim the bounty once the deadline plus seven days has passed,
+whatever the merit of the work, and the task page says so.
 
 **6. The clock is the validator's.** `Clock::get()` is not a precise wall clock;
 deadlines are accurate to within a slot or so, which is fine at hour granularity.

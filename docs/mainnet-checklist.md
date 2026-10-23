@@ -301,6 +301,15 @@ tasks. The planner prints `initialize_limits` for exactly that reason. It starts
   addressed to the real admin); the order for a leaked key is in
   [verifier-runbook.md](verifier-runbook.md#5-emergency-a-leaked-key).
 - ☐ A banner stating the program is **unaudited** and capped.
+- ☐ A decision, written down, on **human review of held tasks**. Off by default
+  (`REVIEWER_ADDRESSES` unset): a task the judge cannot settle then waits until the
+  poster's reclaim date, which can go against a worker whose work was fine. If on, each
+  reviewer's wallet is a credential that can release escrow through the verifier key, the
+  list is short, and none of them post or work tasks.
+  [dispute-design.md](dispute-design.md) says what it does and does not give you; it does
+  **not** let anyone contest a verdict that has already landed.
+- ☐ If a fallback judge model is configured (`JUDGE_FALLBACK_MODEL`), it has been run
+  against the judge prompt and its first rulings have been read.
 
 ## Phase 7 — Making it permanent ⚠⚠
 

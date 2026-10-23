@@ -16,6 +16,8 @@ replace the key without a gap.
 | You want to replace the key, on a normal day | [4. Routine rotation](#4-routine-rotation) |
 | You think the key has leaked | [5. Emergency: a leaked key](#5-emergency-a-leaked-key) |
 | You need to pause, change the cap, or change the fee wallet | [6. The admin multisig](#6-the-admin-multisig) |
+| A task is held with "out of API quota", or the judge is rate limited | [2. What the app does](#2-what-the-app-does-when-the-verifier-or-the-judge-cannot-do-their-job) |
+| A task is held because the judge was unsure, and you want a person to rule on it | [9. Reviewers](#9-reviewers) |
 
 ---
 
@@ -33,6 +35,20 @@ replace the key without a gap.
 Both key variables accept base58 or a JSON byte array. Neither is ever echoed by an
 error message: a bad value says *which variable* is wrong and nothing about its
 content.
+
+The judge and the reviewers have their own settings, all optional:
+
+- **`JUDGE_FALLBACK_MODEL`** — a second Gemini model to ask when the first gives **no
+  answer** (out of quota, too slow, down). Off unless set. See section 2.
+- **`JUDGE_TOTAL_BUDGET_MS`** — the most time one judging run may take, retries and
+  fallback included. Default `200000`. The verify route is capped at 300 s.
+- **`JUDGE_QUOTA_RETRY_MAX_WAIT_MS`** — the longest rate limit waited out on the same
+  model. Default `6000`.
+- **`REVIEWER_ADDRESSES`** — comma-separated wallets allowed to rule on held tasks.
+  **Unset means human review is off.** See section 9.
+
+A value that is not a positive number falls back to the default rather than switching a
+limit off.
 
 **What a verdict costs.** One 5,000-lamport signature in the normal case. The worst
 case is a verdict that must recreate the token accounts it needs, because someone
@@ -88,7 +104,7 @@ faster than normal traffic would.
 
 ---
 
-## 2. What the app does when the verifier cannot settle
+## 2. What the app does when the verifier or the judge cannot do their job
 
 You should know this, because it is what your users see.
 
@@ -101,9 +117,25 @@ You should know this, because it is what your users see.
    ruling on the work"*. The escrow is untouched, nobody is paid or refunded, and no
    verdict or decision time is stored — a retry may rule differently, and showing a
    ruling that may not survive would be worse than showing none.
-3. A task held because the **judge** was unsure ("confidence below the threshold") is
-   a different thing, is shown differently, and is **never** retried automatically:
-   a person is needed, and a retry would spend quota to reach the same answer.
+3. If the **judge itself** cannot be asked - out of API quota, too slow, down - it first
+   backs off and retries (exponential, with jitter, inside a total time budget), honouring
+   a rate limit's own "retry in 145ms". If it still gets no answer, the task is held as an
+   operational hold: **no ruling is recorded** (no verdict, no confidence, no decision
+   time), the page says it is not a ruling on the work, and `retry-stuck.ts` picks it up.
+   A quota error with no short wait is not retried on the same model: there is no point.
+4. **Fallback (opt-in).** With `JUDGE_FALLBACK_MODEL` set, a second Gemini model is asked
+   when the first gave **no answer**. Free-tier quotas are typically per model, so it often
+   has its own. It is asked **only** because of a failure to answer, never because of
+   *what the first model said*: a low-confidence ruling, a rejection or a refusal is an
+   answer and stands. Asking again until something agrees would be judge-shopping, and the
+   tests enforce that it cannot happen. The fallback's ruling goes through the same guards,
+   and the published verdict records which model actually ruled. Pick a model you have run
+   this prompt on; a weaker one is allowed but is not free of risk.
+5. A task held because the judge **looked and was unsure** ("confidence below the
+   threshold"), or refused, or kept returning unusable output, is a different thing. It is
+   shown differently and is **never** retried automatically: a person is needed, and a
+   retry would spend quota to reach the same answer. If the deployment has reviewers, one
+   can rule on it (section 9). If not, it waits for the poster's reclaim, below.
 
 A stuck task is a delay, not a payout: nothing has been decided, so nothing moves.
 But the delay is not free. If a task is never judged, the poster can `reclaim_expired`
@@ -293,7 +325,9 @@ first time is not during an incident.
 | Monitor alerting, `unreadable` | RPC down or rate-limited | Check the RPC endpoint. |
 | Task stuck in Submitted | Worker's tab never finished the call | `retry-stuck.ts`. |
 | Task held, "not a ruling on the work" | Settlement did not land | Fix the cause (usually the wallet), then `retry-stuck.ts`. |
-| Task held, confidence below threshold | The judge was unsure | A person reviews it. It is not retried automatically. |
+| Task held, "out of API quota" or "could not be reached" | The judge could not be asked | Wait for quota, or set `JUDGE_FALLBACK_MODEL`; then `retry-stuck.ts`. No ruling was recorded. |
+| Task held, confidence below threshold | The judge was unsure | Not retried automatically. A reviewer can rule on it (section 9); otherwise it waits for the reclaim date. |
+| A reviewer's ruling returns 502 | Settlement did not land | The task is unchanged. Check the verifier health, then submit the ruling again. |
 | Every approval reverts | Fee account frozen | `--set-fee-destination` to a clean wallet. |
 | Key leaked | — | Section 5, in that order. |
 
@@ -311,3 +345,62 @@ first time is not during an incident.
   be rehearsed through your multisig, on a deployment it controls.
 - ☐ The pause and a rotation rehearsed as multisig transactions.
 - ☐ Confirmed that the multisig's vault address survives membership changes.
+- ☐ Decided whether human review is on. If it is, `REVIEWER_ADDRESSES` holds a few people
+  you trust, none of whom post or work tasks, and each knows their wallet can release
+  escrow. If it is not, `REVIEWER_ADDRESSES` is unset and held tasks wait for the reclaim
+  date.
+- ☐ If a fallback model is configured, it has been run against this prompt, and its first
+  few rulings have been read.
+
+## 9. Reviewers
+
+Read [dispute-design.md](dispute-design.md) first. In one paragraph: a **reviewer** is a
+wallet that may rule on a *held* task. They mark each sealed clause pass or fail with a
+reason, and the outcome follows, so they cannot approve a task with a failing clause or
+reject one without citing it. They sign with their wallet to prove who they are, and the
+server's **verifier key** signs the on-chain verdict. A reviewer is therefore exactly as
+trusted as the verifier: **treat a reviewer's wallet as a credential that can release
+escrow**, because through the verifier key it can.
+
+### Turning it on
+
+Set `REVIEWER_ADDRESSES` to a comma-separated list of wallet addresses and redeploy. Unset
+or empty, and every review endpoint says review is not enabled. An entry that is not a valid
+address is logged (as a count) and ignored, never guessed at, so a typo can only *remove* a
+reviewer.
+
+Choose few, and choose people who neither post nor work tasks. A reviewer is barred from a
+task their own wallet posted or worked on, but nothing stops one person controlling a second
+wallet, so this is a guard against accidents and not against bad faith.
+
+### What a reviewer does
+
+1. Connect the reviewer wallet. On a held task's page a **Review this held task** panel
+   appears; for anyone else it does not.
+2. `/review` lists every held task, soonest-reclaimable first. That date is the one to race:
+   after it, the poster can take the bounty back whatever the merit of the work.
+3. For each clause, choose *Passes* or *Fails* and give a reason. Add a summary. The panel
+   states what the ruling will do (approve and pay the worker, or reject and refund the
+   poster) before you sign.
+4. Sign the message. It moves none of your own funds. The ruling is published with your
+   wallet address and its hash goes on-chain.
+
+A ruling is **final**: `Settled` and `Refunded` are terminal in the program.
+
+### If something looks wrong
+
+| Symptom | Meaning |
+| --- | --- |
+| The panel does not appear | The connected wallet is not on `REVIEWER_ADDRESSES`, or review is off. |
+| "A reviewer cannot rule on a task they posted or worked on" | The wallet is the poster or the worker. Use another reviewer. |
+| "Only a held task can be ruled on here" | It is not held: it was decided, or is still being judged. |
+| 502, "nothing was recorded" | Settlement did not land. The task is **unchanged**; check `/api/health/verifier` and submit again. |
+| "Could not confirm whether the ruling was recorded" | The request was sent and no answer came back. **Do not resubmit blindly**: refresh and read the task first. A repeat is refused if the ruling landed. |
+| "Sealed clause mismatch" or "Submission mismatch" | The database no longer matches what was sealed on-chain. The task is held and **nobody** may rule on it until a person has investigated. |
+
+### What this does not give you
+
+No assignment, no quorum, no appeal of a human ruling, and no way to contest a verdict that
+has already landed. There is no notification either: nothing tells a reviewer a task is
+waiting, and nothing alerts you if tasks sit held. `/review` is the worklist; someone has to
+look at it. See [dispute-design.md](dispute-design.md#5-what-v1-does-not-do).
