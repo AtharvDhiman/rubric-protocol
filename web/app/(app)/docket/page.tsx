@@ -13,6 +13,7 @@ import { DEMO_MODE, demoTasks, isSampleTask } from "@/lib/demo";
 import { MetaRow } from "@/components/MetaRow";
 import { Stamp, stampForState } from "@/components/Stamp";
 import { formatUsdc } from "@/lib/task-view";
+import { refundWasRuling } from "@/lib/outcome";
 import { formatRecordNumber } from "@/lib/task-id";
 import { CATEGORIES } from "@/lib/constants";
 
@@ -137,6 +138,18 @@ export default async function DocketPage({
           <p className="page-lede">
             Open matters awaiting submission or verdict.
           </p>
+          {/* Shown only when the list has a held or refunded matter, because that is
+              when the difference matters. A hold decides nothing; a rejection is a
+              ruling; a refund with no ruling is a reclaim. */}
+          {tasks.some((task) => task.state === "HELD" || task.state === "REFUNDED") && (
+            <p className="page-lede" style={{ marginTop: 8 }}>
+              <strong>Held</strong> means nothing has been decided and the escrow is
+              untouched. <strong>Rejected</strong> means the judge ruled that a sealed
+              clause failed, and the poster was refunded. <strong>Refunded</strong>, on
+              its own, means the poster reclaimed an undecided task: no one ruled
+              against the work.
+            </p>
+          )}
         </div>
         <span className="label label-11">
           {tasks.length} {tasks.length === 1 ? "MATTER" : "MATTERS"} ·{" "}
@@ -287,7 +300,10 @@ export default async function DocketPage({
                     SAMPLE
                   </span>
                 )}
-                <Stamp variant={stampForState(task.state)} small />
+                <Stamp
+                  variant={stampForState(task.state, refundWasRuling(task.verdictJson))}
+                  small
+                />
               </span>
             </Link>
           ))}

@@ -29,6 +29,7 @@
  */
 
 import { hashRubricHex, hashSubmissionHex } from "./hash";
+import { operationalHold } from "./holds";
 
 /** True when this deployment has no database configured at all. */
 export const DEMO_MODE = !process.env.DATABASE_URL;
@@ -46,6 +47,11 @@ export type TaskState = "OPEN" | "SUBMITTED" | "HELD" | "SETTLED" | "REFUNDED";
  * assign into the same array as a real Task row.
  */
 export type DemoVerdict = {
+  /**
+   * What the judge published. Real verdicts carry it; the older samples below omit it,
+   * like records that predate the field, and are read by `approved` (lib/outcome.ts).
+   */
+  outcome?: "approved" | "rejected" | "needs_manual_review";
   approved: boolean;
   confidence: number;
   summary: string;
@@ -226,6 +232,59 @@ const SEEDS: Seed[] = [
         { index: 0, passed: true, reason: "Transcripts were produced for the recordings." },
         { index: 1, passed: false, reason: "States that unclear passages were filled in from context, which clause 2 forbids." },
         { index: 2, passed: false, reason: "Says speakers were not labelled separately." },
+      ],
+    },
+  },
+  {
+    // The shape a real outage hold has: NO verdict, no confidence, no decision time,
+    // because the judge was never asked. The page must read as "not a ruling", not
+    // as a judge that was 0% sure.
+    id: "demo-held-unavailable",
+    n: 47,
+    title: "Summarise 40 support tickets into themes",
+    clauses: [
+      "Every ticket is assigned to exactly one theme.",
+      "Each theme has a one-sentence definition.",
+    ],
+    category: "Content",
+    usdc: 9,
+    state: "HELD",
+    deadlineHours: 20,
+    submittedHoursAgo: 1,
+    submission:
+      "Grouped the 40 tickets into six themes (billing, login, export, performance, permissions, other). Each ticket sits in exactly one theme, checked with a count that sums to 40. Each theme has a one-sentence definition at the top of its section.",
+    heldReason: operationalHold(
+      "The judge service is out of API quota, so this submission was not ruled on and nothing has been decided."
+    ),
+  },
+  {
+    // A task that was held for a JUDGEMENT reason and then reclaimed by the poster.
+    // It is REFUNDED, and its stored verdict says approved: false - but nobody
+    // rejected it. It must read as "refunded, no ruling", never as "rejected".
+    id: "demo-reclaimed-held",
+    n: 48,
+    title: "Collect 30 competitor pricing pages",
+    clauses: [
+      "Each page is saved as a dated PDF.",
+      "The source URL is recorded beside every file.",
+    ],
+    category: "Verification",
+    usdc: 14,
+    state: "REFUNDED",
+    deadlineHours: -240,
+    submittedHoursAgo: 260,
+    decidedSecondsAfter: 47,
+    submission:
+      "Saved 28 of the 30 pages as dated PDFs; two sites blocked the crawler and are listed in missing.txt. The URL for each saved page is in sources.csv.",
+    verdict: {
+      outcome: "needs_manual_review",
+      approved: false,
+      confidence: 48,
+      summary:
+        "Whether 28 of 30 satisfies 'each page' is genuinely unclear, and the submission is candid about the two it could not fetch.",
+      clauses: [
+        { index: 0, passed: false, reason: "Two of the 30 pages were not saved." },
+        { index: 1, passed: true, reason: "A sources file records the URL for every saved page." },
       ],
     },
   },

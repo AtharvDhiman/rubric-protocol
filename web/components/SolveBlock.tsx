@@ -22,7 +22,7 @@
  *
  *   held      Δ negative, or the matter is held for manual review for one of the
  *             other reasons `applyVerdictGuards` can produce. Reads
- *             "UNRESOLVED — HELD FOR REVIEW" in --warning, and the block's own
+ *             "UNRESOLVED — NOTHING DECIDED" in --warning, and the block's own
  *             border switches from 1px SOLID to 1px DASHED. That dash is
  *             load-bearing and consistent across the whole product: dotted is a
  *             hypothesis, solid is a measurement. The escrow is untouched -
@@ -194,7 +194,7 @@ export function SolveBlock({
         : "0";
 
   const statusWord =
-    variant === "held" ? "UNRESOLVED — HELD FOR REVIEW" : "SOLVE LOCKED";
+    variant === "held" ? "UNRESOLVED — NOTHING DECIDED" : "SOLVE LOCKED";
 
   const note =
     variant === "released"
@@ -215,7 +215,7 @@ export function SolveBlock({
     variant === "released"
       ? "Solve locked, and the escrow released to the worker."
       : variant === "held"
-        ? "Unresolved and held for review. The escrow is untouched: nobody was paid and nobody was refunded."
+        ? "Unresolved: nothing has been decided. The escrow is untouched: nobody was paid and nobody was refunded."
         : "Solve locked: the ruling cleared the threshold.";
 
   const spoken = `Solve residual. Confidence ${figure(

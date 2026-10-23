@@ -13,6 +13,7 @@ import { DEMO_MODE, DEMO_WRITE_MESSAGE, demoTasks } from "@/lib/demo";
 import { TASK_ID_RANDOM_BITS, nextOnchainTaskId } from "@/lib/task-id";
 import { prisma } from "@/lib/db";
 import { serializeBigInts } from "@/lib/db";
+import { refundWasRuling } from "@/lib/outcome";
 import { hashRubricHex, validateRubric } from "@/lib/hash";
 import { CATEGORIES } from "@/lib/constants";
 import { evaluateCreate, refusalStatus } from "@/lib/limits";
@@ -182,6 +183,7 @@ export async function GET(request: Request) {
           ...task,
           clauseCount: task.clauses.length,
           clauses: undefined,
+          ruledRefund: refundWasRuling(task.verdictJson),
         })),
         page: 1,
         perPage: all.length,
@@ -227,6 +229,9 @@ export async function GET(request: Request) {
         state: true,
         creatorAddress: true,
         confidence: true,
+        // Read only to say whether a refund was a rejection; it is NOT sent on (the
+        // full ruling does not belong in a 50-row list).
+        verdictJson: true,
       },
     }),
     prisma.task.count({ where }),
@@ -243,6 +248,8 @@ export async function GET(request: Request) {
         ...t,
         clauseCount: t.clauses.length,
         clauses: undefined,
+        verdictJson: undefined,
+        ruledRefund: refundWasRuling(t.verdictJson),
       })),
       page,
       perPage,

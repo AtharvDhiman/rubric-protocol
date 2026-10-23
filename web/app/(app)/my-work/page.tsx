@@ -24,6 +24,8 @@ interface Row {
   bountyAmount: string;
   state: string;
   creatorAddress: string;
+  /** Whether a REFUNDED task was refunded by the judge rejecting it (lib/outcome.ts). */
+  ruledRefund?: boolean;
 }
 
 export default function MyWorkPage() {
@@ -102,7 +104,7 @@ export default function MyWorkPage() {
               {formatUsdc(row.bountyAmount)}
             </span>
             <span style={{ width: 120, flex: "0 0 120px", textAlign: "right" }}>
-              <Stamp variant={stampForState(row.state)} small />
+              <Stamp variant={stampForState(row.state, row.ruledRefund)} small />
             </span>
           </Link>
         ))}

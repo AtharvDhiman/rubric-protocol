@@ -23,6 +23,8 @@ import { SolveBlock } from "@/components/SolveBlock";
 import { explorerTxUrl } from "@/lib/env";
 import { formatRecordNumber } from "@/lib/task-id";
 import { holdDetail, isOperationalHold } from "@/lib/holds";
+import { holdCopy, reclaimOpensAt } from "@/lib/held-copy";
+import { refundWasRuling } from "@/lib/outcome";
 import {
   formatUsdc,
 
@@ -53,10 +55,14 @@ function windowHasClosed(deadline: Date): boolean {
  * the same reason as `windowHasClosed`: reading the clock in a component body
  * is flagged impure, and this resolves once per request.
  */
-const VERDICT_GRACE_MS = 7 * 24 * 60 * 60 * 1000;
-
 function graceHasElapsed(deadline: Date): boolean {
-  return Date.now() > deadline.getTime() + VERDICT_GRACE_MS;
+  // The grace period lives in lib/held-copy.ts, where a test pins it to the
+  // program's VERDICT_GRACE_SECONDS.
+  return Date.now() > reclaimOpensAt(deadline).getTime();
+}
+
+function currentTime(): Date {
+  return new Date();
 }
 
 function formatDate(date: Date): string {
@@ -136,7 +142,20 @@ export default async function TaskPage({
   const refunded = task.state === "REFUNDED";
   const held = task.state === "HELD";
   const decided = settled || refunded;
+  // REFUNDED does not mean REJECTED. A poster who reclaims an undecided task is
+  // refunded too, and the old verdict stays on the row (a held task keeps its
+  // not-approved one). Nobody ruled against the work, so it must not be stamped,
+  // animated or worded as though someone had. (lib/outcome.ts)
+  const reclaimedNoRuling = refunded && !refundWasRuling(task.verdictJson);
   const windowClosed = windowHasClosed(task.deadline);
+
+  // What a held task says. Computed for every task and used only when held.
+  const copy = holdCopy({
+    operational: isOperationalHold(task.heldReason),
+    reclaimAt: reclaimOpensAt(task.deadline),
+    now: currentTime(),
+    formatDate,
+  });
 
   const awaitingVerdict = task.state === "SUBMITTED" || task.state === "HELD";
   const reclaimable =
@@ -195,7 +214,7 @@ export default async function TaskPage({
           </span>
         </span>
         <span className="label">
-          {decided && task.decidedAt && task.submittedAt
+          {decided && !reclaimedNoRuling && task.decidedAt && task.submittedAt
             ? `VERDICT IN ${Math.max(
                 1,
                 Math.round(
@@ -365,27 +384,22 @@ export default async function TaskPage({
                   A JUDGEMENT hold is a statement about the work: the judge could
                   not decide, or the evidence does not match what was sealed. An
                   OPERATIONAL hold is a statement about OUR infrastructure: the
-                  judge ran but settlement could not land, e.g. the verifier's
-                  wallet was empty. Nothing about the work was decided. Saying
-                  "the judge was not confident enough" about the second tells a
-                  poster and a worker their work was found wanting when it has not
-                  been ruled on at all - and hides the cause from whoever could
-                  fix it. (lib/holds.ts) */}
-              {isOperationalHold(task.heldReason) ? (
-                <p style={{ fontSize: 14, color: "var(--text-2)", marginTop: 16 }}>
-                  <strong>This is not a ruling on the work.</strong> The judge
-                  could not finish settling this task for a reason on our side, so
-                  nothing has been decided. The escrow is untouched, nobody has
-                  been paid and nobody has been refunded, and judging will be
-                  re-run.
-                </p>
-              ) : (
-                <p style={{ fontSize: 14, color: "var(--text-2)", marginTop: 16 }}>
-                  This was not settled automatically, so the escrow is untouched
-                  and a person will review it. Nobody has been paid and nobody has
-                  been refunded.
-                </p>
-              )}
+                  judge could not be asked (out of quota, down) or settlement
+                  could not land (e.g. the verifier's wallet was empty). Nothing
+                  about the work was decided. Saying "the judge was not confident
+                  enough" about the second tells a poster and a worker their work
+                  was found wanting when it has not been ruled on at all - and
+                  hides the cause from whoever could fix it. (lib/holds.ts)
+
+                  The words themselves live in lib/held-copy.ts, where a test
+                  enforces that they never promise a reviewer or a re-run that
+                  nothing delivers. */}
+              <p style={{ fontSize: 14, color: "var(--text-2)", marginTop: 16 }}>
+                <strong>{copy.lead}</strong> {copy.detail}
+              </p>
+              <p style={{ fontSize: 14, color: "var(--text-2)", marginTop: 8 }}>
+                {copy.notRejected}
+              </p>
               {task.heldReason && (
                 <p
                   style={{
@@ -397,10 +411,29 @@ export default async function TaskPage({
                   {holdDetail(task.heldReason)}
                 </p>
               )}
+              <p style={{ fontSize: 14, color: "var(--text-2)", marginTop: 8 }}>
+                {copy.next ? `${copy.next} ` : ""}
+                {copy.deadline}
+              </p>
             </div>
           )}
 
-          {verdict && (
+          {reclaimedNoRuling && (
+            <div style={{ marginTop: 32 }}>
+              <Stamp variant="refunded" />
+              <p style={{ fontSize: 14, color: "var(--text-2)", marginTop: 16 }}>
+                <strong>No ruling is on record for this task.</strong> The escrow was
+                returned to the poster, which happens when the poster reclaims an
+                undecided task after the deadline and the grace period. That is not
+                a rejection of the work.
+              </p>
+              <p className="label" style={{ marginTop: 20 }}>
+                RETURNED TO POSTER · {formatUsdc(task.bountyAmount)} USDC
+              </p>
+            </div>
+          )}
+
+          {verdict && !reclaimedNoRuling && (
             <div style={{ marginTop: 32 }}>
               {/* The judge and its reading, as one statement.
 
@@ -460,8 +493,8 @@ export default async function TaskPage({
                   variant={
                     // A held task is not a rejected one. `approved` is false in
                     // both cases, so reading it alone stamps REJECTED across a
-                    // task that is only waiting for a human - and no escrow has
-                    // moved either way.
+                    // task that nobody has ruled on - and no escrow has moved
+                    // either way.
                     held ? "held" : verdict.approved ? "approved" : "rejected"
                   }
                   large
@@ -551,8 +584,10 @@ export default async function TaskPage({
       <MetaRow
         footnote={
           held
-            ? "Held for human review. No escrow has moved."
-            : decided
+            ? "Held: nothing has been decided. No escrow has moved."
+            : reclaimedNoRuling
+              ? "Refunded to the poster. No ruling was made."
+              : decided
               ? "This verdict is final. Rubric has no appeal process; the reasoning above is the record."
               : "No verdict yet. Escrow is untouched."
         }

@@ -15,11 +15,15 @@ export type StampVariant =
   | "inReview"
   | "paid"
   | "expired"
+  | "refunded"
   | "submitted";
 
 const LABELS: Record<StampVariant, string> = {
   approved: "Approved",
   rejected: "Rejected",
+  // The money went back to the poster and nobody ruled against the work (see
+  // lib/outcome.ts). Deliberately plain: it is true however the refund came about.
+  refunded: "Refunded",
   sealed: "Sealed",
   held: "Held",
   open: "Open",
@@ -38,6 +42,9 @@ const CLASSES: Record<StampVariant, string> = {
   inReview: "stamp-inreview",
   paid: "stamp-paid",
   expired: "stamp-expired",
+  // Same ink as expired, so no new colour and no new contrast pair to prove. The
+  // word is what carries the meaning, as it does for every status.
+  refunded: "stamp-expired",
   submitted: "stamp-inreview",
 };
 
@@ -66,8 +73,15 @@ export function Stamp({
   );
 }
 
-/** Map a task state string from the API onto a stamp variant. */
-export function stampForState(state: string): StampVariant {
+/**
+ * Map a task state string from the API onto a stamp variant.
+ *
+ * `ruledRefund` says whether a REFUNDED task was refunded by the judge REJECTING it,
+ * as opposed to the poster reclaiming an undecided task (lib/outcome.ts). It defaults
+ * to false, so a caller that does not know stamps the plain, always-true "Refunded"
+ * and never claims a rejection nobody made.
+ */
+export function stampForState(state: string, ruledRefund = false): StampVariant {
   switch (state) {
     case "OPEN":
       return "open";
@@ -76,7 +90,7 @@ export function stampForState(state: string): StampVariant {
     case "SETTLED":
       return "approved";
     case "REFUNDED":
-      return "rejected";
+      return ruledRefund ? "rejected" : "refunded";
     case "HELD":
       return "held";
     default:

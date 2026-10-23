@@ -587,7 +587,7 @@ export async function runVerdict(
         summary:
           kind === "operational"
             ? "The judge could not be reached, so this submission has not been judged."
-            : "This submission could not be judged automatically and is held for human review.",
+            : "This submission could not be judged automatically, so nothing has been decided.",
       },
       "needs_manual_review",
       heldReason,
