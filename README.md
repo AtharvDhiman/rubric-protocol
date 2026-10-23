@@ -22,8 +22,8 @@ the reasoning is public and its hash is on-chain.
 
 | Part | State |
 | --- | --- |
-| Anchor program (5 instructions + admin rotation) | **Compiles clean** on Anchor 1.1.2 — no warnings |
-| 19 integration tests (14 attack cases) | **All 19 pass** against a local validator |
+| Anchor program (5 core instructions + admin controls: verifier rotation, fee destination, bounty cap, pause) | **Compiles clean** on Anchor 1.1.2 — no warnings |
+| 51 integration tests (every guard mutation-checked) | **49 pass** on a default build and 2 more need the `short-grace` test build (`npm run test:grace`) — see [docs/security-review.md](docs/security-review.md) |
 | Judge (`web/lib/verifier.ts`) | Working, in production. **19/19 pass**, and it has ruled on a real devnet task and released escrow |
 | Canonical hashing | Working. 25 tests pass, including a pinned golden digest |
 | API routes + Prisma schema | Written; compile and typecheck clean |
@@ -33,8 +33,10 @@ the reasoning is public and its hash is on-chain.
 **Verified by running it:**
 
 - `anchor build` — clean, zero warnings, on anchor-cli 1.1.2 / Solana 3.1.10 / Rust 1.89.0
-- `anchor test` — **19/19 passing** against `solana-test-validator`, including all
-  14 attack cases
+- `anchor test --validator legacy` — **49 passing, 2 pending** against
+  `solana-test-validator`; the 2 pending run under `npm run test:grace`, which builds
+  the test-only `short-grace` feature. Plain `anchor test` does not work on
+  anchor-cli 1.x: it defaults to surfpool, which is not installed.
 - `next build`, `tsc --noEmit` and `eslint` all clean; 37 web tests pass
 - `.next/static` contains no reference to `VERIFIER_SECRET_KEY` or `ANTHROPIC_API_KEY`
 
@@ -208,11 +210,23 @@ submission should move nothing but a fraction of a cent in SOL.
 
 ### The program keypair
 
-`target/deploy/rubric-keypair.json` **is** the program's identity, and it is
-gitignored because it is a private key. It currently exists in exactly one place.
-Back it up. Losing it means you can never upgrade a program deployed under
-`F2Uo5JUfGQtho8s9ZbwcpWBd8iJ4XvBqamUaqdjcrRxz`; you would redeploy at a new
-address, and every task PDA would move with it.
+`target/deploy/rubric-keypair.json` is what lets you **deploy**
+`F2Uo5JUfGQtho8s9ZbwcpWBd8iJ4XvBqamUaqdjcrRxz` the first time on a cluster. It is
+gitignored because until that deploy, whoever holds it could deploy different code
+at this address first.
+
+**Once deployed it authorises nothing, and losing it does not stop upgrades.** An
+earlier version of this section said it did. That was wrong, and it was tested:
+on a local validator I deployed with the keypair, deleted it, and upgraded the
+program using only its public address and the upgrade authority; an upgrade by any
+other key was refused. Upgrades are authorised by the program's **upgrade
+authority** — that is the key (or multisig) that must never be lost or leaked,
+because whoever holds it can replace the program and take every escrow.
+
+The keypair is still needed to deploy the *same address* to a **new** cluster, so
+reusing this devnet id on mainnet would mean keeping a development key. For
+mainnet, generate a fresh program keypair on the deploy machine instead
+([docs/mainnet-checklist.md](docs/mainnet-checklist.md), Phase 1).
 
 ---
 
@@ -225,6 +239,7 @@ The chain holds only what has to be tamper-proof:
 | Account | Holds |
 | --- | --- |
 | `Config` (singleton PDA, seeds `[b"config"]`) | admin, verifier authority, bounty mint, fee bps, fee destination |
+| `Limits` (singleton PDA, seeds `[b"limits"]`) | the bounty cap and a pause switch, both set by the admin. `create_task` **requires** it. Pausing stops new deposits only — it can never trap money already in escrow |
 | `Task` (PDA, seeds `[b"task", creator, task_id]`) | creator, worker, mint, **rubric hash**, submission hash, bounty, deadline, state, verdict |
 | Escrow | an associated token account whose **authority is the Task PDA** |
 
@@ -284,11 +299,11 @@ the worker, so the server must not do it for them.
 ```
 programs/rubric/src/
   lib.rs                    program entry, one function per instruction
-  state.rs                  Config, Task, TaskState, VerdictRecord
+  state.rs                  Config, Limits, Task, TaskState, VerdictRecord
   errors.rs                 every failure mode, named
-  constants.rs              seeds, fee ceiling, MAX_BOUNTY, work-window cap
+  constants.rs              seeds, fee ceiling, hard bounty ceiling, work-window cap
   instructions/             one file per instruction
-tests/rubric.ts             19 integration tests
+tests/rubric.ts             51 integration tests
 web/
   lib/verifier.ts           the judge
   lib/hash.ts               canonical rubric hashing — load-bearing
@@ -365,8 +380,23 @@ reload will silently not work**.
 anchor build
 anchor keys sync    # rewrites declare_id! and Anchor.toml with the real program id
 anchor build        # again, so the id is baked in
-anchor test         # runs the 19 integration tests on a local validator
+anchor test --validator legacy   # the integration suite, on solana-test-validator
 ```
+
+`Anchor.toml` must contain `[test]` with `upgradeable = true` (it does). The test
+validator deploys the program immutable otherwise, and `initialize_config` — which
+only accepts the program's upgrade authority — then refuses every caller, so the
+suite dies in `before all` with `NotAdmin`.
+
+The grace-period tests (`reclaim_expired` out of `Submitted`) need a **test-only**
+build with a 6-second grace instead of 7 days:
+
+```bash
+npm run test:grace   # anchor build -- --features short-grace, then the suite
+```
+
+Never deploy a binary built with `short-grace`. It would let a poster reclaim a
+bounty seconds after the deadline from work the verifier had not yet ruled on.
 
 ### 3. A database for local development
 
@@ -423,14 +453,19 @@ opinion. v2 replaces it with multi-agent consensus; until then this is the
 protocol's single largest trust assumption and it is not hidden.
 
 Two things bound the damage:
-- `MAX_BOUNTY` is 50 USDC. A compromised key cannot drain more than that per task.
+- The bounty cap is held on-chain in `Limits`, launched at 50 USDC, and the admin
+  can change it — but never above a 1,000 USDC ceiling that is compiled into the
+  program. **It bounds one task, not the total:** anyone may claim any open task, so
+  a compromised key can reach the cap times the number of open tasks. Size a launch
+  around the *sum* of open escrow. An admin-only pause stops new deposits (and
+  nothing else) if you need to stop the growth of exposure.
 - `set_verifier_authority` lets the admin revoke a leaked key in one transaction
   without redeploying.
 
 Neither of these makes it decentralized. They make it survivable.
 
-**2. The program is unaudited.** It compiles clean and passes 19 integration
-tests including 14 attack cases, and it is deployed to devnet — but no third
+**2. The program is unaudited.** It compiles clean and passes 49 integration
+tests (51 with the test-only build), and it is deployed to devnet — but no third
 party has reviewed it. Tests prove the failures I thought to write down. They
 say nothing about the ones I did not. Do not put real money on this.
 

@@ -11,8 +11,12 @@ skip-lint = false
 
 [programs.localnet]
 # Set by `anchor keys sync`. The matching keypair lives at
-# target/deploy/rubric-keypair.json and is gitignored - BACK IT UP, because
-# losing it means you can never upgrade a program deployed under this id.
+# target/deploy/rubric-keypair.json and is gitignored. It is needed to DEPLOY this
+# address for the first time on a cluster, and for nothing after that: upgrades are
+# authorised by the program's UPGRADE AUTHORITY, not by this key. (Tested: deploy,
+# delete the keypair, upgrade with only the public address - it works, and an
+# upgrade by any other authority is refused.) What to protect once it is deployed is
+# the upgrade authority.
 rubric = "F2Uo5JUfGQtho8s9ZbwcpWBd8iJ4XvBqamUaqdjcrRxz"
 
 [programs.devnet]

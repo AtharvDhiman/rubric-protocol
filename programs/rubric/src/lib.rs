@@ -48,9 +48,13 @@ use instructions::*;
 // ```
 //
 // which generates `target/deploy/rubric-keypair.json`, reads its public key, and
-// rewrites this line and `Anchor.toml` to match. That keypair is the program's
-// identity - it is gitignored, and losing it means you can never upgrade the
-// deployed program.
+// rewrites this line and `Anchor.toml` to match. That keypair is what lets you
+// DEPLOY this address for the first time on a cluster - it is gitignored, because
+// until that deploy anyone holding it could deploy different code at this address
+// first. After the deploy it authorises nothing: UPGRADES are authorised by the
+// program's upgrade authority, so losing the keypair does not stop you upgrading
+// (tested on a local validator: deploy, delete the keypair, upgrade using only the
+// public address). Guard the upgrade authority, not this file.
 declare_id!("F2Uo5JUfGQtho8s9ZbwcpWBd8iJ4XvBqamUaqdjcrRxz");
 
 #[program]

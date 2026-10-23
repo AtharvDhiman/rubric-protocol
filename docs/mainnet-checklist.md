@@ -25,20 +25,26 @@ to each before starting.
 | --- | --- | --- |
 | D1 | **Admin = a multisig from day zero.** | There is **no** `set_admin` instruction. `Config.admin` is whoever signs `initialize_config` and it can never change. A hot admin key is a permanent hot admin key. |
 | D2 | **Upgrade authority plan.** Multisig + timelock, or immutable after an audit. | The upgrade authority can replace the program and take every escrow. It, not the admin, is the real root of trust (finding R-01). |
-| D3 | **Fee destination wallet.** A dedicated multisig-controlled wallet, with its USDC account created beforehand. | `fee_destination` is immutable and USDC is freezable by Circle. A frozen fee account makes every approval revert (finding R-03). |
-| D4 | **Launch bounty cap and whether it is configurable.** | `MAX_BOUNTY` is a compile-time constant today; raising it is a redeploy. See the pending proposal in the review. |
+| D3 | **Fee destination wallet.** A dedicated multisig-controlled wallet, with its USDC account created beforehand. | USDC is freezable by Circle, and a frozen fee account makes every approval revert (finding R-03). The admin can now recover with `set_fee_destination`, but keep the fee wallet clean so it never needs to. |
+| D4 | **The launch bounty cap.** Now an on-chain `Limits` account the admin can change — but never above a compiled-in 1,000 USDC ceiling. Launch low (the scripts default to 50 USDC). | The cap bounds **one task, not the total**; size the launch around cap × open tasks. Raising the *ceiling* is a program upgrade. |
 | D5 | **Audit status you will state publicly.** | The program is unaudited. A UI notice and a low cap are the honest minimum. |
 | D6 | **Verifier custody.** A hot key on the server is unavoidable; decide the funding, alerting and rotation plan first. | Covered by item 3 of the launch plan; the program cannot help here. |
 
 ## Phase 1 — Code freeze and build
 
-- ☐ All review fixes you accepted are merged and **`anchor test` passes**.
-  Note that on Anchor 1.x `anchor test` defaults to **surfpool**, which is not
-  installed; use the validator that ships with Solana:
+- ☐ All review fixes you accepted are merged and **the suite passes**. On Anchor
+  1.x plain `anchor test` defaults to **surfpool**, which is not installed; use the
+  validator that ships with Solana (this is also what `npm test` runs):
 
   ```bash
-  anchor test --validator legacy
+  anchor test --validator legacy     # 49 passing, 2 pending
+  npm run test:grace                 # the 2 pending, against the TEST-ONLY build
   ```
+
+  The second command builds with `--features short-grace`, which shortens the
+  reclaim grace period from 7 days to 6 seconds. **Never deploy that binary.**
+  `anchor build --verifiable` (below) uses default features, and a test pins that
+  `short-grace` is not a default.
 
 - ☐ **`Anchor.toml` must contain `[test]` with `upgradeable = true`.** On
   anchor-cli 1.1.2 the test validator deploys the program as **immutable unless
@@ -64,11 +70,14 @@ to each before starting.
   gitignored; this path is not, so keep it outside the repo), and delete it once
   the deploy is confirmed.
 
-  > The comments in `lib.rs` and `Anchor.toml` say losing this keypair means you
-  > can never upgrade the program. **That is wrong for an upgradeable program:**
-  > upgrades are authorised by the *upgrade authority*, not the program keypair.
-  > Confirm during the devnet rehearsal, then fix the comments so nobody hoards
-  > copies of a key that is useless after deploy.
+  > Earlier copies of the `lib.rs` and `Anchor.toml` comments said losing this
+  > keypair means you can never upgrade the program. **That was wrong, and has been
+  > tested:** on a local validator I deployed with the keypair, deleted it, and
+  > upgraded using only the program's public address and the upgrade authority; an
+  > upgrade by any other key was refused. Upgrades are authorised by the *upgrade
+  > authority*. So after a confirmed deploy this file is safe to delete, and the key
+  > to protect is the upgrade authority. (Re-check this once on devnet during the
+  > rehearsal; it is the same loader mainnet uses.)
 - ☐ Rebuild after the sync, then make a **verifiable build** (needs Docker). It
   is deterministic, so anyone can reproduce the exact bytes you deploy:
 
@@ -148,6 +157,29 @@ For the recommended order the multisig must execute `initialize_config` itself
 multisig's own documentation for executing an arbitrary instruction; I have not
 verified the current UI flow and will not guess at it.
 
+**`web/scripts/mainnet-init-plan.ts` prepares exactly that.** It signs nothing,
+sends nothing, reads no key file and writes no file. Run it twice:
+
+```bash
+# 1. Read every check and the fingerprint of what you are about to make permanent.
+cd web
+npx tsx scripts/mainnet-init-plan.ts --rpc <paid mainnet rpc> \
+  --admin <MULTISIG_VAULT> --mint EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v \
+  --fee-destination <FEE_WALLET> --verifier <VERIFIER_PUBKEY>
+
+# 2. Having read it, confirm with the fingerprint to be given the instructions.
+npx tsx scripts/mainnet-init-plan.ts <the same arguments> --confirm <fingerprint>
+```
+
+It refuses (and prints nothing) unless the admin is the program's upgrade authority,
+the mint is mainnet USDC with 6 decimals, nothing is initialised yet, the fee is
+within its ceiling, the verifier is not the admin, and no key is the all-zero key.
+On mainnet it also refuses an ordinary keypair address as the admin unless you pass
+`--allow-eoa-admin`. Cluster is identified by **genesis hash**, never by the URL.
+It prints **both** instructions — `initialize_config` and `initialize_limits` — to be
+executed by the multisig in **one transaction, in that order**, plus the rent the
+vault must hold. Every refusal is a unit test (`web/lib/init-plan.test.ts`).
+
 Handing the authority to a multisig *vault* needs one flag you should read twice.
 A vault is a PDA and **cannot sign** a top-level transaction, so the CLI's default
 check that the new authority signs must be skipped. That makes a wrong address
@@ -184,8 +216,9 @@ on-chain account before running it.
 - ☐ **`fee_bps`** — 200 (2%). Capped at 1000 by the program and not changeable.
 - ☐ **`fee_destination`** — the dedicated wallet from D3.
   **Create its USDC token account first.** Every verdict validates it; if it does
-  not exist the verifier has to create it, and if it is later frozen no approval
-  can ever settle.
+  not exist the verifier has to create it, and if it is later frozen every approval
+  reverts until the admin runs `set_fee_destination` to point at a clean wallet.
+  Unlike the mint and the fee, this one can be changed.
 
   ```bash
   spl-token create-account EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v \
@@ -196,20 +229,31 @@ on-chain account before running it.
   the devnet verifier. It will live in server environment variables; fund it and
   alert on its balance (see the launch plan).
 
-### Do not use `web/scripts/init-config.ts` as it stands
+### Do not use `web/scripts/init-config.ts` or `init-limits.ts` on mainnet
 
-It was written for devnet and three of its defaults are unsafe on mainnet:
+Both were written for devnet and are unsafe on mainnet:
 
-1. It loads the admin from a **JSON keypair file** (`--admin ~/.config/solana/id.json`).
-2. `--mint` **defaults to devnet USDC** and `--fee-destination` **defaults to the
-   admin**. A forgotten flag silently initialises mainnet with the wrong mint or
-   with your upgrade authority collecting fees — permanently.
-3. It writes the **verifier secret to `verifier.json`** in the repo root.
+1. `init-config.ts` loads the admin from a **JSON keypair file**
+   (`--admin ~/.config/solana/id.json`), **defaults `--mint` to devnet USDC** and
+   **`--fee-destination` to the admin**, and **writes the verifier secret to
+   `verifier.json`** in the repo root. A forgotten flag silently initialises mainnet
+   with the wrong mint or with your upgrade authority collecting fees — permanently.
+2. `init-limits.ts` also reads the admin from a file. It refuses to run against
+   mainnet (by genesis hash) so it cannot be used by mistake, but that is a seatbelt,
+   not a mainnet tool.
 
-A mainnet variant should refuse to run unless `--mint` is passed explicitly *and*
-on-chain verifies the mint (owner, 6 decimals), print the full config and require
-a typed confirmation, never read a key file for the admin, and never write a
-secret to disk. That is a code change and is listed as a proposal, not done.
+`mainnet-init-plan.ts`, above, is the mainnet path. Generate the verifier key on the
+server that will hold it and pass only its **public** key.
+
+### The Limits account
+
+`create_task` **requires** the `Limits` account, so a deployment without one takes no
+tasks. The planner prints `initialize_limits` for exactly that reason. It starts
+**unpaused** at the launch cap. Afterwards the admin multisig can use:
+
+- `set_max_bounty` — never above the compiled-in 1,000 USDC ceiling;
+- `set_paused` — stops **new** tasks only. Claims, verdicts and reclaims never read
+  `Limits`, so pausing cannot trap money already in escrow (test 50 proves it).
 
 ## Phase 4 — Prove the deployment
 
@@ -241,8 +285,11 @@ secret to disk. That is a code change and is listed as a proposal, not done.
   open task and a compromised verifier key could approve them all. Size your
   launch around the *sum*, not the per-task number.
 - ☐ A written plan for "pause": what you will do within an hour of finding a bug.
-  Today the only on-chain levers are `set_verifier_authority` and a program
-  upgrade. (A pause flag is part of the pending proposal.)
+  The on-chain levers are `set_paused` (stops new tasks), `set_verifier_authority`
+  (cuts off a leaked verifier) and a program upgrade. **`set_paused` does not stop
+  anyone claiming an existing open task** — against a compromised verifier,
+  rotating it is the lever that matters. Rehearse the pause as a multisig
+  transaction before launch, so the first time is not during an incident.
 - ☐ A banner stating the program is **unaudited** and capped.
 
 ## Phase 7 — Making it permanent ⚠⚠
@@ -266,6 +313,6 @@ immutable and the config does not exist.
 | --- | --- | --- |
 | Verifier key leaked | `set_verifier_authority` (admin) to a new key. | Recall anything already paid. |
 | Admin key lost / compromised | **Nothing.** Compromise lets an attacker rotate the verifier to themselves. | Rotate or revoke the admin. |
-| Fee account frozen | **Nothing without a program change.** Approvals revert; posters get refunds after the grace period. | Change `fee_destination`. |
-| Bug found in the program | Upgrade, if the authority is not yet final. | Anything, if it is. |
+| Fee account frozen | `set_fee_destination` (admin) to a clean wallet. Approvals revert until it lands; if it lands late, posters reclaim after the grace period. | Recover fees already stuck in the frozen account. |
+| Bug found in the program | `set_paused` now, to stop growth; upgrade, if the authority is not yet final. | Anything, if it is final. |
 | Verifier offline | Posters can `reclaim_expired` after deadline **+ 7 days**. | Shorten the 7 days. |

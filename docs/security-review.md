@@ -38,17 +38,17 @@ signed by the verifier. The exposure is elsewhere:
 | ID | Sev | Finding | Status |
 | --- | --- | --- | --- |
 | R-01 | **High** | The upgrade authority, not the PDA, is the root of trust | Operational — checklist |
-| R-02 | **High** | A compromised verifier **or admin** key can redirect every open escrow; `MAX_BOUNTY` bounds one task, not the system | Mitigate — item 3 + limits |
-| R-03 | Medium | `fee_destination` is immutable and USDC is freezable → every approval can be bricked | Fix proposed |
-| R-04 | Medium | Every verdict needs three token accounts, two attacker-owned; the off-chain workaround lets an attacker drain the verifier's SOL | **Demonstrated**; fix deferred |
-| R-05 | Medium | First signer to `submit_work` owns the task; one shot, no stake, no re-open | Design — item 4 |
-| R-06 | Medium | 6 reachable guards and the `initialize_config` gate have no test | Fix proposed (no program change) |
-| R-07 | Medium | The only liveness escape hatch's success path is untested | Fix proposed |
-| R-08 | Low | Anyone can pre-create an escrow account and block `create_task` for a predictable id | **Demonstrated**; fix proposed |
-| R-09 | Low | `initialize_config` validates nothing about mint/fee destination and `Config` is immutable | Tooling guard rails |
-| R-10 | Info | `Task` rent (~0.00255 SOL) is never returned | Accepted, documented |
-| R-11 | Info | Stale or wrong comments, and hot-key habits in setup tooling | Fix proposed |
-| R-12 | Info | The documented test command does not reproduce on a clean checkout | Fix proposed |
+| R-02 | **High** | A compromised verifier **or admin** key can redirect every open escrow; the bounty cap bounds one task, not the system | **Mitigated, not removed**: cap now adjustable with a hard ceiling, plus a pause for new tasks. Key custody is launch-plan item 3 |
+| R-03 | Medium | `fee_destination` is immutable and USDC is freezable → every approval can be bricked | **Fixed** — `set_fee_destination` |
+| R-04 | Medium | Every verdict needs three token accounts, two attacker-owned; the off-chain workaround lets an attacker drain the verifier's SOL | **Demonstrated**; pinned by a characterisation test; structural fix deferred to a design review |
+| R-05 | Medium | First signer to `submit_work` owns the task; one shot, no stake, no re-open | Design — launch-plan item 4 |
+| R-06 | Medium | 6 reachable guards and the `initialize_config` gate have no test | **Fixed** — tests 20–28, every one mutation-checked |
+| R-07 | Medium | The only liveness escape hatch's success path is untested | **Fixed** — `short-grace` test build, tests 36–39 |
+| R-08 | Low | Anyone can pre-create an escrow account and block `create_task` for a predictable id | **Fixed** (web): ids carry 24 random bits. The program is unchanged and test 30 still pins it |
+| R-09 | Low | `initialize_config` validates nothing about mint/fee destination and `Config` is immutable | **Fixed in tooling** — `mainnet-init-plan.ts` |
+| R-10 | Info | `Task` rent (~0.00186 SOL) is never returned | Accepted, documented |
+| R-11 | Info | Stale or wrong comments, and hot-key habits in setup tooling | **Fixed** — the program-keypair claim was tested, found false, and corrected everywhere |
+| R-12 | Info | The documented test command does not reproduce on a clean checkout | **Fixed** — `Anchor.toml`, README, `npm test` |
 
 ---
 
@@ -252,11 +252,15 @@ real per-task cost that weighs heavily on a $1 bounty — say so in the launch p
 
 ### R-11 — Info — Wrong comments and hot-key habits
 
-- `lib.rs` and `Anchor.toml` say losing the **program keypair** means you can
-  never upgrade the program. For an upgradeable program, upgrades are authorised
-  by the *upgrade authority*, not that keypair, so I believe this is wrong; I did
-  not test it. The error matters because it encourages keeping copies of a key
-  that is useless after deploy. Confirm in the devnet rehearsal, then correct.
+- `lib.rs`, `Anchor.toml` and the README said losing the **program keypair** means
+  you can never upgrade the program. **That was false, and is now corrected.** Tested
+  on an isolated local validator: deploy upgradeably with the keypair, delete the
+  keypair, upgrade using only the program's public address and the upgrade authority
+  — it succeeds (slot 19 → 34) — and an upgrade signed by any other authority is
+  refused ("authority does not match"). Upgrades are authorised by the *upgrade
+  authority*. The error mattered because it encouraged hoarding copies of a key that
+  authorises nothing after deploy, while the key that can take every escrow got less
+  attention. The keypair is still needed to deploy the same address to a *new* cluster.
 - `constants.rs` calls `MAX_BOUNTY` "the ceiling on what any one task can lose" —
   accurate, but see R-02.
 - `web/scripts/init-config.ts` loads the admin from a key file, **defaults the
@@ -340,50 +344,104 @@ verification, a mainnet-fork run, a frozen-account test (needs a second mint wit
 a freeze authority — the SPL behaviour is standard but unproven here), and review
 of the web app beyond the two joins above.
 
-## 6. `MAX_BOUNTY`: what it bounds, and the cost of changing it
+## 6. The bounty cap: what it bounds, and the cost of changing it
 
-It is a compile-time constant (50 USDC). It is the program's only blast-radius
-control, and it controls less than its comment suggests.
+*Status: built.* The cap used to be a compile-time constant, `MAX_BOUNTY` (50 USDC).
+It now lives in an on-chain `Limits` account that the admin can change — but never
+above `ABSOLUTE_MAX_BOUNTY`, a **1,000 USDC** ceiling compiled into the program.
+The launch scripts start it at 50 USDC. It is the program's only blast-radius
+control, and it controls less than its name suggests.
 
 | | |
 | --- | --- |
 | **Bounds** | The most any one task can lose. |
 | **Does not bound** | Aggregate exposure. That is `cap × open tasks`, and under R-02 an attacker claims them all. Doubling the cap doubles the exposure. |
 | **Cost of a low cap** | Throughput of value. At the 50 USDC cap a worker receives at most **$49**, so $100,000 of settled volume is at least **2,041 tasks**; at $5 bounties it is 20,409. Fixed per-task costs (the ~0.00186 SOL `Task` rent, R-10) weigh more the smaller the bounty. |
-| **Cost of changing it** | A redeploy/upgrade today. |
+| **Cost of changing it** | One admin transaction, up to the ceiling. Raising the *ceiling* is still a program upgrade. |
 
-**Making it configurable** is a trade, not a free improvement. An admin-settable
-value can be changed in one transaction — useful for a staged ramp-up, and it
-avoids re-shipping and re-auditing a binary — but it is one more thing a
-compromised admin key can turn up. A constant is changeable only by whoever holds
-the upgrade authority, which (R-01) already has total power. The safe form is a
-setter bounded by a **hard compile-time ceiling** the admin can never exceed.
+**Why configurable is a trade, not a free improvement.** An admin-settable cap can be
+changed in one transaction — useful for a staged ramp-up, and it avoids re-shipping
+and re-auditing a binary — but it is one more thing a compromised admin key can turn
+up. A constant is changeable only by whoever holds the upgrade authority, which (R-01)
+already has total power. The compiled-in ceiling is what bounds that new power: even
+a compromised admin cannot make the cap unbounded.
 
-Whichever you choose, treat the *sum* of open escrow as the number you actually
-launch against, and watch it (a read-only query over `Task` accounts).
+**Why `create_task` requires the account.** If `Limits` were optional, a poster could
+get round a lowered cap, or a pause, by leaving it out of the transaction. As a
+required account, a deployment without one takes no tasks at all (test 43), and a
+look-alike is refused (test 51).
 
-## 7. Proposed changes — awaiting your approval
+**The pause switch** stops `create_task` and nothing else. `submit_work`,
+`submit_verdict` and `reclaim_expired` never read `Limits`, so pausing cannot trap
+money already in escrow (test 50 settles, claims and reclaims *while paused*). It
+also does **not** stop anyone claiming an existing open task, so against a
+compromised verifier the lever that matters is `set_verifier_authority`, not the pause.
 
-Nothing below is done. Each is small and reviewable on its own; none moves funds
-differently from today except where stated.
+Whatever the cap, treat the *sum* of open escrow as the number you actually launch
+against, and watch it (a read-only query over `Task` accounts).
 
-| | Change | Touches | Risk |
+## 7. Status of the proposed changes
+
+Everything proposed in the first version of this review was approved and built, each
+as its own commit. Every new guard test was **mutation-checked**: the guard it
+protects was deleted in an isolated copy, the program rebuilt, and the suite run —
+the matching test went red each time. A guard test that has never been seen to fail
+proves nothing.
+
+| | Change | Commit | Verified |
 | --- | --- | --- | --- |
-| **P1** | **Test backfill**: the eight missing guards (R-06) plus `POC-A`/`POC-B` as characterisation tests | `tests/` only | None |
-| **P2** | **`set_fee_destination`** (admin-only) + tests (R-03) | New instruction; no layout change | Low |
-| **P3** | **Limits**: a new `Limits` PDA `{ max_bounty, paused }`, admin-set via `set_limits`, bounded by a hard `ABSOLUTE_MAX_BOUNTY`; `create_task` requires it and honours `paused`. Existing escrows always settle or reclaim — pause stops *new deposits only*. + tests. Delivers the configurable cap and a kill switch. | `create_task` gains a required account → IDL, web client, and a one-time admin call after upgrade | **Medium** — see below |
-| **P4** | **`short-grace`** test feature + the reclaim-success tests (R-07) | `constants.rs`, tests, `Anchor.toml` | Low |
-| **P5** | **Tooling and docs**: commit `[test] upgradeable = true`; fix the README test command; random on-chain task ids (R-08); correct the keypair comments after the devnet rehearsal (R-11, R-12) | `Anchor.toml`, `README.md`, one web route | Low |
-| **P6** | **A mainnet-safe setup script**: explicit `--mint` required and verified on-chain, no key file for the admin, no secret written to disk, typed confirmation | New script; `init-config.ts` left as devnet-only | Low |
+| **P1** | Test backfill: the missing guards, the `initialize_config` gate, plus `POC-A`/`POC-B` as characterisation tests (R-06) | `4d49ad7` | 8 of 8 mutations caught |
+| R-08 | Task ids carry 24 random bits; record numbers stay readable (R-08) | `02ccc18` | 14 unit tests |
+| **P2** | `set_fee_destination` (R-03) | `48fc038` | 3 of 3 mutations caught, including an error-code renumbering |
+| **P4** | `short-grace` test feature and the grace-period tests (R-07) | `c4dd3e7` | 4 of 4 mutations caught |
+| **P3** | `Limits`: configurable bounty cap, hard ceiling, pause switch, and its web client | `e9b7ae3` | 6 of 6 mutations caught; 51 tests pass on the short-grace build |
+| **P5** | Tooling and docs: `[test] upgradeable = true` (`4d49ad7`), the README, and correcting the program-keypair claim (this docs commit) | `4d49ad7`, docs commit | the keypair claim was tested, not assumed |
+| **P6** | `mainnet-init-plan.ts`, a planner that signs nothing | `e440d1a` | 24 unit tests; dry-run read-only against devnet |
 
-**P3 is the one to think about.** It adds a *mandatory* account to `create_task`,
-so a deployed old client breaks the moment the program is upgraded, and the new
-`Limits` account must be initialised by the admin before any task can be created.
-On devnet that means a short outage of the live demo while the program, IDL and
-web app are updated together. I would not touch your devnet deployment: I would
-give you the exact `anchor upgrade` and setup commands to run in order.
+**P3 verification.** Six mutations were run against the new tests: deleting the
+admin check on `initialize_limits`, deleting the range check, deleting the pause
+check in `create_task`, deleting the cap check, deleting the admin check on the
+update instructions, and making `short-grace` a default feature. **All six were
+caught.** (The last one also closed a gap from P4: its first attempt failed to apply
+because my search string matched a comment as well, so test 36 had gone unproven
+until this run.) Two things the run showed are worth knowing. With the range check
+deleted, test 41's zero-cap initialisation *succeeds* and poisons the whole suite —
+the cascade you would want an unbounded cap to cause. And test 51 cannot tell the
+`seeds` constraint on `limits` from Anchor's own discriminator check, since both
+reject a look-alike; that constraint is defence in depth rather than something a
+test can prove on its own.
 
-**Deliberately not proposed now:** restructuring `submit_verdict` to take only the
-accounts each branch needs (R-04) and any change to who may claim a task (R-05).
-Both are in the most security-critical path or change the product's rules, and
-deserve a design review and an audit, not a patch under time pressure.
+**Deliberately not done:** restructuring `submit_verdict` to take only the accounts
+each branch needs (R-04), and any change to who may claim a task (R-05). Both are in
+the most security-critical path or change the product's rules, and deserve a design
+review and an audit slot, not a patch.
+
+### Upgrading the devnet deployment
+
+`create_task` now requires the `Limits` account, so an upgraded program takes no
+tasks until the admin has created it. Nothing here was run against devnet. The order
+matters, because it decides what a visitor sees while you work:
+
+1. **Deploy the web app first.** Its create page reads `Limits`, finds none, and says
+   *"limits not set up, new tasks cannot be sealed"* instead of letting someone sign a
+   transaction that will fail. Reading, judging and settling are unaffected.
+2. **Upgrade the program.** Build it in **your own working copy** (`~/rubric`), whose
+   `target/deploy/rubric-keypair.json` matches `F2Uo5JUfGQtho8s9ZbwcpWBd8iJ4XvBqamUaqdjcrRxz`.
+   Do not use a build from anywhere else: a binary whose `declare_id!` differs from
+   the address it is deployed to fails every instruction.
+
+   ```bash
+   anchor build                       # default features - NEVER --features short-grace
+   anchor upgrade target/deploy/rubric.so \
+     --program-id F2Uo5JUfGQtho8s9ZbwcpWBd8iJ4XvBqamUaqdjcrRxz \
+     --provider.cluster devnet --provider.wallet <devnet upgrade authority keypair>
+   ```
+
+3. **Create `Limits` immediately:** `cd web && npx tsx scripts/init-limits.ts --admin <devnet admin keypair>`.
+   It refuses mainnet, checks the key really is `Config.admin`, and runs once.
+4. Existing tasks and the `Config` are untouched: `Task` is pinned at 239 bytes by
+   test 29 and no `Config` field changed.
+
+Rehearse the whole sequence against a throwaway program id first. In particular, re-check
+on a real cluster that **upgrading needs only the upgrade authority and not the program
+keypair** (R-11 — already shown on a local validator, which uses the same loader).
