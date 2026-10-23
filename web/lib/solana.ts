@@ -13,6 +13,7 @@ import { USDC_DECIMALS } from "./constants";
 /** Must match `constants.rs`. Duplicated on purpose - a drift is a bug. */
 export const CONFIG_SEED = Buffer.from("config");
 export const TASK_SEED = Buffer.from("task");
+export const LIMITS_SEED = Buffer.from("limits");
 
 export const ASSOCIATED_TOKEN_PROGRAM_ID = new PublicKey(
   "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL"
@@ -51,6 +52,14 @@ export function connection(): Connection {
 
 export function configPda(program = programId()): PublicKey {
   return PublicKey.findProgramAddressSync([CONFIG_SEED], program)[0];
+}
+
+/**
+ * The singleton Limits account: the bounty cap and the pause switch. Required by
+ * `create_task`, so a client that omits it cannot seal a task.
+ */
+export function limitsPda(program = programId()): PublicKey {
+  return PublicKey.findProgramAddressSync([LIMITS_SEED], program)[0];
 }
 
 /** `task_id` as the 8 little-endian bytes the program uses in its seeds. */

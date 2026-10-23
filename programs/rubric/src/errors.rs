@@ -115,4 +115,15 @@ pub enum RubricError {
     /// anyone controls. Fees sent to its token account could never be recovered.
     #[msg("The fee destination must be a real account, not the all-zero key.")]
     InvalidFeeDestination,
+
+    /// `create_task` was refused because the admin has paused new tasks. Existing
+    /// tasks are unaffected: pausing never blocks a verdict, a submission, or a
+    /// reclaim.
+    #[msg("New tasks are paused.")]
+    ProtocolPaused,
+
+    /// A bounty cap must be above zero and no more than `ABSOLUTE_MAX_BOUNTY`, the
+    /// compile-time ceiling the admin cannot exceed.
+    #[msg("The limit must be above zero and no more than the hard ceiling.")]
+    LimitOutOfRange,
 }

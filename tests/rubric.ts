@@ -60,10 +60,18 @@ import type { Rubric } from "../target/types/rubric";
 const USDC_DECIMALS = 6;
 const ONE_USDC = 1_000_000;
 const FEE_BPS = 200; // 2%
+/**
+ * The cap this suite configures `Limits` with: the 50 USDC launch value. It is no
+ * longer a constant in the program - the cap lives on-chain and the admin can
+ * change it - so this is a test fixture, not a mirror.
+ */
 const MAX_BOUNTY = 50_000_000; // 50 USDC
+/** The compile-time ceiling the admin can never set the cap above (1,000 USDC). */
+const ABSOLUTE_MAX_BOUNTY = 1_000_000_000;
 
 const CONFIG_SEED = Buffer.from("config");
 const TASK_SEED = Buffer.from("task");
+const LIMITS_SEED = Buffer.from("limits");
 
 /** Where ProgramData lives, so we can prove the signer is the upgrade authority. */
 const BPF_LOADER_UPGRADEABLE = new PublicKey(
@@ -240,6 +248,7 @@ describe("rubric", () => {
   let attackerAta: PublicKey;
   let feeAta: PublicKey;
   let configPda: PublicKey;
+  let limitsPda: PublicKey;
   let programDataPda: PublicKey;
 
   /** Monotonic task ids so tests never collide on a PDA. */
@@ -284,6 +293,7 @@ describe("rubric", () => {
       .accounts({
         creator: creator.publicKey,
         config: configPda,
+        limits: limitsPda,
         task,
         mint,
         creatorTokenAccount: creatorAta,
@@ -389,6 +399,10 @@ describe("rubric", () => {
       [CONFIG_SEED],
       program.programId
     );
+    [limitsPda] = PublicKey.findProgramAddressSync(
+      [LIMITS_SEED],
+      program.programId
+    );
     [programDataPda] = PublicKey.findProgramAddressSync(
       [program.programId.toBuffer()],
       BPF_LOADER_UPGRADEABLE
@@ -416,6 +430,71 @@ describe("rubric", () => {
     assert.equal(config.verifierAuthority.toBase58(), verifier.publicKey.toBase58());
     assert.equal(config.bountyMint.toBase58(), mint.toBase58());
     assert.equal(config.feeBps, FEE_BPS);
+    // NOTE: `Limits` is deliberately NOT created here. Its refusals can only be
+    // shown while it does not exist, so the tests directly below prove them first
+    // and then create it. Every later test depends on that creation.
+  });
+
+  // =========================================================================
+  // THE LIMITS ACCOUNT - LIFECYCLE. THESE RUN FIRST, AND MUST.
+  //
+  // `Limits` can be created exactly once, so its refusals can only be shown before
+  // the legitimate creation; and `create_task` REQUIRES it, so every test below
+  // needs the account that test 44 creates. Do not move them.
+  // =========================================================================
+
+  /** initialize_limits, signed by the admin (the provider wallet) unless told otherwise. */
+  function initializeLimitsCall(maxBounty: number, signer?: Keypair) {
+    const call = program.methods.initializeLimits(new BN(maxBounty)).accounts({
+      admin: (signer ?? admin).publicKey,
+      config: configPda,
+      limits: limitsPda,
+      systemProgram: SystemProgram.programId,
+    });
+    return signer ? call.signers([signer]) : call;
+  }
+
+  it("40. initialize_limits by anyone but the admin -> NotAdmin, and creates nothing", async () => {
+    await expectError(initializeLimitsCall(MAX_BOUNTY, attacker).rpc(), "NotAdmin");
+    assert.isNull(await connection.getAccountInfo(limitsPda), "no Limits account was created");
+  });
+
+  it("41. initialize_limits with a zero cap -> LimitOutOfRange", async () => {
+    await expectError(initializeLimitsCall(0).rpc(), "LimitOutOfRange");
+    assert.isNull(await connection.getAccountInfo(limitsPda));
+  });
+
+  it("42. initialize_limits above the hard ceiling -> LimitOutOfRange", async () => {
+    await expectError(
+      initializeLimitsCall(ABSOLUTE_MAX_BOUNTY + 1).rpc(),
+      "LimitOutOfRange"
+    );
+    assert.isNull(await connection.getAccountInfo(limitsPda));
+  });
+
+  it("43. create_task before Limits exists is refused and moves no money", async () => {
+    // The reason the account is REQUIRED: a missing Limits must stop a task being
+    // created, never read as 'no cap'. Otherwise leaving the account out would be
+    // a way round the cap.
+    const before = await balanceOf(creatorAta);
+    const { task, call } = createTaskCall();
+    await expectError(call.rpc(), "AccountNotInitialized");
+    assert.isNull(await connection.getAccountInfo(task), "no task was created");
+    assert.equal(await balanceOf(creatorAta), before, "no money moved");
+  });
+
+  it("44. the admin creates Limits, starting unpaused at the launch cap", async () => {
+    await initializeLimitsCall(MAX_BOUNTY).rpc();
+    const limits = await program.account.limits.fetch(limitsPda);
+    assert.equal(limits.maxBounty.toNumber(), MAX_BOUNTY);
+    assert.isFalse(limits.paused);
+  });
+
+  it("45. initialize_limits cannot run twice, so it cannot reset the cap or un-pause", async () => {
+    await expectFailure(initializeLimitsCall(ABSOLUTE_MAX_BOUNTY).rpc());
+    const limits = await program.account.limits.fetch(limitsPda);
+    assert.equal(limits.maxBounty.toNumber(), MAX_BOUNTY, "the cap is unchanged");
+    assert.isFalse(limits.paused);
   });
 
   // =========================================================================
@@ -615,6 +694,7 @@ describe("rubric", () => {
         .accounts({
           creator: creator.publicKey,
           config: configPda,
+          limits: limitsPda,
           task,
           mint,
           creatorTokenAccount: creatorAta,
@@ -718,6 +798,7 @@ describe("rubric", () => {
         .accounts({
           creator: creator.publicKey,
           config: configPda,
+          limits: limitsPda,
           task,
           mint,
           creatorTokenAccount: creatorAta,
@@ -760,6 +841,7 @@ describe("rubric", () => {
         .accounts({
           creator: creator.publicKey,
           config: configPda,
+          limits: limitsPda,
           task,
           mint,
           creatorTokenAccount: creatorAta,
@@ -790,6 +872,7 @@ describe("rubric", () => {
         .accounts({
           creator: creator.publicKey,
           config: configPda,
+          limits: limitsPda,
           task,
           mint,
           creatorTokenAccount: creatorAta,
@@ -890,6 +973,8 @@ describe("rubric", () => {
       bounty?: number;
       /** Swap the whole token context for another mint, consistently. */
       otherMint?: { mint: PublicKey; creatorAta: PublicKey };
+      /** Pass a different account where Limits belongs (a look-alike). */
+      limits?: PublicKey;
     } = {}
   ) {
     const taskId = newTaskId();
@@ -909,6 +994,7 @@ describe("rubric", () => {
         .accounts({
           creator: creator.publicKey,
           config: configPda,
+          limits: opts.limits ?? limitsPda,
           task,
           mint: m,
           creatorTokenAccount: opts.otherMint?.creatorAta ?? creatorAta,
@@ -1161,6 +1247,7 @@ describe("rubric", () => {
         .accounts({
           creator: creator.publicKey,
           config: configPda,
+          limits: limitsPda,
           task,
           mint,
           creatorTokenAccount: creatorAta,
@@ -1207,6 +1294,7 @@ describe("rubric", () => {
       .accounts({
         creator: poster.publicKey,
         config: configPda,
+        limits: limitsPda,
         task,
         mint,
         creatorTokenAccount: posterAta,
@@ -1572,5 +1660,157 @@ describe("rubric", () => {
       Object.keys((await program.account.task.fetch(task)).state),
       ["settled"]
     );
+  });
+
+  // =========================================================================
+  // THE LIMITS - behaviour (the cap and the pause switch)
+  // =========================================================================
+
+  const setMaxBountyCall = (value: number, signer?: Keypair) => {
+    const call = program.methods
+      .setMaxBounty(new BN(value))
+      .accounts({ admin: (signer ?? admin).publicKey, config: configPda, limits: limitsPda });
+    return signer ? call.signers([signer]) : call;
+  };
+  const setPausedCall = (paused: boolean, signer?: Keypair) => {
+    const call = program.methods
+      .setPaused(paused)
+      .accounts({ admin: (signer ?? admin).publicKey, config: configPda, limits: limitsPda });
+    return signer ? call.signers([signer]) : call;
+  };
+
+  /**
+   * Put the limits back to the suite's baseline (50 USDC, unpaused) if a test left
+   * them changed. These tests mutate shared state, and an unpaused protocol is a
+   * precondition for every test that creates a task - so one failure here must not
+   * read as dozens.
+   */
+  async function restoreLimits() {
+    const limits = await program.account.limits.fetch(limitsPda);
+    if (limits.paused) await setPausedCall(false).rpc();
+    if (limits.maxBounty.toNumber() !== MAX_BOUNTY) await setMaxBountyCall(MAX_BOUNTY).rpc();
+  }
+
+  it("46. only the admin can change the bounty cap -> NotAdmin", async () => {
+    try {
+      await expectError(setMaxBountyCall(ABSOLUTE_MAX_BOUNTY, attacker).rpc(), "NotAdmin");
+      const limits = await program.account.limits.fetch(limitsPda);
+      assert.equal(limits.maxBounty.toNumber(), MAX_BOUNTY, "the cap is unchanged");
+    } finally {
+      await restoreLimits();
+    }
+  });
+
+  it("47. only the admin can pause -> NotAdmin", async () => {
+    try {
+      await expectError(setPausedCall(true, attacker).rpc(), "NotAdmin");
+      assert.isFalse((await program.account.limits.fetch(limitsPda)).paused);
+    } finally {
+      await restoreLimits();
+    }
+  });
+
+  it("48. the cap must be above zero and no more than the hard ceiling -> LimitOutOfRange", async () => {
+    try {
+      await expectError(setMaxBountyCall(0).rpc(), "LimitOutOfRange");
+      await expectError(setMaxBountyCall(ABSOLUTE_MAX_BOUNTY + 1).rpc(), "LimitOutOfRange");
+      assert.equal(
+        (await program.account.limits.fetch(limitsPda)).maxBounty.toNumber(),
+        MAX_BOUNTY,
+        "a refused change leaves the cap alone"
+      );
+
+      // The ceiling itself is allowed - it is the most the admin can ever set.
+      await setMaxBountyCall(ABSOLUTE_MAX_BOUNTY).rpc();
+      assert.equal(
+        (await program.account.limits.fetch(limitsPda)).maxBounty.toNumber(),
+        ABSOLUTE_MAX_BOUNTY
+      );
+    } finally {
+      await restoreLimits();
+    }
+  });
+
+  it("49. create_task enforces the cap that is ON-CHAIN, and follows it when the admin changes it", async () => {
+    try {
+      // Lowered: 25 USDC no longer fits, exactly 10 does.
+      await setMaxBountyCall(10 * ONE_USDC).rpc();
+      const tooBig = createTaskCall({ bounty: 25 * ONE_USDC });
+      await expectError(tooBig.call.rpc(), "AmountTooLarge");
+      assert.isNull(await connection.getAccountInfo(tooBig.task));
+      await createTask({ bounty: 10 * ONE_USDC });
+
+      // Raised: 100 USDC, which the old 50 USDC constant could never have allowed.
+      await setMaxBountyCall(200 * ONE_USDC).rpc();
+      const { task } = await createTask({ bounty: 100 * ONE_USDC });
+      assert.equal(await balanceOf(escrowFor(task)), 100 * ONE_USDC);
+
+      // And one base unit over the cap is still refused: the boundary.
+      const edge = createTaskCall({ bounty: 200 * ONE_USDC + 1 });
+      await expectError(edge.call.rpc(), "AmountTooLarge");
+    } finally {
+      await restoreLimits();
+    }
+  });
+
+  it("50. while paused, create_task is refused - but nothing already in escrow is trapped", async () => {
+    // The property that makes a pause switch safe to have. It stops NEW deposits.
+    // It must never stop a claim, a verdict, or a reclaim, or one press of the
+    // button would freeze every escrow in the protocol.
+    const expiring = (await createTask({ deadlineOffsetSeconds: 2 })).task;
+    const awaitingVerdict = (await createTask()).task;
+    await submitWork(awaitingVerdict);
+    const toClaim = (await createTask()).task;
+
+    await setPausedCall(true).rpc();
+    try {
+      assert.isTrue((await program.account.limits.fetch(limitsPda)).paused);
+
+      const refused = createTaskCall();
+      await expectError(refused.call.rpc(), "ProtocolPaused");
+      assert.isNull(await connection.getAccountInfo(refused.task), "no task was created");
+
+      // A worker can still claim.
+      await submitWork(toClaim);
+      assert.deepEqual(
+        Object.keys((await program.account.task.fetch(toClaim)).state),
+        ["submitted"]
+      );
+
+      // The verifier can still rule, and the worker is still paid.
+      const workerBefore = await balanceOf(workerAta);
+      await verdictCall(awaitingVerdict, true, 95).rpc();
+      const bounty = 25 * ONE_USDC;
+      assert.equal(
+        await balanceOf(workerAta),
+        workerBefore + bounty - (bounty * FEE_BPS) / 10_000
+      );
+
+      // A poster can still take back an expired, unworked task.
+      await sleep(4_000);
+      const creatorBefore = await balanceOf(creatorAta);
+      await reclaimCall(expiring).rpc();
+      assert.equal(await balanceOf(creatorAta), creatorBefore + 25 * ONE_USDC);
+    } finally {
+      await restoreLimits();
+    }
+
+    // Resumed: tasks can be created again.
+    await createTask();
+  });
+
+  it("51. a look-alike Limits account is refused, so the cap cannot be swapped for another", async () => {
+    // If a poster could name any account as `limits`, they could point at one that
+    // says 'no cap, not paused'. Only an account at the program's own PDA, owned
+    // by the program, is accepted.
+    const before = await balanceOf(creatorAta);
+    const attempt = createTaskCall({ limits: configPda });
+    await expectError(attempt.call.rpc(), [
+      "ConstraintSeeds",
+      "AccountDiscriminatorMismatch",
+      "AccountNotInitialized",
+    ]);
+    assert.isNull(await connection.getAccountInfo(attempt.task), "no task was created");
+    assert.equal(await balanceOf(creatorAta), before);
   });
 });

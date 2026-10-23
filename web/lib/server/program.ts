@@ -28,10 +28,12 @@ import {
 import { createAssociatedTokenAccountIdempotentInstruction } from "@solana/spl-token";
 
 import { rpcUrl } from "../env";
+import type { ProtocolLimits } from "../limits";
 import {
   associatedTokenAddress,
   configPda,
   escrowAddress,
+  limitsPda,
   taskPda,
   TOKEN_PROGRAM_ID,
 } from "../solana";
@@ -184,7 +186,11 @@ interface RawTaskAccount {
 /** Anchor's `program.account` namespace is keyed by account name at runtime. */
 type AccountNamespace = Record<
   string,
-  { fetch(address: PublicKey): Promise<unknown> }
+  {
+    fetch(address: PublicKey): Promise<unknown>;
+    /** Resolves to null, instead of throwing, when the account does not exist. */
+    fetchNullable(address: PublicKey): Promise<unknown | null>;
+  }
 >;
 
 export async function fetchConfig(): Promise<OnChainConfig> {
@@ -198,6 +204,34 @@ export async function fetchConfig(): Promise<OnChainConfig> {
     feeBps: account.feeBps,
     feeDestination: account.feeDestination,
   };
+}
+
+/** What Anchor decodes a Limits account into. See `RawConfigAccount` for why it is declared by hand. */
+interface RawLimitsAccount {
+  maxBounty: { toString(): string };
+  paused: boolean;
+}
+
+/**
+ * The protocol limits, or null when the Limits account has not been created yet.
+ *
+ * Null is a real and expected state: a deployment that has just been upgraded to
+ * a program that requires `Limits` has none until the admin runs the one-time
+ * setup. Callers must treat it as "cannot create tasks", never as "no cap" - see
+ * `evaluateCreate` in lib/limits.ts.
+ *
+ * Read from the chain on every call rather than cached. The cap and the pause
+ * switch are admin levers meant to take effect immediately, and a cached "not
+ * paused" is precisely the wrong thing to be serving during an incident.
+ */
+export async function fetchLimits(): Promise<ProtocolLimits | null> {
+  const program = readOnlyProgram();
+  const accounts = program.account as unknown as AccountNamespace;
+  const raw = (await accounts.limits.fetchNullable(
+    limitsPda()
+  )) as RawLimitsAccount | null;
+  if (raw === null) return null;
+  return { maxBounty: BigInt(raw.maxBounty.toString()), paused: raw.paused };
 }
 
 export type OnChainTaskState =

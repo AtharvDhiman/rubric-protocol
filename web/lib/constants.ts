@@ -32,8 +32,16 @@ export const DEFAULT_CONFIDENCE_THRESHOLD = 70;
 export const FEE_BPS = 200;
 export const FEE_PERCENT_LABEL = "2%";
 
-/** Mirrors `MAX_BOUNTY` in the Rust program: 50 USDC in base units. */
-export const MAX_BOUNTY_BASE_UNITS = 50_000_000;
+/**
+ * The bounty cap a deployment is LAUNCHED with: 50 USDC in base units.
+ *
+ * This is no longer a mirror of anything in the program. The cap lives on-chain in
+ * the `Limits` account and the admin can change it, so the UI and the API read it
+ * from there (see lib/limits.ts). This constant is only the value the setup
+ * scripts pass to `initialize_limits`, i.e. the number we deliberately start low
+ * with. Do NOT use it to validate input.
+ */
+export const LAUNCH_MAX_BOUNTY_BASE_UNITS = 50_000_000;
 export const USDC_DECIMALS = 6;
 
 /** Mirrors `MAX_CLAUSES` / `MAX_CLAUSE_LENGTH` in lib/hash.ts. */

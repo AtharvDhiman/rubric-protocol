@@ -14,13 +14,25 @@ pub const BPS_DENOMINATOR: u64 = 10_000;
 /// 1000 bps = 10%. Even a compromised admin cannot set a confiscatory fee.
 pub const MAX_FEE_BPS: u16 = 1_000;
 
-/// MVP blast-radius cap on a single bounty.
+/// The HARD CEILING on the bounty cap: 1,000 USDC (USDC has 6 decimals).
 ///
-/// USDC has 6 decimals, so this is 50.000000 USDC. The protocol is unaudited and
-/// runs on a SINGLE verifier authority; if that key is compromised, this constant
-/// is the ceiling on what any one task can lose. Raise it only after an audit and
+/// The day-to-day cap lives in the `Limits` account, and the admin can change it
+/// without redeploying - launch scripts start it at 50 USDC. But the admin can
+/// never set it above THIS, because this is compiled in: only a program upgrade
+/// can raise it. So even a compromised admin key cannot make the cap unbounded.
+///
+/// It replaces the old compile-time `MAX_BOUNTY` (50 USDC), which could only be
+/// changed by redeploying. The trade is deliberate: a settable cap allows a staged
+/// ramp-up in one transaction and avoids re-shipping and re-auditing a binary, at
+/// the price of one more thing the admin key can turn up - bounded by this number.
+///
+/// What it does and does not bound is in docs/security-review.md (R-02): the cap
+/// limits ONE task, not the sum of open escrow. Raise it only after an audit and
 /// after the verifier is no longer a single key.
-pub const MAX_BOUNTY: u64 = 50_000_000;
+pub const ABSOLUTE_MAX_BOUNTY: u64 = 1_000_000_000;
+
+/// PDA seed prefix for the singleton `Limits` account.
+pub const LIMITS_SEED: &[u8] = b"limits";
 
 /// Longest work window a task may set, in seconds (30 days).
 ///

@@ -9,9 +9,11 @@ use anchor_lang::prelude::*;
 use anchor_spl::associated_token::AssociatedToken;
 use anchor_spl::token::{transfer_checked, Mint, Token, TokenAccount, TransferChecked};
 
-use crate::constants::{CONFIG_SEED, MAX_BOUNTY, MAX_WORK_WINDOW_SECONDS, TASK_SEED, ZERO_HASH};
+use crate::constants::{
+    ABSOLUTE_MAX_BOUNTY, CONFIG_SEED, LIMITS_SEED, MAX_WORK_WINDOW_SECONDS, TASK_SEED, ZERO_HASH,
+};
 use crate::errors::RubricError;
-use crate::state::{Config, Task, TaskState};
+use crate::state::{Config, Limits, Task, TaskState};
 
 #[derive(Accounts)]
 #[instruction(task_id: u64)]
@@ -27,6 +29,20 @@ pub struct CreateTask<'info> {
     /// Re-derived from its seeds so a caller cannot pass a look-alike account.
     #[account(seeds = [CONFIG_SEED], bump = config.bump)]
     pub config: Account<'info, Config>,
+
+    /// The singleton Limits: the admin-set bounty cap and the pause switch.
+    ///
+    /// REQUIRED, and that is the point. If this account were optional, a poster
+    /// could get around a lowered cap - or a pause - by simply leaving it out of
+    /// the transaction, and the program would have nothing to compare against. As a
+    /// required account, a client that omits it cannot create a task at all.
+    ///
+    /// Re-derived from its seeds with the stored bump, so it is provably the one
+    /// account this program created. A look-alike carrying a huge cap or
+    /// `paused = false` cannot be substituted: only this program can own an account
+    /// at that address. Read-only here; only the admin's instructions write it.
+    #[account(seeds = [LIMITS_SEED], bump = limits.bump)]
+    pub limits: Account<'info, Limits>,
 
     /// The Task PDA at seeds `[b"task", creator, task_id]`.
     ///
@@ -50,7 +66,7 @@ pub struct CreateTask<'info> {
     /// was configured for. It is passed in rather than hardcoded so the same
     /// program works with devnet and mainnet USDC without a code change, but it
     /// is NOT free choice: without this constraint a poster could escrow a token
-    /// they minted themselves, and `MAX_BOUNTY` - which is denominated in base
+    /// they minted themselves, and the bounty cap - which is denominated in base
     /// units and assumes 6 decimals - would stop meaning what it says.
     #[account(address = config.bounty_mint @ RubricError::MintMismatch)]
     pub mint: Account<'info, Mint>,
@@ -102,14 +118,27 @@ pub fn create_task_handler(
     bounty_amount: u64,
     deadline: i64,
 ) -> Result<()> {
+    // ---- The brake -----------------------------------------------------------
+    // A paused protocol takes no NEW tasks. This is checked first so the answer is
+    // the same for everyone, whatever they typed. It is the only place the pause
+    // is read: submit_work, submit_verdict and reclaim_expired never look at it, so
+    // pausing can stop deposits but can never trap money already in escrow.
+    require!(!ctx.accounts.limits.paused, RubricError::ProtocolPaused);
+
     // ---- Validate the money ------------------------------------------------
     // A zero bounty is not an escrow. Reject it rather than creating a task that
     // can never pay anyone.
     require!(bounty_amount > 0, RubricError::AmountZero);
 
-    // MVP blast-radius cap. The protocol is unaudited and runs on one verifier
-    // key; this constant bounds what a single task can lose.
-    require!(bounty_amount <= MAX_BOUNTY, RubricError::AmountTooLarge);
+    // Blast-radius cap. The protocol is unaudited and runs on one verifier key;
+    // this bounds what a SINGLE task can lose. (It does not bound the total: that
+    // is this cap times the number of open tasks - see docs/security-review.md R-02.)
+    //
+    // The admin sets it, but it is clamped to the compile-time ceiling AGAIN here
+    // rather than trusting that every writer enforced it. Belt and braces on the
+    // one number this program uses to limit its own risk.
+    let cap = ctx.accounts.limits.max_bounty.min(ABSOLUTE_MAX_BOUNTY);
+    require!(bounty_amount <= cap, RubricError::AmountTooLarge);
 
     // ---- Validate the commitment ------------------------------------------
     // An all-zero hash would mean the poster committed to nothing, which would

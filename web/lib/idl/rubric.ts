@@ -63,6 +63,37 @@ export type Rubric = {
           }
         },
         {
+          "name": "limits",
+          "docs": [
+            "The singleton Limits: the admin-set bounty cap and the pause switch.",
+            "",
+            "REQUIRED, and that is the point. If this account were optional, a poster",
+            "could get around a lowered cap - or a pause - by simply leaving it out of",
+            "the transaction, and the program would have nothing to compare against. As a",
+            "required account, a client that omits it cannot create a task at all.",
+            "",
+            "Re-derived from its seeds with the stored bump, so it is provably the one",
+            "account this program created. A look-alike carrying a huge cap or",
+            "`paused = false` cannot be substituted: only this program can own an account",
+            "at that address. Read-only here; only the admin's instructions write it."
+          ],
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  108,
+                  105,
+                  109,
+                  105,
+                  116,
+                  115
+                ]
+              }
+            ]
+          }
+        },
+        {
           "name": "task",
           "docs": [
             "The Task PDA at seeds `[b\"task\", creator, task_id]`.",
@@ -105,7 +136,7 @@ export type Rubric = {
             "was configured for. It is passed in rather than hardcoded so the same",
             "program works with devnet and mainnet USDC without a code change, but it",
             "is NOT free choice: without this constraint a poster could escrow a token",
-            "they minted themselves, and `MAX_BOUNTY` - which is denominated in base",
+            "they minted themselves, and the bounty cap - which is denominated in base",
             "units and assumes 6 decimals - would stop meaning what it says."
           ]
         },
@@ -468,6 +499,113 @@ export type Rubric = {
       ]
     },
     {
+      "name": "initializeLimits",
+      "docs": [
+        "Create the singleton `Limits` account (the bounty cap and the pause switch).",
+        "Admin only, once per deployment, after `initialize_config`.",
+        "",
+        "`create_task` requires this account, so a deployment upgraded to this",
+        "program takes no new tasks until it has been run."
+      ],
+      "discriminator": [
+        223,
+        198,
+        167,
+        252,
+        152,
+        210,
+        10,
+        159
+      ],
+      "accounts": [
+        {
+          "name": "admin",
+          "docs": [
+            "Must be the admin recorded in Config. Signs, and pays the rent for the new",
+            "account.",
+            "",
+            "`mut` because lamports leave this account to fund `limits`. `Signer`",
+            "proves this key authorised the transaction; the `has_one` on `config`",
+            "below proves it is the RIGHT key."
+          ],
+          "writable": true,
+          "signer": true,
+          "relations": [
+            "config"
+          ]
+        },
+        {
+          "name": "config",
+          "docs": [
+            "The singleton Config, read only to check who the admin is.",
+            "",
+            "`seeds` + `bump = config.bump` re-derive the one legitimate config address",
+            "so a look-alike (naming the attacker as admin) cannot be substituted.",
+            "`has_one = admin` requires `config.admin == admin.key()`: this is the check",
+            "that stops a stranger setting the protocol's limits."
+          ],
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "limits",
+          "docs": [
+            "The Limits PDA at seeds `[b\"limits\"]`.",
+            "",
+            "`init` means this can only ever succeed once: creating an account that",
+            "already exists fails at the system-program level, so the limits cannot be",
+            "re-initialised to quietly reset the cap or un-pause the protocol. `seeds`",
+            "+ `bump` mean the address is derived by the program, not chosen by the",
+            "caller, so there is exactly one and `create_task` can find it. `space` is",
+            "8 bytes of Anchor discriminator plus the derived struct size."
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  108,
+                  105,
+                  109,
+                  105,
+                  116,
+                  115
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "systemProgram",
+          "docs": [
+            "Required by `init` to allocate the account. Anchor checks the address really",
+            "is the system program, so a fake one cannot be passed."
+          ],
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "maxBounty",
+          "type": "u64"
+        }
+      ]
+    },
+    {
       "name": "reclaimExpired",
       "docs": [
         "Take back a bounty nobody resolved. The poster signs.",
@@ -736,6 +874,257 @@ export type Rubric = {
         }
       ],
       "args": []
+    },
+    {
+      "name": "setFeeDestination",
+      "docs": [
+        "Point the protocol fee at a different wallet. Admin only.",
+        "",
+        "Exists because the fee destination was immutable and the asset it is paid",
+        "in is freezable: one frozen fee account would revert every approval, and the",
+        "only remedy was redeploying under a new program id."
+      ],
+      "discriminator": [
+        73,
+        250,
+        134,
+        131,
+        222,
+        211,
+        154,
+        78
+      ],
+      "accounts": [
+        {
+          "name": "admin",
+          "docs": [
+            "Must be the admin recorded in Config.",
+            "",
+            "`Signer` proves this key authorised the transaction. The `has_one`",
+            "constraint on `config` below proves it is the RIGHT key. Both are needed: a",
+            "signature from the wrong key, or the right key without a signature, both",
+            "fail."
+          ],
+          "signer": true,
+          "relations": [
+            "config"
+          ]
+        },
+        {
+          "name": "config",
+          "docs": [
+            "The singleton Config.",
+            "",
+            "`seeds` + `bump = config.bump` re-derive the one legitimate config address",
+            "and reject any look-alike account. `has_one = admin` requires",
+            "`config.admin == admin.key()`, so a stranger who signs cannot redirect the",
+            "protocol's fees - this is the check that makes the instruction safe.",
+            "`mut` because the destination is written."
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "newFeeDestination",
+          "type": "pubkey"
+        }
+      ]
+    },
+    {
+      "name": "setMaxBounty",
+      "docs": [
+        "Change the bounty cap for NEW tasks. Admin only. Never above the",
+        "compile-time `ABSOLUTE_MAX_BOUNTY`; tasks that already exist are unaffected."
+      ],
+      "discriminator": [
+        49,
+        201,
+        78,
+        222,
+        162,
+        87,
+        144,
+        65
+      ],
+      "accounts": [
+        {
+          "name": "admin",
+          "docs": [
+            "Must be the admin recorded in Config.",
+            "",
+            "`Signer` proves this key authorised the transaction; the `has_one` on",
+            "`config` below proves it is the RIGHT key. Both are needed."
+          ],
+          "signer": true,
+          "relations": [
+            "config"
+          ]
+        },
+        {
+          "name": "config",
+          "docs": [
+            "The singleton Config, read only to check who the admin is.",
+            "",
+            "`seeds` + `bump = config.bump` re-derive the one legitimate config address",
+            "and reject a look-alike. `has_one = admin` requires",
+            "`config.admin == admin.key()`, so a stranger who signs cannot change the",
+            "limits - this is the check that makes both instructions safe."
+          ],
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "limits",
+          "docs": [
+            "The singleton Limits being changed.",
+            "",
+            "Re-derived from its seeds with the stored bump, so it is provably the one",
+            "account `create_task` reads and not a look-alike. `mut` because a field is",
+            "written."
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  108,
+                  105,
+                  109,
+                  105,
+                  116,
+                  115
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "maxBounty",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "setPaused",
+      "docs": [
+        "Pause or resume NEW tasks. Admin only. The emergency brake: it stops",
+        "deposits and nothing else, so it can never trap money already in escrow."
+      ],
+      "discriminator": [
+        91,
+        60,
+        125,
+        192,
+        176,
+        225,
+        166,
+        218
+      ],
+      "accounts": [
+        {
+          "name": "admin",
+          "docs": [
+            "Must be the admin recorded in Config.",
+            "",
+            "`Signer` proves this key authorised the transaction; the `has_one` on",
+            "`config` below proves it is the RIGHT key. Both are needed."
+          ],
+          "signer": true,
+          "relations": [
+            "config"
+          ]
+        },
+        {
+          "name": "config",
+          "docs": [
+            "The singleton Config, read only to check who the admin is.",
+            "",
+            "`seeds` + `bump = config.bump` re-derive the one legitimate config address",
+            "and reject a look-alike. `has_one = admin` requires",
+            "`config.admin == admin.key()`, so a stranger who signs cannot change the",
+            "limits - this is the check that makes both instructions safe."
+          ],
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "limits",
+          "docs": [
+            "The singleton Limits being changed.",
+            "",
+            "Re-derived from its seeds with the stored bump, so it is provably the one",
+            "account `create_task` reads and not a look-alike. `mut` because a field is",
+            "written."
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  108,
+                  105,
+                  109,
+                  105,
+                  116,
+                  115
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "paused",
+          "type": "bool"
+        }
+      ]
     },
     {
       "name": "setVerifierAuthority",
@@ -1560,6 +1949,19 @@ export type Rubric = {
       ]
     },
     {
+      "name": "limits",
+      "discriminator": [
+        242,
+        54,
+        149,
+        118,
+        118,
+        25,
+        185,
+        129
+      ]
+    },
+    {
       "name": "task",
       "discriminator": [
         79,
@@ -1668,6 +2070,21 @@ export type Rubric = {
       "code": 6018,
       "name": "feeDestinationMismatch",
       "msg": "Fee destination does not match the configured fee destination."
+    },
+    {
+      "code": 6019,
+      "name": "invalidFeeDestination",
+      "msg": "The fee destination must be a real account, not the all-zero key."
+    },
+    {
+      "code": 6020,
+      "name": "protocolPaused",
+      "msg": "New tasks are paused."
+    },
+    {
+      "code": 6021,
+      "name": "limitOutOfRange",
+      "msg": "The limit must be above zero and no more than the hard ceiling."
     }
   ],
   "types": [
@@ -1685,7 +2102,10 @@ export type Rubric = {
           {
             "name": "admin",
             "docs": [
-              "May rotate `verifier_authority`. Nothing else."
+              "May rotate `verifier_authority`, change `fee_destination`, and set the",
+              "`Limits`. It can never touch a task, move escrowed money, or change",
+              "`fee_bps` or `bounty_mint`. There is NO instruction that rotates the admin",
+              "itself, so this is chosen once at initialisation - make it a multisig."
             ],
             "type": "pubkey"
           },
@@ -1703,10 +2123,10 @@ export type Rubric = {
               "The ONE SPL mint this deployment escrows in (USDC).",
               "",
               "Without this, `create_task` accepted any mint the poster passed, which",
-              "made `MAX_BOUNTY` meaningless: \"50_000_000 base units\" is 50 USDC at 6",
+              "made the bounty cap meaningless: \"50_000_000 base units\" is 50 USDC at 6",
               "decimals but 50 million whole tokens against a 0-decimal mint the poster",
-              "minted themselves. The cap is the MVP's blast-radius limit, so the mint",
-              "it is denominated in has to be fixed too."
+              "minted themselves. The cap is the blast-radius limit, so the mint it is",
+              "denominated in has to be fixed too."
             ],
             "type": "pubkey"
           },
@@ -1720,7 +2140,9 @@ export type Rubric = {
           {
             "name": "feeDestination",
             "docs": [
-              "Wallet that owns the token account fees are paid into."
+              "Wallet that owns the token account fees are paid into. The admin can",
+              "change it (`set_fee_destination`), because the asset is freezable and a",
+              "frozen fee account would otherwise revert every approval."
             ],
             "type": "pubkey"
           },
@@ -1729,6 +2151,59 @@ export type Rubric = {
             "docs": [
               "Stored bump so we never have to re-derive it (and so we never trust a",
               "bump supplied by a caller)."
+            ],
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "limits",
+      "docs": [
+        "Limits on NEW tasks, adjustable by the admin without redeploying.",
+        "",
+        "PDA seeds: `[b\"limits\"]` - exactly one, at a fixed address.",
+        "",
+        "This is its own account rather than more fields on `Config` for a practical",
+        "reason: `Config` already exists on every deployed cluster, and adding fields",
+        "would change its size and orphan it. A new account can be added to a running",
+        "deployment with one admin call.",
+        "",
+        "WHAT THE LIMITS CAN AND CANNOT DO",
+        "---------------------------------",
+        "They govern `create_task` and nothing else. Neither can ever block",
+        "`submit_work`, `submit_verdict` or `reclaim_expired`, so no setting here can",
+        "trap money that is already in escrow.",
+        "",
+        "The cap bounds ONE task, not the protocol. Total exposure is the cap times the",
+        "number of open tasks (docs/security-review.md, R-02), so it is a dial for",
+        "launch caution, not a guarantee against a compromised verifier."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "maxBounty",
+            "docs": [
+              "The largest bounty `create_task` accepts, in the mint's base units.",
+              "",
+              "Always between 1 and `ABSOLUTE_MAX_BOUNTY`. The admin chooses the value;",
+              "the ceiling is compiled in, so even a compromised admin key cannot make",
+              "the cap unbounded - only a program upgrade can raise the ceiling."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "paused",
+            "docs": [
+              "While true, `create_task` is refused. Existing tasks are unaffected."
+            ],
+            "type": "bool"
+          },
+          {
+            "name": "bump",
+            "docs": [
+              "Stored canonical bump."
             ],
             "type": "u8"
           }

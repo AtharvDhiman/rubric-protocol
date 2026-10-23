@@ -9,12 +9,14 @@
 
 import { randomInt } from "node:crypto";
 import { NextResponse } from "next/server";
-import { TASK_ID_RANDOM_BITS, nextOnchainTaskId } from "@/lib/task-id";
 import { DEMO_MODE, DEMO_WRITE_MESSAGE, demoTasks } from "@/lib/demo";
+import { TASK_ID_RANDOM_BITS, nextOnchainTaskId } from "@/lib/task-id";
 import { prisma } from "@/lib/db";
 import { serializeBigInts } from "@/lib/db";
 import { hashRubricHex, validateRubric } from "@/lib/hash";
-import { MAX_BOUNTY_BASE_UNITS, CATEGORIES } from "@/lib/constants";
+import { CATEGORIES } from "@/lib/constants";
+import { evaluateCreate, refusalStatus } from "@/lib/limits";
+import { fetchLimits } from "@/lib/server/program";
 import { PublicKey } from "@solana/web3.js";
 
 export const runtime = "nodejs";
@@ -80,9 +82,28 @@ export async function POST(request: Request) {
     return badRequest("bountyAmount must be an integer string in base units.");
   }
   if (bounty <= 0n) return badRequest("bountyAmount must be greater than zero.");
-  if (bounty > BigInt(MAX_BOUNTY_BASE_UNITS)) {
-    return badRequest(
-      `bountyAmount is above the MVP cap of ${MAX_BOUNTY_BASE_UNITS} base units (50 USDC).`
+
+  // The cap and the pause switch live on-chain, and `create_task` enforces both.
+  // Ask the chain rather than a constant, so the answer a poster gets here is the
+  // answer the program will give. If the chain cannot be read we refuse rather
+  // than guess a cap: a draft for a task that cannot be sealed is just clutter.
+  let limits: Awaited<ReturnType<typeof fetchLimits>>;
+  try {
+    limits = await fetchLimits();
+  } catch {
+    return NextResponse.json(
+      {
+        error:
+          "Could not read the protocol limits from the chain, so nothing was drafted. Try again shortly.",
+      },
+      { status: 503 }
+    );
+  }
+  const verdict = evaluateCreate(limits, bounty);
+  if (!verdict.ok) {
+    return NextResponse.json(
+      { error: verdict.message, code: verdict.code },
+      { status: refusalStatus(verdict.code) }
     );
   }
 

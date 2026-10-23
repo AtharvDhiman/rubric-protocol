@@ -15,7 +15,7 @@
  * judge against, and the task could never be settled.
  */
 
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { PublicKey } from "@solana/web3.js";
@@ -38,16 +38,22 @@ import {
   CATEGORIES,
   CLAUSE_COUNTER_VISIBLE_FROM,
   FEE_BPS,
-  MAX_BOUNTY_BASE_UNITS,
   MAX_CLAUSES,
   MAX_CLAUSE_LENGTH,
   WORK_WINDOWS,
 } from "@/lib/constants";
 import {
+  evaluateCreate,
+  fromPayload,
+  type LimitsPayload,
+  type ProtocolLimits,
+} from "@/lib/limits";
+import {
   ASSOCIATED_TOKEN_PROGRAM_ID,
   configPda,
   escrowAddress,
   formatUsdc,
+  limitsPda,
   parseUsdc,
   taskPda,
   TOKEN_PROGRAM_ID,
@@ -72,6 +78,27 @@ export default function CreatePage() {
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [understood, setUnderstood] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
+
+  // The bounty cap and the pause switch live on the chain, so they are asked for
+  // rather than assumed. undefined = still loading, null = the Limits account does
+  // not exist yet, otherwise the chain's answer. `limitsError` is a failed read,
+  // which is deliberately not the same thing as "no limits".
+  const [limits, setLimits] = useState<ProtocolLimits | null | undefined>(undefined);
+  const [limitsError, setLimitsError] = useState(false);
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/limits", { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))
+      .then((payload: LimitsPayload) => {
+        if (!cancelled) setLimits(fromPayload(payload));
+      })
+      .catch(() => {
+        if (!cancelled) setLimitsError(true);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const problems = useMemo(
     () => validateRubric({ title, clauses }),
@@ -100,11 +127,20 @@ export default function CreatePage() {
     [title, clauses]
   );
 
+  // What the program will say to this bounty right now. Null until both the
+  // limits and a parseable bounty are known - an unknown cap must never be
+  // treated as permission to proceed.
+  const createVerdict =
+    limits === undefined || bountyBaseUnits === null
+      ? null
+      : evaluateCreate(limits, bountyBaseUnits);
+
   const readyToSeal =
     problems.length === 0 &&
     bountyBaseUnits !== null &&
     bountyBaseUnits > 0n &&
-    bountyBaseUnits <= BigInt(MAX_BOUNTY_BASE_UNITS);
+    createVerdict !== null &&
+    createVerdict.ok;
 
   function updateClause(index: number, value: string) {
     setClauses((prev) => prev.map((c, i) => (i === index ? value : c)));
@@ -189,6 +225,7 @@ export default function CreatePage() {
         .accounts({
           creator: publicKey,
           config: configPda(),
+          limits: limitsPda(),
           task,
           mint,
           creatorTokenAccount: creatorAta,
@@ -355,9 +392,37 @@ export default function CreatePage() {
               USDC
             </span>
           </div>
-          <p id="bounty-cap" className="label" style={{ marginTop: 8 }}>
-            MVP CAP {formatUsdc(MAX_BOUNTY_BASE_UNITS)} USDC
+          <p
+            id="bounty-cap"
+            className="label"
+            style={{
+              marginTop: 8,
+              // The held colour, because "cannot seal right now" is a held state.
+              color:
+                limits === null || (limits && limits.paused)
+                  ? "var(--warning)"
+                  : undefined,
+            }}
+          >
+            {limitsError
+              ? "CAP UNAVAILABLE - COULD NOT READ IT FROM THE CHAIN"
+              : limits === undefined
+                ? "CAP - READING FROM THE CHAIN"
+                : limits === null
+                  ? "LIMITS NOT SET UP - NEW TASKS CANNOT BE SEALED"
+                  : limits.paused
+                    ? "NEW TASKS PAUSED"
+                    : `CAP ${formatUsdc(limits.maxBounty)} USDC`}
           </p>
+          {/* Said in words, not only in the label, because a disabled button with
+              no reason is the worst kind of dead end. */}
+          {createVerdict !== null &&
+            !createVerdict.ok &&
+            (createVerdict.code !== "NOT_POSITIVE" || bounty.trim() !== "") && (
+            <p role="status" style={{ marginTop: 8, fontSize: 13, color: "var(--text-2)" }}>
+              {createVerdict.message}
+            </p>
+          )}
 
           <dl
             style={{

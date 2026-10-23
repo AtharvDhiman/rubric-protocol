@@ -62,7 +62,10 @@ pub struct VerdictRecord {
 #[account]
 #[derive(InitSpace)]
 pub struct Config {
-    /// May rotate `verifier_authority`. Nothing else.
+    /// May rotate `verifier_authority`, change `fee_destination`, and set the
+    /// `Limits`. It can never touch a task, move escrowed money, or change
+    /// `fee_bps` or `bounty_mint`. There is NO instruction that rotates the admin
+    /// itself, so this is chosen once at initialisation - make it a multisig.
     pub admin: Pubkey,
     /// The ONLY key permitted to call `submit_verdict`. This is the MVP's
     /// centralization point and it is documented as such in the README.
@@ -70,18 +73,68 @@ pub struct Config {
     /// The ONE SPL mint this deployment escrows in (USDC).
     ///
     /// Without this, `create_task` accepted any mint the poster passed, which
-    /// made `MAX_BOUNTY` meaningless: "50_000_000 base units" is 50 USDC at 6
+    /// made the bounty cap meaningless: "50_000_000 base units" is 50 USDC at 6
     /// decimals but 50 million whole tokens against a 0-decimal mint the poster
-    /// minted themselves. The cap is the MVP's blast-radius limit, so the mint
-    /// it is denominated in has to be fixed too.
+    /// minted themselves. The cap is the blast-radius limit, so the mint it is
+    /// denominated in has to be fixed too.
     pub bounty_mint: Pubkey,
     /// Protocol fee in basis points (200 = 2%). Capped at `MAX_FEE_BPS`.
     pub fee_bps: u16,
-    /// Wallet that owns the token account fees are paid into.
+    /// Wallet that owns the token account fees are paid into. The admin can
+    /// change it (`set_fee_destination`), because the asset is freezable and a
+    /// frozen fee account would otherwise revert every approval.
     pub fee_destination: Pubkey,
     /// Stored bump so we never have to re-derive it (and so we never trust a
     /// bump supplied by a caller).
     pub bump: u8,
+}
+
+/// Limits on NEW tasks, adjustable by the admin without redeploying.
+///
+/// PDA seeds: `[b"limits"]` - exactly one, at a fixed address.
+///
+/// This is its own account rather than more fields on `Config` for a practical
+/// reason: `Config` already exists on every deployed cluster, and adding fields
+/// would change its size and orphan it. A new account can be added to a running
+/// deployment with one admin call.
+///
+/// WHAT THE LIMITS CAN AND CANNOT DO
+/// ---------------------------------
+/// They govern `create_task` and nothing else. Neither can ever block
+/// `submit_work`, `submit_verdict` or `reclaim_expired`, so no setting here can
+/// trap money that is already in escrow.
+///
+/// The cap bounds ONE task, not the protocol. Total exposure is the cap times the
+/// number of open tasks (docs/security-review.md, R-02), so it is a dial for
+/// launch caution, not a guarantee against a compromised verifier.
+#[account]
+#[derive(InitSpace)]
+pub struct Limits {
+    /// The largest bounty `create_task` accepts, in the mint's base units.
+    ///
+    /// Always between 1 and `ABSOLUTE_MAX_BOUNTY`. The admin chooses the value;
+    /// the ceiling is compiled in, so even a compromised admin key cannot make
+    /// the cap unbounded - only a program upgrade can raise the ceiling.
+    pub max_bounty: u64,
+    /// While true, `create_task` is refused. Existing tasks are unaffected.
+    pub paused: bool,
+    /// Stored canonical bump.
+    pub bump: u8,
+}
+
+impl Limits {
+    /// A cap must be positive and no more than the compile-time ceiling.
+    ///
+    /// One function, used by both the instruction that creates the account and
+    /// the one that changes it, so the two can never disagree about what is
+    /// allowed.
+    pub fn validate_max_bounty(max_bounty: u64) -> Result<()> {
+        require!(
+            max_bounty > 0 && max_bounty <= crate::constants::ABSOLUTE_MAX_BOUNTY,
+            crate::errors::RubricError::LimitOutOfRange
+        );
+        Ok(())
+    }
 }
 
 /// One posted matter: the sealed criteria, the money, and the ruling.

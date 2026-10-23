@@ -1,10 +1,12 @@
 pub mod create_task;
 pub mod initialize_config;
+pub mod initialize_limits;
 pub mod reclaim_expired;
 pub mod set_fee_destination;
 pub mod set_verifier_authority;
 pub mod submit_verdict;
 pub mod submit_work;
+pub mod update_limits;
 
 // These globs are REQUIRED, not stylistic. `#[derive(Accounts)]` generates
 // hidden `__client_accounts_*` and `__cpi_client_accounts_*` modules alongside
@@ -16,8 +18,10 @@ pub mod submit_work;
 // called `handler`, which would make the name ambiguous across these globs.
 pub use create_task::*;
 pub use initialize_config::*;
+pub use initialize_limits::*;
 pub use reclaim_expired::*;
 pub use set_fee_destination::*;
 pub use set_verifier_authority::*;
 pub use submit_verdict::*;
 pub use submit_work::*;
+pub use update_limits::*;

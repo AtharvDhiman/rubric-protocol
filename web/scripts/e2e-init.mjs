@@ -16,7 +16,7 @@ import {
   SystemProgram,
   VersionedTransaction,
 } from "@solana/web3.js";
-import { AnchorProvider, Program } from "@anchor-lang/core";
+import { AnchorProvider, BN, Program } from "@anchor-lang/core";
 
 const RPC = "http://127.0.0.1:8899";
 
@@ -59,24 +59,45 @@ const [programData] = PublicKey.findProgramAddressSync(
   new PublicKey("BPFLoaderUpgradeab1e11111111111111111111111")
 );
 
+const [limits] = PublicKey.findProgramAddressSync([Buffer.from("limits")], programId);
+
 if (await conn.getAccountInfo(config)) {
   console.log("  config already initialized at", config.toBase58());
-  process.exit(0);
+} else {
+  const sig = await program.methods
+    .initializeConfig(verifier, mint, 200, admin.publicKey)
+    .accounts({
+      admin: admin.publicKey,
+      config,
+      program: programId,
+      programData,
+      systemProgram: SystemProgram.programId,
+    })
+    .rpc();
+
+  console.log("  initialize_config:", sig);
+  console.log("  config PDA :", config.toBase58());
+  console.log("  admin      :", admin.publicKey.toBase58());
+  console.log("  verifier   :", verifier.toBase58());
+  console.log("  bounty mint:", mint.toBase58());
 }
 
-const sig = await program.methods
-  .initializeConfig(verifier, mint, 200, admin.publicKey)
-  .accounts({
-    admin: admin.publicKey,
-    config,
-    program: programId,
-    programData,
-    systemProgram: SystemProgram.programId,
-  })
-  .rpc();
-
-console.log("  initialize_config:", sig);
-console.log("  config PDA :", config.toBase58());
-console.log("  admin      :", admin.publicKey.toBase58());
-console.log("  verifier   :", verifier.toBase58());
-console.log("  bounty mint:", mint.toBase58());
+// `create_task` REQUIRES the Limits account, so a protocol without one takes no
+// tasks at all. Created separately from the config, and only if missing, so this
+// script is safe to re-run against a validator that was initialised before Limits
+// existed. 50 USDC is the launch cap.
+if (await conn.getAccountInfo(limits)) {
+  console.log("  limits already initialized at", limits.toBase58());
+} else {
+  const sig = await program.methods
+    .initializeLimits(new BN(50_000_000))
+    .accounts({
+      admin: admin.publicKey,
+      config,
+      limits,
+      systemProgram: SystemProgram.programId,
+    })
+    .rpc();
+  console.log("  initialize_limits:", sig);
+  console.log("  limits PDA :", limits.toBase58(), "(cap 50 USDC, unpaused)");
+}

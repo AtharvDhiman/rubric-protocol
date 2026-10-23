@@ -100,6 +100,27 @@ pub mod rubric {
         instructions::set_fee_destination::set_fee_destination_handler(ctx, new_fee_destination)
     }
 
+    /// Create the singleton `Limits` account (the bounty cap and the pause switch).
+    /// Admin only, once per deployment, after `initialize_config`.
+    ///
+    /// `create_task` requires this account, so a deployment upgraded to this
+    /// program takes no new tasks until it has been run.
+    pub fn initialize_limits(ctx: Context<InitializeLimits>, max_bounty: u64) -> Result<()> {
+        instructions::initialize_limits::initialize_limits_handler(ctx, max_bounty)
+    }
+
+    /// Change the bounty cap for NEW tasks. Admin only. Never above the
+    /// compile-time `ABSOLUTE_MAX_BOUNTY`; tasks that already exist are unaffected.
+    pub fn set_max_bounty(ctx: Context<UpdateLimits>, max_bounty: u64) -> Result<()> {
+        instructions::update_limits::set_max_bounty_handler(ctx, max_bounty)
+    }
+
+    /// Pause or resume NEW tasks. Admin only. The emergency brake: it stops
+    /// deposits and nothing else, so it can never trap money already in escrow.
+    pub fn set_paused(ctx: Context<UpdateLimits>, paused: bool) -> Result<()> {
+        instructions::update_limits::set_paused_handler(ctx, paused)
+    }
+
     /// Seal a rubric and fund its escrow. The poster signs.
     pub fn create_task(
         ctx: Context<CreateTask>,

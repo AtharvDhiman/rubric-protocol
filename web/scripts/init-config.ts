@@ -192,6 +192,10 @@ async function main() {
   console.log("Put this in web/.env, server-side only:");
   console.log(`VERIFIER_SECRET_KEY=${bs58.encode(verifier.secretKey)}`);
   console.log(`\nThe secret is also at ${verifierPath} (gitignored). Back it up.`);
+  console.log(
+    "\nNEXT - create the Limits account, or no task can be sealed:\n" +
+      "  npx tsx scripts/init-limits.ts --admin <the same admin keypair>"
+  );
 }
 
 main().catch((e) => {
