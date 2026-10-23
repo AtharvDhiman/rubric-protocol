@@ -17,6 +17,8 @@ import { Stamp } from "@/components/Stamp";
 import { CopyButton } from "@/components/CopyButton";
 import { SubmitWorkPanel } from "./SubmitWorkPanel";
 import { ReclaimPanel } from "./ReclaimPanel";
+import { ReviewPanel } from "./ReviewPanel";
+import { reviewerOfModel } from "@/lib/review";
 import { Oracle, type OracleState } from "@/components/rig/Oracle";
 import { InspectionTable } from "@/components/InspectionTable";
 import { SolveBlock } from "@/components/SolveBlock";
@@ -134,6 +136,8 @@ export default async function TaskPage({
     approved: boolean;
     confidence: number;
     summary: string;
+    /** The AI's model id, or `human:<address>` for a ruling by a reviewer. */
+    model?: string;
     clauses: Array<{ index: number; passed: boolean; reason: string }>;
   };
 
@@ -415,6 +419,10 @@ export default async function TaskPage({
                 {copy.next ? `${copy.next} ` : ""}
                 {copy.deadline}
               </p>
+              {/* Renders nothing unless the connected wallet is a reviewer. The
+                  public copy above promises no reviewer, because whether one will
+                  look is not something this page can know. */}
+              <ReviewPanel taskId={task.id} clauses={task.clauses} />
             </div>
           )}
 
@@ -500,6 +508,20 @@ export default async function TaskPage({
                   large
                 />
               </div>
+
+              {/* "The AI verdict is the authorization to release funds" is this
+                  protocol's claim, and a human ruling is an exception to it. The
+                  reader must be able to see which kind of ruling this is. */}
+              {reviewerOfModel(verdict.model) && (
+                <p style={{ fontSize: 14, color: "var(--text-2)", marginBottom: 16 }}>
+                  <strong>Ruled by a human reviewer, not by the AI judge.</strong>{" "}
+                  Reviewer{" "}
+                  <span className="data">
+                    {truncateAddress(reviewerOfModel(verdict.model) as string, 4, 4)}
+                  </span>
+                  . The ruling and its hash are public, like any other.
+                </p>
+              )}
 
               {/* The inspection record. Server-rendered COMPLETE: every STATUS
                   and OUTTOL cell filled and the sigma row present, so the

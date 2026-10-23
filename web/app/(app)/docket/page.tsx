@@ -147,7 +147,11 @@ export default async function DocketPage({
               untouched. <strong>Rejected</strong> means the judge ruled that a sealed
               clause failed, and the poster was refunded. <strong>Refunded</strong>, on
               its own, means the poster reclaimed an undecided task: no one ruled
-              against the work.
+              against the work.{" "}
+              <Link href="/review" style={{ color: "var(--accent)" }}>
+                Held matters, most urgent first
+              </Link>
+              .
             </p>
           )}
         </div>
