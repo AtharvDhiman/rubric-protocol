@@ -37,7 +37,7 @@ import {
   taskPda,
   TOKEN_PROGRAM_ID,
 } from "../solana";
-import { getVerifierKeypair } from "./verifier-keypair";
+import { selectVerifierKeypair } from "./verifier-keypair";
 
 /** Where `npm run sync:idl` puts the built IDL, and the raw build location. */
 const IDL_CANDIDATES = [
@@ -112,9 +112,9 @@ class KeypairWallet {
  * Only ever used for `submit_verdict`. Creating it loads the secret, so do not
  * call it from a route that does not need to sign.
  */
-export function verifierProgram(): Program {
+export function verifierProgram(signer: Keypair): Program {
   const connection = serverConnection();
-  const wallet = new KeypairWallet(getVerifierKeypair());
+  const wallet = new KeypairWallet(signer);
   const provider = new AnchorProvider(connection, wallet as never, {
     commitment: "confirmed",
     preflightCommitment: "confirmed",
@@ -370,10 +370,23 @@ export async function sendVerdict(params: {
   confidence: number;
   reasoningHash: Uint8Array;
 }): Promise<string> {
-  const program = verifierProgram();
   const config = await fetchConfig();
+
+  // Sign with whichever configured key the chain trusts RIGHT NOW. During a
+  // rotation that is what removes the window in which every verdict bounces: the
+  // app follows the admin's on-chain change instead of needing a redeploy in step
+  // with it. If no configured key matches there is nothing valid to sign with, and
+  // saying so here is better than sending a transaction the program must reject.
+  const signer = selectVerifierKeypair(config.verifierAuthority);
+  if (!signer) {
+    throw new Error(
+      "No configured verifier key matches the on-chain verifier authority " +
+        `${config.verifierAuthority.toBase58()}.`
+    );
+  }
+  const program = verifierProgram(signer);
   const task = taskPda(params.creator, params.taskId);
-  const verifier = getVerifierKeypair().publicKey;
+  const verifier = signer.publicKey;
 
   return await program.methods
     .submitVerdict(

@@ -10,8 +10,18 @@
  *
  * THIS IS THE MVP's CENTRALIZATION POINT, and it is stated plainly in the
  * README's "Known limitations". v2 replaces the single key with multi-agent
- * consensus; until then, the `MAX_BOUNTY` cap in the Rust program (50 USDC) is
- * what bounds the damage if this key leaks.
+ * consensus; until then it is managed, not removed.
+ *
+ * What bounds the damage if it leaks, honestly stated: the bounty cap limits what
+ * ONE task can lose, but anyone may claim any open task, so a leaked key can reach
+ * the cap times the number of open tasks - the cap is a launch-caution dial, not a
+ * guarantee (docs/security-review.md, R-02). What actually limits the damage is
+ * speed: `set_verifier_authority` cuts a leaked key off in one transaction, and
+ * docs/verifier-runbook.md is the plan for doing that quickly.
+ *
+ * TWO KEYS, FOR ROTATION. `VERIFIER_SECRET_KEY_NEXT` is optional. When set, the
+ * app signs with whichever configured key the chain currently trusts, so a
+ * rotation has no window in which every verdict bounces. See lib/verifier-keys.ts.
  *
  * Rules for this file:
  *   - It is imported ONLY from route handlers and other files under lib/server/.
@@ -25,85 +35,75 @@
 import "server-only";
 
 import { Keypair, PublicKey } from "@solana/web3.js";
-import bs58 from "bs58";
+import {
+  checkSigner,
+  configuredKeys,
+  selectByAuthority,
+  type ConfiguredKeys,
+  type SignerCheck,
+} from "../verifier-keys";
 
-let cached: Keypair | null = null;
+let cached: ConfiguredKeys | null = null;
 
 /**
- * Load the verifier keypair from the environment.
+ * The keys this server holds, read from the environment once.
  *
- * Accepts either a base58 secret key (what `solana-keygen` prints and what the
- * .env.example documents) or a JSON byte array (what `solana-keygen` writes to
- * a file), because operators reliably paste both.
+ * Throws if VERIFIER_SECRET_KEY is missing or unusable - without it nothing can
+ * sign. A bad VERIFIER_SECRET_KEY_NEXT is NOT thrown (it would stop the current
+ * key signing); it is surfaced by `verifierNextKeyError` and the health check.
  */
-export function getVerifierKeypair(): Keypair {
+export function getConfiguredKeys(): ConfiguredKeys {
   if (cached) return cached;
-
-  const raw = process.env.VERIFIER_SECRET_KEY;
-  if (!raw || raw.trim().length === 0) {
-    throw new Error(
-      "VERIFIER_SECRET_KEY is not set. The verifier cannot sign verdicts without it."
-    );
-  }
-
-  let secret: Uint8Array;
-  try {
-    const trimmed = raw.trim();
-    secret = trimmed.startsWith("[")
-      ? Uint8Array.from(JSON.parse(trimmed) as number[])
-      : bs58.decode(trimmed);
-  } catch {
-    // Deliberately vague: never echo the value, not even a prefix of it.
-    throw new Error(
-      "VERIFIER_SECRET_KEY could not be decoded. Expected base58 or a JSON byte array."
-    );
-  }
-
-  if (secret.length !== 64) {
-    throw new Error(
-      `VERIFIER_SECRET_KEY decoded to ${secret.length} bytes; a Solana secret key is 64.`
-    );
-  }
-
-  cached = Keypair.fromSecretKey(secret);
+  cached = configuredKeys(
+    process.env.VERIFIER_SECRET_KEY,
+    process.env.VERIFIER_SECRET_KEY_NEXT
+  );
   return cached;
 }
 
-/** The verifier's public key. Safe to log and safe to show in the UI. */
+/**
+ * The CURRENT verifier keypair (VERIFIER_SECRET_KEY).
+ *
+ * Kept for callers that only need an identity. Anything that SIGNS a verdict
+ * should use `selectVerifierKeypair`, which follows the chain through a rotation.
+ */
+export function getVerifierKeypair(): Keypair {
+  return getConfiguredKeys().keys[0].keypair;
+}
+
+/** The current verifier's public key. Safe to log and safe to show in the UI. */
 export function verifierPublicKey(): PublicKey {
   return getVerifierKeypair().publicKey;
 }
 
 /**
- * Assert that the loaded key is actually the one the on-chain program trusts.
+ * The configured key that the on-chain config currently trusts, or null if none of
+ * them is. This is the key a verdict must be signed with.
+ */
+export function selectVerifierKeypair(onChainAuthority: PublicKey): Keypair | null {
+  return selectByAuthority(getConfiguredKeys().keys, onChainAuthority)?.keypair ?? null;
+}
+
+/** Why VERIFIER_SECRET_KEY_NEXT is unusable, if it is set and unusable. */
+export function verifierNextKeyError(): string | null {
+  return getConfiguredKeys().nextError;
+}
+
+/**
+ * Assert that a configured key is actually the one the on-chain program trusts.
  *
- * If these disagree, every verdict transaction will fail with
- * `NotVerifierAuthority` - but it will fail AFTER the judge has already run and
- * the user has been told their task is being decided. Better to detect it here
- * and say so loudly.
+ * If none is, every verdict transaction will fail with `NotVerifierAuthority` - but
+ * it will fail AFTER the judge has already run and the user has been told their
+ * task is being decided. Better to detect it here and say so loudly.
  *
  * Returns an object rather than throwing so a health-check route can report the
  * mismatch without taking the whole app down.
  */
-export function checkVerifierMatchesConfig(onChainAuthority: PublicKey): {
-  ok: boolean;
-  message: string;
-} {
-  const local = verifierPublicKey();
-  if (local.equals(onChainAuthority)) {
-    return {
-      ok: true,
-      message: `Verifier authority matches on-chain config: ${local.toBase58()}`,
-    };
+export function checkVerifierMatchesConfig(onChainAuthority: PublicKey): SignerCheck {
+  const check = checkSigner(getConfiguredKeys(), onChainAuthority);
+  if (!check.ok) {
+    // Loud, as specified. Public keys only - never the secret.
+    console.error(`\n${"=".repeat(78)}\n${check.message}\n${"=".repeat(78)}\n`);
   }
-
-  const message =
-    `VERIFIER AUTHORITY MISMATCH. The key in VERIFIER_SECRET_KEY is ` +
-    `${local.toBase58()} but the on-chain config trusts ` +
-    `${onChainAuthority.toBase58()}. No verdict this server signs will be ` +
-    `accepted. Fix the env var, or run set_verifier_authority as the admin.`;
-
-  // Loud, as specified. Public keys only - never the secret.
-  console.error(`\n${"=".repeat(78)}\n${message}\n${"=".repeat(78)}\n`);
-  return { ok: false, message };
+  return check;
 }
