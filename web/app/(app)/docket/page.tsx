@@ -14,6 +14,7 @@ import { MetaRow } from "@/components/MetaRow";
 import { Stamp, stampForState } from "@/components/Stamp";
 import { formatUsdc } from "@/lib/task-view";
 import { refundWasRuling } from "@/lib/outcome";
+import { medianVerdictSeconds, verdictsSince } from "@/lib/verdict-stats";
 import { formatRecordNumber } from "@/lib/task-id";
 import { CATEGORIES } from "@/lib/constants";
 
@@ -43,6 +44,9 @@ export default async function DocketPage({
   let medianSeconds: number | null = null;
   let dbReachable = true;
 
+  const startOfDay = new Date();
+  startOfDay.setUTCHours(0, 0, 0, 0);
+
   if (DEMO_MODE) {
     // No database configured at all. Serve the sample docket rather than an
     // error page, and say so above the table. See lib/demo.ts for why this is
@@ -54,14 +58,9 @@ export default async function DocketPage({
     totalEscrow = all
       .filter((task) => ["OPEN", "SUBMITTED", "HELD"].includes(task.state))
       .reduce((sum, task) => sum + task.bountyAmount, 0n);
-    verdictsToday = all.filter((task) => task.state === "SETTLED" || task.state === "REFUNDED").length;
-    const durations = all
-      .filter((task) => task.decidedAt && task.submittedAt)
-      .map((task) => (task.decidedAt!.getTime() - task.submittedAt!.getTime()) / 1000)
-      .sort((a, b) => a - b);
-    medianSeconds = durations.length
-      ? Math.round(durations[Math.floor(durations.length / 2)])
-      : null;
+    // Same rule as the database branch: a reclaim is not a verdict (lib/verdict-stats.ts).
+    verdictsToday = verdictsSince(all, startOfDay);
+    medianSeconds = medianVerdictSeconds(all);
   } else
   try {
     const where = {
@@ -69,9 +68,9 @@ export default async function DocketPage({
       ...(active ? { category: active } : {}),
     };
 
-    const startOfDay = new Date();
-    startOfDay.setUTCHours(0, 0, 0, 0);
-
+    // REFUNDED is a verdict only when the judge rejected the work, and only the stored
+    // verdict says which, so these two read verdictJson and are narrowed in TypeScript
+    // by lib/verdict-stats.ts rather than counted by the database.
     const [rows, escrowAgg, decidedToday, decided] = await Promise.all([
       prisma.task.findMany({
         where,
@@ -82,11 +81,12 @@ export default async function DocketPage({
         where: { state: { in: ["OPEN", "SUBMITTED", "HELD"] } },
         _sum: { bountyAmount: true },
       }),
-      prisma.task.count({
+      prisma.task.findMany({
         where: {
           state: { in: ["SETTLED", "REFUNDED"] },
           decidedAt: { gte: startOfDay },
         },
+        select: { state: true, verdictJson: true, decidedAt: true, submittedAt: true },
       }),
       prisma.task.findMany({
         where: {
@@ -94,26 +94,18 @@ export default async function DocketPage({
           decidedAt: { not: null },
           submittedAt: { not: null },
         },
-        select: { decidedAt: true, submittedAt: true },
+        select: { state: true, verdictJson: true, decidedAt: true, submittedAt: true },
+        // Newest first, so the 200-row window is the 200 most recent decisions rather
+        // than whichever 200 the database returned first.
+        orderBy: { decidedAt: "desc" },
         take: 200,
       }),
     ]);
 
     tasks = rows;
     totalEscrow = escrowAgg._sum.bountyAmount ?? 0n;
-    verdictsToday = decidedToday;
-
-    const durations = decided
-      .map((d) =>
-        d.decidedAt && d.submittedAt
-          ? (d.decidedAt.getTime() - d.submittedAt.getTime()) / 1000
-          : null
-      )
-      .filter((v): v is number => v !== null && v >= 0)
-      .sort((a, b) => a - b);
-    if (durations.length > 0) {
-      medianSeconds = Math.round(durations[Math.floor(durations.length / 2)]);
-    }
+    verdictsToday = verdictsSince(decidedToday, startOfDay);
+    medianSeconds = medianVerdictSeconds(decided);
   } catch (error) {
     console.error("[docket] database unreachable:", error);
     dbReachable = false;
