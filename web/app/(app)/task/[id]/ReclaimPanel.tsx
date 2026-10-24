@@ -35,6 +35,7 @@ import {
 
 import { useRubricProgram } from "@/lib/useRubricProgram";
 import { TxFlow, useTxFlow } from "@/components/TxFlow";
+import { SigningNotice } from "@/components/SigningNotice";
 import { methodsOf } from "@/lib/anchor-methods";
 
 export function ReclaimPanel({
@@ -165,6 +166,8 @@ export function ReclaimPanel({
           >
             {busy ? "Working…" : "Reclaim escrow"}
           </button>
+          {/* Only on a shared hosting address. See lib/host-notice.ts. */}
+          <SigningNotice />
         </>
       )}
 

@@ -25,6 +25,7 @@ import {
 import { useRubricProgram } from "@/lib/useRubricProgram";
 import { TxFlow, useTxFlow } from "@/components/TxFlow";
 import { WalletPreflight } from "@/components/WalletPreflight";
+import { SigningNotice } from "@/components/SigningNotice";
 import { fromHex, hashSubmissionHex } from "@/lib/hash";
 import { workerAuthMessage } from "@/lib/worker-auth";
 import bs58 from "bs58";
@@ -226,6 +227,9 @@ export function SubmitWorkPanel({
       </button>
 
       <WalletPreflight />
+
+      {/* Only on a shared hosting address. See lib/host-notice.ts. */}
+      <SigningNotice />
 
       <TxFlow state={state} onDismiss={reset} />
 

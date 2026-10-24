@@ -547,8 +547,22 @@ transaction and installing themselves as admin and verifier. The consequence: do
 not make the program immutable before initializing the config, or the deployment
 is unusable.
 
-**11. Landing-page figures are targets, not measurements.** They are labelled as
-such in the UI and live in `web/lib/constants.ts`.
+**11. Nothing on the landing page is a measurement.** Each figure carries a TARGET
+(a goal for the beta) or BY DESIGN (a property of the code) tag beside it, and they live
+in `web/lib/constants.ts`. The scripted verdict log and the hero instrument are
+**illustrations**, headed EXAMPLE, and are not a live feed or a real matter. A test fails
+if a timing is stated without being marked as a target, if the word LIVE returns, or if a
+record number or the launch cap is hard-coded. The real, measured figures are on the
+docket and come from real verdicts.
+
+**13. The beta runs on a shared hosting address, and wallets may warn about it.**
+Wallets such as Phantom can warn about a domain they have not reviewed yet, and about a
+transaction they cannot predict. Phantom's documentation does **not** say shared hosting
+domains are treated differently, and I could not reproduce either warning, so nothing here
+claims a cause. On a shared hosting address the app shows a short notice next to the three
+buttons that sign a transaction. It tells people what to check and to not sign if anything
+does not match; it never tells anyone to ignore a warning. Moving to a domain of your own
+needs no code change: see [docs/custom-domain.md](docs/custom-domain.md).
 
 **12. Nothing retries a stuck verdict on its own.** Verification is triggered once,
 by the worker's own browser tab. If that call fails or the tab is closed mid-judge,

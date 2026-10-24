@@ -301,6 +301,12 @@ tasks. The planner prints `initialize_limits` for exactly that reason. It starts
   addressed to the real admin); the order for a leaked key is in
   [verifier-runbook.md](verifier-runbook.md#5-emergency-a-leaked-key).
 - ☐ A banner stating the program is **unaudited** and capped.
+- ☐ **A domain of your own, moved to at least two weeks before launch.** Wallets may show
+  a "new or unreviewed domain" warning for a few days, and Phantom's documented route if
+  it lasts over a week is a review form, so a domain introduced on launch day meets users
+  with a warning and no time to clear it. No code change is needed. See
+  [custom-domain.md](custom-domain.md), including what is *not* known about Phantom's
+  treatment of shared hosting.
 - ☐ A decision, written down, on **human review of held tasks**. Off by default
   (`REVIEWER_ADDRESSES` unset): a task the judge cannot settle then waits until the
   poster's reclaim date, which can go against a worker whose work was fine. If on, each

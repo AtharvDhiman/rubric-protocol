@@ -26,6 +26,7 @@ import { MetaRow } from "@/components/MetaRow";
 import { Stamp } from "@/components/Stamp";
 import { TxFlow, useTxFlow } from "@/components/TxFlow";
 import { WalletPreflight } from "@/components/WalletPreflight";
+import { SigningNotice } from "@/components/SigningNotice";
 import { useRubricProgram } from "@/lib/useRubricProgram";
 import { methodsOf } from "@/lib/anchor-methods";
 import {
@@ -483,6 +484,9 @@ export default function CreatePage() {
           )}
 
           <WalletPreflight needsUsdc />
+
+          {/* Only on a shared hosting address. See lib/host-notice.ts. */}
+          <SigningNotice />
 
           <TxFlow state={state} onDismiss={reset} />
         </section>
