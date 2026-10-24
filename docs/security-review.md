@@ -404,7 +404,8 @@ proves nothing.
 | **P5** | Tooling and docs: `[test] upgradeable = true` (`4d49ad7`), the README, and correcting the program-keypair claim (this docs commit) | `4d49ad7`, docs commit | the keypair claim was tested, not assumed |
 | **P6** | `mainnet-init-plan.ts`, a planner that signs nothing | `e440d1a` | 24 unit tests; dry-run read-only against devnet |
 | **P7** | Verifier operations (launch-plan item 3), as five pieces: key rotation with no gap, a wallet health check, a preflight and operational holds, a retry script, and an admin-action planner. Runbook: [verifier-runbook.md](verifier-runbook.md) | `298c49b`, `d496b8b`, `4a11824`, `037cdf5`, `9e30174`, `a4d369c` | see below |
-| **P8** | Judge reliability and human review (launch-plan item 4): backoff, an opt-in fallback model, outages recorded as "not a ruling", HELD-versus-REJECTED made clear, and a reviewer path for held tasks. Design: [dispute-design.md](dispute-design.md) | `6be37bd`, `4ccc054`, `646640e`, docs commit | see **P8 verification** |
+| **P8** | Judge reliability and human review (launch-plan item 4): backoff, an opt-in fallback model, outages recorded as "not a ruling", HELD-versus-REJECTED made clear, and a reviewer path for held tasks. Design: [dispute-design.md](dispute-design.md) | `6be37bd`, `4ccc054`, `646640e`, `44bba6a` | see **P8 verification** |
+| **P9** | Trust and honesty (launch-plan item 5): the landing page stops presenting an illustration as activity, sample data can never appear on mainnet, a mainnet banner, and a notice and a way off a shared hosting address. [custom-domain.md](custom-domain.md) | `595553c`, `acb45cb`, `6587461` | see **P9** below |
 
 **P7 verification, and its limits.** The pure decisions are unit tested (rotation
 17, health 19, holds and stuck-task selection 19, retry 40, admin planner 50), and
@@ -471,6 +472,58 @@ What P8 does **not** do:
   judge's live test suite was not re-run, since the system prompt did not change.
 - **The deployed Anthropic model id is unverified** (`claude-opus-5` in `lib/verifier.ts`);
   the Gemini path is the one that has run live.
+
+**P9: trust and honesty (launch-plan item 5)** — `595553c`, `acb45cb`, `6587461`, and
+`7c8876f`, which merges the docket-figures fix made in a separate session (it counts only
+real rulings in "verdicts today" and "median time to verdict", not reclaims).
+
+Findings, none of them in the program, all of them places the product said something it could
+not back:
+
+- **A scripted verdict log was headed "LIVE"** beside a pulsing green dot, with timestamps and
+  "released 25.00 USDC". It was the seeded sample matter. Green is the one colour the design
+  reserves for "the chain paid". It is now headed EXAMPLE and uses no green.
+- **The hero named seeded matter Nº 42 as a settled matter**, unlabelled. On mainnet a real
+  Nº 42 could exist and be misdescribed. It now says EXAMPLE MATTER.
+- **Timing claims stood outside the "targets" note**: "Median verdict: 41 seconds", "in under a
+  second", and "finality 0.4s", which was a slot time worded as finality. Marked or removed;
+  every figure now carries TARGET or BY DESIGN beside it.
+- **Demo mode ignored the cluster.** With no database on mainnet it would have served sample
+  tasks with plausible totals. It is now off on mainnet.
+- **`isMainnet()` was described as a "hard stop" and was not one**: a plain comparison, called
+  nowhere. And it fails open: `solanaCluster()` reads an unrecognised value as devnet, so
+  `NEXT_PUBLIC_SOLANA_CLUSTER=mainnet` would have switched protections off. The guards use
+  `treatAsMainnet()`, which fails closed.
+- **`npm run db:seed` wrote fake settled matters under ordinary generated ids**, which
+  `isSampleTask()` never marked. In a real database they looked real and counted in totals.
+- **The "unaudited and capped" banner in the mainnet checklist did not exist.** It does now.
+- **Phantom's documentation does not support the premise** that `*.vercel.app` is flagged. It
+  documents a new-domain warning that clears in days and a separate transaction-simulation
+  warning. The notice claims no cause.
+
+Verified: 79 new tests (landing 20, wallet notice 13, sample-data and banner 39, route cases
+7). Mutation checks: 16 of 16 on the landing, 12 of 12 on the wallet notice (a thirteenth was an
+equivalent mutant, a dead guard, now removed), 28 of 28 on the mainnet guard. The real app was run
+as a mainnet deployment with no database (no rows, no SAMPLE labels, no demo banner, the mainnet
+banner showing) and as devnet (unchanged).
+
+What P9 does **not** do:
+
+- **It cannot reproduce a Phantom warning**, so nothing is known about which one users see or
+  whether a custom domain would clear it. The wallet notice was seen with its hostname forced in
+  a dev build, not on a real `*.vercel.app` host.
+- **The move to a custom domain is not done.** It needs no code change (docs/custom-domain.md)
+  but is the operator's, and should happen at least two weeks before launch.
+- **None of the three user-signed transactions sets compute-unit limits.** Phantom's guidance
+  suggests it; it is the first thing to try if the "could be malicious" warning appears.
+- **The sample-data guard depends on `NEXT_PUBLIC_SOLANA_CLUSTER` being set.** Unset, the app
+  reads devnet and the protections are off, which is correct for devnet and wrong if the
+  variable was simply forgotten on a mainnet deploy. The mainnet banner makes that visible: no
+  banner means the cluster variable is not what you think.
+- **A database already seeded the old way keeps its old ids.** Mainnet hides those rows; off
+  mainnet they are still not labelled SAMPLE.
+- **The "41s" target is not measured.** It is labelled as a target, and nothing yet shows how
+  close it is.
 
 **P3 verification.** Six mutations were run against the new tests: deleting the
 admin check on `initialize_limits`, deleting the range check, deleting the pause
