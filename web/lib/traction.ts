@@ -79,6 +79,17 @@ export function taskRecordFromAccount(raw: RawTaskAccount): TaskRecord {
   };
 }
 
+/**
+ * "12.34 USDC". Always with a unit: a bare number could be mistaken for a count. Exact, not
+ * truncated to cents like the app's other formatter: a fee of 0.0098 USDC must not print as
+ * 0.00, because a report that rounds away money is wrong in the direction nobody checks.
+ */
+export function usdc(baseUnits: bigint): string {
+  const whole = baseUnits / 1_000_000n;
+  const frac = (baseUnits % 1_000_000n).toString().padStart(6, "0").replace(/0+$/, "").padEnd(2, "0");
+  return `${whole.toString()}.${frac} USDC`;
+}
+
 const BPS_DENOMINATOR = 10_000n;
 
 /**
@@ -325,7 +336,7 @@ export function caveatsFor(report: TractionReport): string[] {
   const lines: string[] = [...STANDING_CAVEATS];
   if (report.selfDealt.tasks > 0) {
     lines.push(
-      `${report.selfDealt.tasks} task(s) were posted and worked by the same wallet (${report.selfDealt.postedVolume} base units posted, ${report.selfDealt.settledVolume} settled) and are excluded from the headline.`
+      `${report.selfDealt.tasks} task(s) were posted and worked by the same wallet (${usdc(report.selfDealt.postedVolume)} posted, ${usdc(report.selfDealt.settledVolume)} settled) and are excluded from the headline.`
     );
   }
   if (report.independent.reciprocalPairs > 0) {

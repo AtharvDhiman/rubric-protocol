@@ -312,6 +312,13 @@ describe("the caveats", () => {
     expect(some.caveats.join(" ")).toMatch(/2 task\(s\) were posted and worked by the same wallet/);
   });
 
+  it("state the set-aside amounts in USDC, never as raw base units", () => {
+    const line = buildTractionReport(FIXTURE, CONFIG).caveats.find((c) => /posted and worked by the same wallet/.test(c));
+    expect(line).toBeDefined();
+    expect(line).not.toMatch(/base units/);
+    expect(line).toMatch(/\d+\.\d\d USDC posted, \d+\.\d\d USDC settled/);
+  });
+
   it("flag a reciprocal pair, without calling it proof of a ring", () => {
     const line = buildTractionReport(FIXTURE, CONFIG).caveats.find((c) => /each posted a task the other worked/.test(c));
     expect(line).toBeDefined();
