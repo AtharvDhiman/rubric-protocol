@@ -161,7 +161,6 @@ export function ReclaimPanel({
             className="btn"
             onClick={reclaim}
             disabled={busy}
-            style={{ borderRadius: 2 }}
           >
             {busy ? "Working…" : "Reclaim escrow"}
           </button>

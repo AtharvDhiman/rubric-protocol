@@ -165,7 +165,6 @@ export function TxFlow({
       style={{
         border: "1px solid var(--border)",
         borderLeft: `2px solid ${accent}`,
-        borderRadius: 2,
         background: "var(--raised)",
         padding: "14px 18px",
         marginTop: 24,

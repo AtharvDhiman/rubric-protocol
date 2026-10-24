@@ -181,7 +181,6 @@ const chipStyle: React.CSSProperties = {
   alignItems: "center",
   gap: 10,
   border: "1px solid var(--rule-strong)",
-  borderRadius: 2,
   padding: "8px 12px",
   background: "transparent",
   color: "var(--text)",
