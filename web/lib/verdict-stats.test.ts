@@ -127,9 +127,26 @@ describe("medianVerdictSeconds", () => {
     expect(medianVerdictSeconds([took(30), took(10), took(20)])).toBe(20);
   });
 
+  it("takes the mean of the two middle durations when the count is even", () => {
+    expect(medianVerdictSeconds([took(10), took(20)])).toBe(15);
+    expect(medianVerdictSeconds([took(40), took(10), took(30), took(20)])).toBe(25);
+    // Not the upper middle (30) and not the lower middle (20), and not skewed by the tails.
+    expect(medianVerdictSeconds([took(1), took(20), took(30), took(900)])).toBe(25);
+  });
+
+  it("rounds a half-second mean up, to a whole second", () => {
+    expect(medianVerdictSeconds([took(38), took(41)])).toBe(40);
+    expect(medianVerdictSeconds([took(10), took(11)])).toBe(11);
+    expect(medianVerdictSeconds([took(10), took(13)])).toBe(12);
+  });
+
+  it("a single duration is its own median", () => {
+    expect(medianVerdictSeconds([took(7)])).toBe(7);
+  });
+
   it("a reclaimed task's hold time does not enter the median", () => {
     // A task held 260 hours before it was reclaimed. If it were counted the middle of
-    // [10, 20, 30, 936000] would be 30; without it, 20.
+    // [10, 20, 30, 936000] would be 25; without it, 20.
     const reclaimed = took(260 * 3600, { state: "REFUNDED", verdictJson: held });
     expect(medianVerdictSeconds([took(30), reclaimed, took(10), took(20)])).toBe(20);
   });
@@ -199,5 +216,10 @@ describe("the seeded demo docket", () => {
     expect(medianVerdictSeconds([byId("demo-reclaimed-held")])).toBeNull();
     expect(medianVerdictSeconds([byId("demo-refunded-transcripts")])).toBe(38);
     expect(medianVerdictSeconds([byId("demo-settled-labels")])).toBe(41);
+  });
+
+  it("the docket's median is the mean of the two verdicts, 38s and 41s, not the slower one", () => {
+    // The reclaim (47s) is excluded, leaving two durations: (38 + 41) / 2 = 39.5 -> 40.
+    expect(medianVerdictSeconds(demoTasks())).toBe(40);
   });
 });

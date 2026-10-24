@@ -53,8 +53,10 @@ export function verdictsSince(tasks: readonly DecisionRecord[], since: Date): nu
 /**
  * Median seconds from submission to verdict, or null if there is nothing to measure.
  *
- * A negative gap (decided before submitted) can only be clock skew, not a real duration,
- * and is dropped. Whole seconds, since that is how the figure is printed.
+ * With an even number of verdicts there is no single middle one, so it is the mean of the
+ * two that straddle it. A negative gap (decided before submitted) can only be clock skew,
+ * not a real duration, and is dropped. Whole seconds, since that is how the figure is
+ * printed.
  */
 export function medianVerdictSeconds(tasks: readonly DecisionRecord[]): number | null {
   const durations: number[] = [];
@@ -65,5 +67,10 @@ export function medianVerdictSeconds(tasks: readonly DecisionRecord[]): number |
   }
   if (durations.length === 0) return null;
   durations.sort((a, b) => a - b);
-  return Math.round(durations[Math.floor(durations.length / 2)]);
+  const middle = Math.floor(durations.length / 2);
+  const median =
+    durations.length % 2 === 1
+      ? durations[middle]
+      : (durations[middle - 1] + durations[middle]) / 2;
+  return Math.round(median);
 }
