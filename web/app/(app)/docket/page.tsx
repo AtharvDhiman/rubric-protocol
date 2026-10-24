@@ -1,5 +1,5 @@
 /**
- * /docket â€” the record list.
+ * /docket — the record list.
  *
  * A ruled ledger, not a grid of cards. Rows are separated by 1px hairlines,
  * hover changes the background and nothing else, and every number is mono.
@@ -154,7 +154,7 @@ export default async function DocketPage({
           )}
         </div>
         <span className="label label-11">
-          {tasks.length} {tasks.length === 1 ? "MATTER" : "MATTERS"} Â·{" "}
+          {tasks.length} {tasks.length === 1 ? "MATTER" : "MATTERS"} ·{" "}
           {formatUsdc(postedTotal)} USDC POSTED
         </span>
       </div>
@@ -205,7 +205,7 @@ export default async function DocketPage({
               borderBottom: "1px solid var(--border-strong)",
             }}
           >
-            <span style={{ width: 56, flex: "0 0 56px" }}>NÂº</span>
+            <span style={{ width: 56, flex: "0 0 56px" }}>Nº</span>
             <span style={{ flex: 1 }}>MATTER</span>
             <span style={{ width: 72, flex: "0 0 72px" }}>CLAUSES</span>
             <span style={{ width: 96, flex: "0 0 96px", textAlign: "right" }}>
@@ -221,7 +221,7 @@ export default async function DocketPage({
 
           {!dbReachable && (
             <p style={{ fontSize: 15, color: "var(--text-muted)", padding: "24px 0" }}>
-              The record store is unavailable. The chain is unaffected â€” nothing
+              The record store is unavailable. The chain is unaffected — nothing
               about escrow depends on this database.
             </p>
           )}
@@ -322,7 +322,7 @@ export default async function DocketPage({
           <Figure label="VERDICTS TODAY" value={String(verdictsToday)} />
           <Figure
             label="MEDIAN TIME TO VERDICT"
-            value={medianSeconds === null ? "â€”" : `${medianSeconds}s`}
+            value={medianSeconds === null ? "—" : `${medianSeconds}s`}
             accent="var(--positive)"
             last
           />
@@ -331,7 +331,7 @@ export default async function DocketPage({
 
       <MetaRow
         footnote="Bounties denominated in USDC."
-        record="RECORD INDEX Â· THE DOCKET"
+        record="RECORD INDEX · THE DOCKET"
       />
     </article>
   );

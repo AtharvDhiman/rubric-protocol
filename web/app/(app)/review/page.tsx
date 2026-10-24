@@ -97,7 +97,7 @@ export default async function ReviewQueuePage() {
             borderBottom: "1px solid var(--border-strong)",
           }}
         >
-          <span style={{ width: 56, flex: "0 0 56px" }}>NÂº</span>
+          <span style={{ width: 56, flex: "0 0 56px" }}>Nº</span>
           <span style={{ flex: 1 }}>MATTER</span>
           <span style={{ width: 112, flex: "0 0 112px" }}>HELD BECAUSE</span>
           <span style={{ width: 88, flex: "0 0 88px", textAlign: "right" }}>BOUNTY</span>
@@ -163,7 +163,7 @@ export default async function ReviewQueuePage() {
 
       <MetaRow
         footnote="Ruling needs an allowlisted reviewer wallet. See docs/dispute-design.md."
-        record="RECORD INDEX Â· REVIEW QUEUE"
+        record="RECORD INDEX · REVIEW QUEUE"
       />
     </article>
   );
