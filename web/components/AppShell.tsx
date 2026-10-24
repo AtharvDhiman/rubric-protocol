@@ -18,6 +18,7 @@ const NAV = [
   { href: "/docket", label: "Docket" },
   { href: "/create", label: "Create" },
   { href: "/my-work", label: "My work" },
+  { href: "/stats", label: "Stats" },
 ];
 
 export function AppHeader() {
@@ -64,7 +65,8 @@ export function AppHeader() {
           Rubric
         </Link>
 
-        <nav style={{ display: "flex", gap: 24, flex: 1 }}>
+        {/* Wraps: four links no longer fit one row at 320px. */}
+        <nav style={{ display: "flex", flexWrap: "wrap", gap: "0 24px", flex: 1 }}>
           {NAV.map((item, i) => {
             const active = pathname?.startsWith(item.href);
             return (

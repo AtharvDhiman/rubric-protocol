@@ -19,8 +19,8 @@ export const TEST_NETWORK_EXPLANATION =
 // `usdc` is defined in lib/traction.ts, where the caveats also need it.
 export { usdc };
 
-const pct = (rate: number | null) => (rate === null ? "n/a" : `${(rate * 100).toFixed(1)}%`);
-const orNone = (v: bigint | null) => (v === null ? "n/a" : usdc(v));
+export const pct = (rate: number | null) => (rate === null ? "n/a" : `${(rate * 100).toFixed(1)}%`);
+export const orNone = (v: bigint | null) => (v === null ? "n/a" : usdc(v));
 
 /** How to check the figures without trusting us. */
 export function verifyInstructions(p: Provenance): string[] {
@@ -85,10 +85,20 @@ export function formatTractionText(report: TractionReport, p: Provenance): strin
   return lines.join("\n");
 }
 
-/** JSON-safe: bigints become decimal strings, so nothing is rounded through a double. */
-export function tractionToJson(report: TractionReport, p: Provenance): string {
+/** How old a served reading is, and whether it is a copy kept after a failed read. */
+export interface CacheMeta {
+  stale: boolean;
+  ageSeconds: number;
+}
+
+/**
+ * JSON-safe: bigints become decimal strings, so nothing is rounded through a double.
+ * `cache` is present only when the reading came from a server-side cache, so a consumer can
+ * tell a copy from a fresh reading without comparing timestamps.
+ */
+export function tractionToJson(report: TractionReport, p: Provenance, cache?: CacheMeta): string {
   return JSON.stringify(
-    { provenance: p, testNetwork: isTestNetwork(p), report },
+    { provenance: p, testNetwork: isTestNetwork(p), report, ...(cache ? { cache } : {}) },
     (_key, value) => (typeof value === "bigint" ? value.toString() : value),
     2
   );

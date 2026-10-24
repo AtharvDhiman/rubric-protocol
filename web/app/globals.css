@@ -1536,8 +1536,16 @@ select.field option {
   .app-header-inner button,
   .record-row,
   .btn,
-  .nav-pill {
+  .nav-pill,
+  .stat-link {
     min-height: 44px;
+  }
+
+  /* The two standalone links on /stats. They sit on their own lines, not in a
+     sentence, so they do not get the running-prose exemption. */
+  .stat-link {
+    display: inline-flex;
+    align-items: center;
   }
 
   /* The landing's own nav. It lives outside .app-header-inner, so it was not

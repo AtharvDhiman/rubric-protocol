@@ -244,6 +244,12 @@ describe("the JSON report", () => {
     expect(JSON.parse(tractionToJson(report, { ...prov, cluster: "mainnet" })).testNetwork).toBe(false);
   });
 
+  it("carries the cache state when there is one, and omits it when there is not", () => {
+    expect(JSON.parse(tractionToJson(report, prov)).cache).toBeUndefined();
+    const parsed = JSON.parse(tractionToJson(report, prov, { stale: true, ageSeconds: 130 }));
+    expect(parsed.cache).toEqual({ stale: true, ageSeconds: 130 });
+  });
+
   it("includes the caveats", () => {
     expect(JSON.parse(tractionToJson(report, prov)).report.caveats.length).toBeGreaterThanOrEqual(5);
   });
