@@ -12,6 +12,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { SolanaMark } from "./SolanaMark";
 import { ConnectWallet } from "./ConnectWallet";
+import { MainnetBanner } from "./MainnetBanner";
 
 const NAV = [
   { href: "/docket", label: "Docket" },
@@ -97,6 +98,9 @@ export function AppShell({
   return (
     <div style={{ minHeight: "100vh", background: "var(--page)" }}>
       <AppHeader />
+
+      {/* Mainnet only: unaudited, and the live cap. Renders nothing elsewhere. */}
+      <MainnetBanner />
 
       {/* Sample records must never be mistakable for real ones. This protocol
           exists so that what you see is what was sealed; a demo that blurred

@@ -14,6 +14,7 @@ import { TASK_ID_RANDOM_BITS, nextOnchainTaskId } from "@/lib/task-id";
 import { prisma } from "@/lib/db";
 import { serializeBigInts } from "@/lib/db";
 import { refundWasRuling } from "@/lib/outcome";
+import { withoutSamples } from "@/lib/sample-data";
 import { hashRubricHex, validateRubric } from "@/lib/hash";
 import { CATEGORIES } from "@/lib/constants";
 import { evaluateCreate, refusalStatus } from "@/lib/limits";
@@ -212,35 +213,48 @@ export async function GET(request: Request) {
     where.category = category;
   }
 
-  const [tasks, total] = await Promise.all([
-    prisma.task.findMany({
-      where,
-      orderBy: { createdAt: "desc" },
-      skip: (page - 1) * perPage,
-      take: perPage,
-      select: {
-        id: true,
-        onchainTaskId: true,
-        title: true,
-        clauses: true,
-        bountyAmount: true,
-        deadline: true,
-        category: true,
-        state: true,
-        creatorAddress: true,
-        confidence: true,
-        // Read only to say whether a refund was a rejection; it is NOT sent on (the
-        // full ruling does not belong in a 50-row list).
-        verdictJson: true,
-      },
-    }),
-    prisma.task.count({ where }),
-  ]);
+  // On mainnet a sample row is never listed or counted (lib/sample-data.ts). The listing,
+  // its total and the escrow aggregate all take the same filter, or one of them would
+  // contradict the others.
+  const visible = withoutSamples(where);
 
-  const totalEscrow = await prisma.task.aggregate({
-    where: { state: { in: ["OPEN", "SUBMITTED", "HELD"] } },
-    _sum: { bountyAmount: true },
-  });
+  let tasks, total, totalEscrow;
+  try {
+    [tasks, total] = await Promise.all([
+      prisma.task.findMany({
+        where: visible,
+        orderBy: { createdAt: "desc" },
+        skip: (page - 1) * perPage,
+        take: perPage,
+        select: {
+          id: true,
+          onchainTaskId: true,
+          title: true,
+          clauses: true,
+          bountyAmount: true,
+          deadline: true,
+          category: true,
+          state: true,
+          creatorAddress: true,
+          confidence: true,
+          // Read only to say whether a refund was a rejection; it is NOT sent on (the
+          // full ruling does not belong in a 50-row list).
+          verdictJson: true,
+        },
+      }),
+      prisma.task.count({ where: visible }),
+    ]);
+
+    totalEscrow = await prisma.task.aggregate({
+      where: withoutSamples({ state: { in: ["OPEN", "SUBMITTED", "HELD"] } }),
+      _sum: { bountyAmount: true },
+    });
+  } catch (error) {
+    // No database, or it is unreachable. Say so, rather than an unexplained 500. The
+    // pages that call this show "the record store is unavailable".
+    console.error("[tasks] database unreachable:", error);
+    return NextResponse.json({ error: "The record store is unavailable." }, { status: 503 });
+  }
 
   return NextResponse.json(
     serializeBigInts({

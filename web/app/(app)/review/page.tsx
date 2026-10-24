@@ -17,6 +17,7 @@ import { MetaRow } from "@/components/MetaRow";
 import { formatRecordNumber } from "@/lib/task-id";
 import { formatUsdc } from "@/lib/task-view";
 import { isOperationalHold } from "@/lib/holds";
+import { withoutSamples } from "@/lib/sample-data";
 import { reclaimOpensAt } from "@/lib/held-copy";
 
 export const dynamic = "force-dynamic";
@@ -52,7 +53,8 @@ export default async function ReviewQueuePage() {
       held = demoTasks().filter((t) => t.state === "HELD");
     } else {
       held = await prisma.task.findMany({
-        where: { state: "HELD" },
+        // Never a sample row on mainnet. See lib/sample-data.ts.
+        where: withoutSamples({ state: "HELD" }),
         select: {
           id: true,
           onchainTaskId: true,
@@ -95,7 +97,7 @@ export default async function ReviewQueuePage() {
             borderBottom: "1px solid var(--border-strong)",
           }}
         >
-          <span style={{ width: 56, flex: "0 0 56px" }}>Nº</span>
+          <span style={{ width: 56, flex: "0 0 56px" }}>NÂº</span>
           <span style={{ flex: 1 }}>MATTER</span>
           <span style={{ width: 112, flex: "0 0 112px" }}>HELD BECAUSE</span>
           <span style={{ width: 88, flex: "0 0 88px", textAlign: "right" }}>BOUNTY</span>
@@ -161,7 +163,7 @@ export default async function ReviewQueuePage() {
 
       <MetaRow
         footnote="Ruling needs an allowlisted reviewer wallet. See docs/dispute-design.md."
-        record="RECORD INDEX · REVIEW QUEUE"
+        record="RECORD INDEX Â· REVIEW QUEUE"
       />
     </article>
   );

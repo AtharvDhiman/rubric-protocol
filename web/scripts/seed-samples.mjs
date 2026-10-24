@@ -26,10 +26,27 @@
  *   DATABASE_SCHEMA=rubric npx tsx scripts/seed-samples.mjs
  */
 
+import { config as loadEnv } from "dotenv";
 import { PrismaClient } from "@prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
 
 import { demoTasks } from "../lib/demo.ts";
+import { treatAsMainnet } from "../lib/env.ts";
+
+// Same order the app uses. Without this, NEXT_PUBLIC_SOLANA_CLUSTER from .env is not
+// visible here and the mainnet refusal below would silently see "devnet".
+loadEnv({ path: ".env.local", quiet: true });
+loadEnv({ quiet: true });
+
+// SAMPLE records are for demos. On mainnet they would show money that never moved as
+// real activity, so this refuses there. It fails closed: see lib/env.ts, treatAsMainnet.
+if (treatAsMainnet()) {
+  console.error(
+    "REFUSING: NEXT_PUBLIC_SOLANA_CLUSTER says mainnet. This script writes SAMPLE records, " +
+      "and on mainnet that would present activity that never happened as real."
+  );
+  process.exit(1);
+}
 
 const connectionString = process.env.DATABASE_URL;
 if (!connectionString) {

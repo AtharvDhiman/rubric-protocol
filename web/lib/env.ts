@@ -88,10 +88,30 @@ export function usdcMintString(): string | undefined {
 }
 
 /**
- * A hard stop on ever pointing this MVP at mainnet by accident. The program is
- * unaudited and runs on a single verifier key; mainnet is a deliberate decision
- * the operator makes by setting this flag, not something a stray env var does.
+ * Is this deployment configured for mainnet-beta, exactly?
+ *
+ * This is a plain predicate. An earlier comment here called it "a hard stop on ever
+ * pointing this MVP at mainnet by accident" and said mainnet is a deliberate decision
+ * "made by setting this flag". There is no such flag and nothing blocks anything: it
+ * only reports what NEXT_PUBLIC_SOLANA_CLUSTER says, and it was not called anywhere.
+ *
+ * For a SAFETY check use `treatAsMainnet` below, not this.
  */
 export function isMainnet(): boolean {
   return solanaCluster() === "mainnet-beta";
+}
+
+/**
+ * Should a safety guard behave as though this is mainnet? FAILS CLOSED.
+ *
+ * `solanaCluster()` silently falls back to "devnet" for any value it does not recognise,
+ * so a typo such as NEXT_PUBLIC_SOLANA_CLUSTER=mainnet reads as devnet. A guard built on
+ * `isMainnet()` would then fail OPEN on exactly the deployment it exists to protect. So
+ * anything that merely looks like mainnet counts: the guard errs toward refusing sample
+ * data, never toward serving it.
+ *
+ * Takes the raw value so it can be tested and used from scripts.
+ */
+export function treatAsMainnet(raw: string | undefined = process.env.NEXT_PUBLIC_SOLANA_CLUSTER): boolean {
+  return /main/i.test(raw ?? "");
 }

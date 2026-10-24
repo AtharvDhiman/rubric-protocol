@@ -300,7 +300,19 @@ tasks. The planner prints `initialize_limits` for exactly that reason. It starts
   refuses the mistakes that matter (a rotation to an unfunded wallet, a proposal not
   addressed to the real admin); the order for a leaked key is in
   [verifier-runbook.md](verifier-runbook.md#5-emergency-a-leaked-key).
-- ☐ A banner stating the program is **unaudited** and capped.
+- ☐ The **mainnet banner** (unaudited program, live on-chain cap) is showing. It appears
+  only when `NEXT_PUBLIC_SOLANA_CLUSTER` is mainnet, so check it on the real deployment,
+  not on devnet.
+- ☐ **No sample data in the production database.** The app hides sample rows on mainnet,
+  but that is a seatbelt, not a clean database. Check: no row has a `demo-` id, the
+  creator `Co4QhGvJ8sPvKqQhWnqjKZ5m1SjvBpTBRq7ZLLNunMTh` or `Co4QbmAUyMsRzLst4tMtMWzQZZQMf4japzh4zua2nMTh`,
+  or a `txCreate` of 87 fives. Never run `npm run db:seed` or `scripts/seed-samples.mjs`
+  against it. Both refuse on mainnet, but only if `NEXT_PUBLIC_SOLANA_CLUSTER` is set
+  somewhere they read (the environment, `.env.local` or `.env`): with it unset they see
+  devnet and proceed.
+- ☐ Open the production docket **with the database deliberately unreachable** (a staging
+  copy, not production) and confirm it says "record store is unavailable" and shows no
+  tasks.
 - ☐ **A domain of your own, moved to at least two weeks before launch.** Wallets may show
   a "new or unreviewed domain" warning for a few days, and Phantom's documented route if
   it lasts over a week is a review form, so a domain introduced on launch day meets users

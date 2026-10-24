@@ -1,4 +1,5 @@
 import { VolumeHero } from "@/components/landing/VolumeHero";
+import { MainnetBanner } from "@/components/MainnetBanner";
 import { SiteFooter } from "@/components/SiteFooter";
 import {
   Figures,
@@ -18,6 +19,8 @@ import {
 export default function LandingPage() {
   return (
     <div>
+      {/* Mainnet only: unaudited, and the live cap. Renders nothing elsewhere. */}
+      <MainnetBanner />
       <VolumeHero />
       <Marquee />
       <HowItWorks />

@@ -35,6 +35,7 @@ vi.mock("@/lib/server/verifier-health", () => ({ getVerifierHealth: mocks.health
 import { POST } from "@/app/api/tasks/[id]/review/route";
 import { hashVerdict } from "@/lib/hash";
 import { reviewerModel } from "@/lib/review";
+import { SAMPLE_CREATORS } from "@/lib/sample-data";
 import {
   CLAUSES,
   ctx,
@@ -218,6 +219,26 @@ describe("conflict of interest", () => {
     expect(res.status).toBe(403);
     expect((await res.json()).code).toBe("CONFLICT_OF_INTEREST");
     untouched();
+  });
+});
+
+describe("a sample row on mainnet", () => {
+  afterEach(() => vi.unstubAllEnvs());
+
+  it("does not exist to a reviewer either: 404, nothing settles", async () => {
+    vi.stubEnv("NEXT_PUBLIC_SOLANA_CLUSTER", "mainnet-beta");
+    task = makeTask({ id: "demo-seed-42" });
+    const res = await POST(request(), ctx());
+    expect(res.status).toBe(404);
+    expect(mocks.sendVerdict).not.toHaveBeenCalled();
+    expect(mocks.fetchTask).not.toHaveBeenCalled();
+  });
+
+  it("includes the legacy seed rows with an ordinary id", async () => {
+    vi.stubEnv("NEXT_PUBLIC_SOLANA_CLUSTER", "mainnet-beta");
+    task = makeTask({ id: "cmgenerated", creatorAddress: SAMPLE_CREATORS[1] });
+    expect((await POST(request(), ctx())).status).toBe(404);
+    expect(mocks.sendVerdict).not.toHaveBeenCalled();
   });
 });
 

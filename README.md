@@ -555,6 +555,18 @@ if a timing is stated without being marked as a target, if the word LIVE returns
 record number or the launch cap is hard-coded. The real, measured figures are on the
 docket and come from real verdicts.
 
+**Sample data never appears on mainnet.** When `NEXT_PUBLIC_SOLANA_CLUSTER` is mainnet,
+demo mode is off even with no database (the app says "record store unavailable"), sample
+rows are excluded from every list, total and lookup, the seed scripts refuse to run, and
+every screen carries an "unaudited program, bounties capped at N USDC" banner with the
+live on-chain cap. The check **fails closed**: any value containing "main" counts, because
+the cluster helper reads an unrecognised value as devnet and a typo would otherwise switch
+the protection off. Sample rows are recognised by the `demo-` id prefix, a creator nobody
+holds, or the seed script's placeholder signature, because `npm run db:seed` used to write
+fake settled matters under ordinary ids that nothing marked as samples. **A database that
+was already seeded that way keeps those ids**: on mainnet they are excluded anyway, and off
+mainnet they are not labelled, so do not run `db:seed` against a database you care about.
+
 **13. The beta runs on a shared hosting address, and wallets may warn about it.**
 Wallets such as Phantom can warn about a domain they have not reviewed yet, and about a
 transaction they cannot predict. Phantom's documentation does **not** say shared hosting

@@ -5,6 +5,7 @@ import type { Prisma, Task } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { hashRubricHex, hashSubmissionHex, hashVerdict, hashVerdictHex } from "@/lib/hash";
 import { operationalHold } from "@/lib/holds";
+import { hideSampleOnMainnet } from "@/lib/sample-data";
 import { fetchTask, sendVerdict, type OnChainTask } from "@/lib/server/program";
 import { getVerifierHealth } from "@/lib/server/verifier-health";
 
@@ -57,7 +58,8 @@ export async function prepareRuling(
 ): Promise<{ ok: true; ready: Ready } | { ok: false; failure: Failure }> {
   const { label, onlyState } = options;
 
-  const task = await prisma.task.findUnique({ where: { id } });
+  // A sample row does not exist on mainnet, so nobody - judge or reviewer - may rule on one.
+  const task = hideSampleOnMainnet(await prisma.task.findUnique({ where: { id } }));
   if (!task || task.state === "PENDING") return fail(404, { error: "Task not found." });
   if (task.state === "SETTLED" || task.state === "REFUNDED") {
     return fail(409, { error: "This task has already been decided.", state: task.state });

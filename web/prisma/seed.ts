@@ -8,14 +8,35 @@
  *
  *   cd web && npm run db:push && npm run db:seed
  *
- * Do not run this against a database that holds real tasks; it deletes every
- * row whose title starts with the demo prefix, but nothing else.
+ * REFUSES TO RUN ON MAINNET. These rows are not real - fake addresses, placeholder
+ * signatures, a "settled" 25 USDC verdict - and on mainnet that would present money that
+ * never moved as real activity. The refusal fails closed (lib/env.ts, `treatAsMainnet`).
+ * The rows also carry the `demo-` id prefix, so the UI labels every one SAMPLE; before
+ * this they had ordinary generated ids and were indistinguishable from real tasks.
+ *
+ * Do not run this against a database that holds real tasks.
  */
 
-import "dotenv/config";
+import { config as loadEnv } from "dotenv";
 import { PrismaClient } from "@prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { hashRubricHex, hashSubmissionHex, hashVerdictHex } from "../lib/hash";
+import { treatAsMainnet } from "../lib/env";
+import { SAMPLE_CREATORS, SAMPLE_ID_PREFIX, SEED_FAKE_TX } from "../lib/sample-data";
+
+// Same order the app uses: .env.local first, then .env. dotenv never overrides a variable
+// that is already set, so the real environment wins.
+loadEnv({ path: ".env.local", quiet: true });
+loadEnv({ quiet: true });
+
+if (treatAsMainnet()) {
+  console.error(
+    "\nREFUSING: NEXT_PUBLIC_SOLANA_CLUSTER says mainnet. This script writes SAMPLE records - " +
+      "fake addresses, placeholder signatures, a settled verdict with no escrow behind it - and " +
+      "on mainnet that would show money that never moved as real activity.\n"
+  );
+  process.exit(1);
+}
 
 // Its own client rather than lib/db.ts, because that module is marked
 // `server-only` and this script runs outside Next.js.
@@ -29,10 +50,10 @@ const prisma = new PrismaClient({
  * unparseable one makes the derivation throw and the PDA render as "—". Derived
  * from fixed seeds so re-seeding produces the same records.
  */
-const CREATOR = "Co4QbmAUyMsRzLst4tMtMWzQZZQMf4japzh4zua2nMTh";
+const CREATOR = SAMPLE_CREATORS[1];
 const WORKER = "9fT2ZmQ7xR4nP1sV8cL3wY6bJ5dK2gN4hA7tX9pM3eS";
 const MINT = "4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU"; // devnet USDC
-const FAKE_TX = "5".repeat(87);
+const FAKE_TX = SEED_FAKE_TX; // one definition, so the detector and the writer cannot drift
 
 const hoursFromNow = (h: number) => new Date(Date.now() + h * 3_600_000);
 
@@ -208,7 +229,10 @@ async function main() {
           onchainTaskId: row.onchainTaskId,
         },
       },
-      create: row,
+      // The id is set on CREATE only: a row seeded before this existed keeps its old
+      // generated id (and is recognised as a sample by its creator and signature instead,
+      // lib/sample-data.ts), and an update must never rewrite a primary key.
+      create: { ...row, id: `${SAMPLE_ID_PREFIX}seed-${row.onchainTaskId}` },
       update: row,
     });
     console.log(`  ${row.onchainTaskId}  ${row.state.padEnd(9)} ${row.title}`);

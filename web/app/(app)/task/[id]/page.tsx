@@ -27,6 +27,7 @@ import { formatRecordNumber } from "@/lib/task-id";
 import { holdDetail, isOperationalHold } from "@/lib/holds";
 import { holdCopy, reclaimOpensAt } from "@/lib/held-copy";
 import { refundWasRuling } from "@/lib/outcome";
+import { hideSampleOnMainnet } from "@/lib/sample-data";
 import {
   formatUsdc,
 
@@ -107,7 +108,8 @@ export default async function TaskPage({
     // With no database configured, serve the sample record instead of erroring.
     task = DEMO_MODE
       ? demoTaskById(id)
-      : await prisma.task.findUnique({ where: { id } });
+      : // On mainnet a sample row does not exist: "no such matter", as if never seeded.
+        hideSampleOnMainnet(await prisma.task.findUnique({ where: { id } }));
   } catch (error) {
     console.error("[task page] database unreachable:", error);
     dbReachable = false;

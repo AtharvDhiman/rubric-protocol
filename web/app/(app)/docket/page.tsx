@@ -1,5 +1,5 @@
 /**
- * /docket — the record list.
+ * /docket â€” the record list.
  *
  * A ruled ledger, not a grid of cards. Rows are separated by 1px hairlines,
  * hover changes the background and nothing else, and every number is mono.
@@ -14,6 +14,7 @@ import { MetaRow } from "@/components/MetaRow";
 import { Stamp, stampForState } from "@/components/Stamp";
 import { formatUsdc } from "@/lib/task-view";
 import { refundWasRuling } from "@/lib/outcome";
+import { withoutSamples } from "@/lib/sample-data";
 import { medianVerdictSeconds, verdictsSince } from "@/lib/verdict-stats";
 import { formatRecordNumber } from "@/lib/task-id";
 import { CATEGORIES } from "@/lib/constants";
@@ -68,32 +69,37 @@ export default async function DocketPage({
       ...(active ? { category: active } : {}),
     };
 
+    // On mainnet EVERY query below excludes sample rows (lib/sample-data.ts), the
+    // aggregates included: a seeded settled task must not be counted in "total in escrow"
+    // or "verdicts today" as though it were real. Off mainnet, samples are labelled and
+    // wanted, so withoutSamples leaves the query alone.
+    //
     // REFUNDED is a verdict only when the judge rejected the work, and only the stored
     // verdict says which, so these two read verdictJson and are narrowed in TypeScript
     // by lib/verdict-stats.ts rather than counted by the database.
     const [rows, escrowAgg, decidedToday, decided] = await Promise.all([
       prisma.task.findMany({
-        where,
+        where: withoutSamples(where),
         orderBy: { createdAt: "desc" },
         take: 50,
       }),
       prisma.task.aggregate({
-        where: { state: { in: ["OPEN", "SUBMITTED", "HELD"] } },
+        where: withoutSamples({ state: { in: ["OPEN", "SUBMITTED", "HELD"] } }),
         _sum: { bountyAmount: true },
       }),
       prisma.task.findMany({
-        where: {
+        where: withoutSamples({
           state: { in: ["SETTLED", "REFUNDED"] },
           decidedAt: { gte: startOfDay },
-        },
+        }),
         select: { state: true, verdictJson: true, decidedAt: true, submittedAt: true },
       }),
       prisma.task.findMany({
-        where: {
+        where: withoutSamples({
           state: { in: ["SETTLED", "REFUNDED"] },
           decidedAt: { not: null },
           submittedAt: { not: null },
-        },
+        }),
         select: { state: true, verdictJson: true, decidedAt: true, submittedAt: true },
         // Newest first, so the 200-row window is the 200 most recent decisions rather
         // than whichever 200 the database returned first.
@@ -148,7 +154,7 @@ export default async function DocketPage({
           )}
         </div>
         <span className="label label-11">
-          {tasks.length} {tasks.length === 1 ? "MATTER" : "MATTERS"} ·{" "}
+          {tasks.length} {tasks.length === 1 ? "MATTER" : "MATTERS"} Â·{" "}
           {formatUsdc(postedTotal)} USDC POSTED
         </span>
       </div>
@@ -199,7 +205,7 @@ export default async function DocketPage({
               borderBottom: "1px solid var(--border-strong)",
             }}
           >
-            <span style={{ width: 56, flex: "0 0 56px" }}>Nº</span>
+            <span style={{ width: 56, flex: "0 0 56px" }}>NÂº</span>
             <span style={{ flex: 1 }}>MATTER</span>
             <span style={{ width: 72, flex: "0 0 72px" }}>CLAUSES</span>
             <span style={{ width: 96, flex: "0 0 96px", textAlign: "right" }}>
@@ -215,7 +221,7 @@ export default async function DocketPage({
 
           {!dbReachable && (
             <p style={{ fontSize: 15, color: "var(--text-muted)", padding: "24px 0" }}>
-              The record store is unavailable. The chain is unaffected — nothing
+              The record store is unavailable. The chain is unaffected â€” nothing
               about escrow depends on this database.
             </p>
           )}
@@ -316,7 +322,7 @@ export default async function DocketPage({
           <Figure label="VERDICTS TODAY" value={String(verdictsToday)} />
           <Figure
             label="MEDIAN TIME TO VERDICT"
-            value={medianSeconds === null ? "—" : `${medianSeconds}s`}
+            value={medianSeconds === null ? "â€”" : `${medianSeconds}s`}
             accent="var(--positive)"
             last
           />
@@ -325,7 +331,7 @@ export default async function DocketPage({
 
       <MetaRow
         footnote="Bounties denominated in USDC."
-        record="RECORD INDEX · THE DOCKET"
+        record="RECORD INDEX Â· THE DOCKET"
       />
     </article>
   );

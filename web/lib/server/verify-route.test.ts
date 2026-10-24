@@ -7,7 +7,7 @@
  * already decided, or record a hold on the work when the fault was ours.
  */
 
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => {
   process.env.DATABASE_URL = "postgresql://test/test";
@@ -35,6 +35,7 @@ vi.mock("@/lib/verifier", async (importOriginal) => ({
 
 import { POST } from "@/app/api/tasks/[id]/verify/route";
 import { isOperationalHold } from "@/lib/holds";
+import { SAMPLE_CREATORS } from "@/lib/sample-data";
 import { CLAUSES, ctx, makeOnChain, makeTask, postRequest } from "./route-test-kit";
 
 let task = makeTask({ state: "SUBMITTED", heldReason: null });
@@ -122,6 +123,46 @@ describe("before any judging", () => {
     task = makeTask({ state: "SUBMITTED", submissionContent: "not what was committed" });
     await call();
     expect(mocks.update).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ state: "HELD" }) }));
+  });
+});
+
+describe("a sample row on mainnet", () => {
+  afterEach(() => vi.unstubAllEnvs());
+
+  it("does not exist: nothing is read from the chain, nothing is judged, nothing is paid", async () => {
+    vi.stubEnv("NEXT_PUBLIC_SOLANA_CLUSTER", "mainnet-beta");
+    task = makeTask({ id: "demo-seed-42", state: "SUBMITTED" });
+    const res = await call();
+    expect(res.status).toBe(404);
+    expect(mocks.fetchTask).not.toHaveBeenCalled();
+    expect(mocks.runVerdict).not.toHaveBeenCalled();
+    expect(mocks.sendVerdict).not.toHaveBeenCalled();
+    expect(mocks.update).not.toHaveBeenCalled();
+  });
+
+  it("includes the legacy seed rows that have an ordinary generated id", async () => {
+    vi.stubEnv("NEXT_PUBLIC_SOLANA_CLUSTER", "mainnet-beta");
+    task = makeTask({ id: "cmgenerated", state: "SUBMITTED", creatorAddress: SAMPLE_CREATORS[1] });
+    expect((await call()).status).toBe(404);
+    expect(mocks.runVerdict).not.toHaveBeenCalled();
+  });
+
+  it("fails closed on a typo'd cluster name", async () => {
+    vi.stubEnv("NEXT_PUBLIC_SOLANA_CLUSTER", "mainnet");
+    task = makeTask({ id: "demo-seed-42", state: "SUBMITTED" });
+    expect((await call()).status).toBe(404);
+  });
+
+  it("is judged normally off mainnet, where samples are labelled and wanted", async () => {
+    vi.stubEnv("NEXT_PUBLIC_SOLANA_CLUSTER", "devnet");
+    task = makeTask({ id: "demo-seed-42", state: "SUBMITTED" });
+    expect((await call()).status).toBe(200);
+  });
+
+  it("a REAL row on mainnet is unaffected", async () => {
+    vi.stubEnv("NEXT_PUBLIC_SOLANA_CLUSTER", "mainnet-beta");
+    task = makeTask({ state: "SUBMITTED", heldReason: null });
+    expect((await call()).status).toBe(200);
   });
 });
 
