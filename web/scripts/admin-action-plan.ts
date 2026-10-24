@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Prepare one admin action for the multisig to execute.
  *
  * THIS SCRIPT SIGNS NOTHING, SENDS NOTHING, READS NO KEY FILE AND WRITES NO FILE.
