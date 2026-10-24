@@ -406,6 +406,7 @@ proves nothing.
 | **P7** | Verifier operations (launch-plan item 3), as five pieces: key rotation with no gap, a wallet health check, a preflight and operational holds, a retry script, and an admin-action planner. Runbook: [verifier-runbook.md](verifier-runbook.md) | `298c49b`, `d496b8b`, `4a11824`, `037cdf5`, `9e30174`, `a4d369c` | see below |
 | **P8** | Judge reliability and human review (launch-plan item 4): backoff, an opt-in fallback model, outages recorded as "not a ruling", HELD-versus-REJECTED made clear, and a reviewer path for held tasks. Design: [dispute-design.md](dispute-design.md) | `6be37bd`, `4ccc054`, `646640e`, `44bba6a` | see **P8 verification** |
 | **P9** | Trust and honesty (launch-plan item 5): the landing page stops presenting an illustration as activity, sample data can never appear on mainnet, a mainnet banner, and a notice and a way off a shared hosting address. [custom-domain.md](custom-domain.md) | `595553c`, `acb45cb`, `6587461` | see **P9** below |
+| **P10** | Traction and a launch plan (launch-plan item 6): figures computed from the chain, a read-only report script, a `/stats` page and `/api/stats` headed as test funds on any cluster but mainnet, and [launch-plan.md](launch-plan.md) | `481faca`, `6975c10`, `68b381f`, `a2f7103`, and the docs commit | see **P10** below |
 
 **P7 verification, and its limits.** The pure decisions are unit tested (rotation
 17, health 19, holds and stuck-task selection 19, retry 40, admin planner 50), and
@@ -524,6 +525,61 @@ What P9 does **not** do:
   mainnet they are still not labelled SAMPLE.
 - **The "41s" target is not measured.** It is labelled as a target, and nothing yet shows how
   close it is.
+
+**P10: traction and a launch plan (launch-plan item 6)** — `481faca`, `6975c10`, `68b381f`,
+`a2f7103`, and the commit that adds [launch-plan.md](launch-plan.md).
+
+The metrics are computed from the program's Task accounts, not from the database, so nothing
+seeded can be counted and anyone can recompute them. Tasks are never closed, so the chain is a
+complete record. Findings, mostly about what a traction number can honestly claim:
+
+- **Volume is trivially fabricated.** `create_task` and `submit_work` do not require the worker
+  to differ from the poster, and the 2% fee is paid to a wallet the operator controls, so a
+  wash trade costs only network fees. A second wallet defeats any rule on the program side, so
+  **no program change is proposed**. Instead the report sets aside tasks where one wallet is on
+  both sides, shows them beside the headline rather than hiding them, and always prints that
+  this removes the laziest wash trading and nothing more. The figure to lead with is
+  independent repeat posters, not volume.
+- **The chain cannot give a latency.** It stores when a verdict landed (`decided_at`) but not
+  when the work was submitted, so the report states it says nothing about speed.
+- **A refund is not a rejection.** A task can be refunded because the judge rejected the work or
+  because the poster reclaimed an undecided one. Counting both as rejections would understate the
+  approval rate; the report separates them and gives the number of decisions with the rate.
+- **A public page that reads the chain is a way to drive RPC load**, and `getProgramAccounts`
+  is the call providers limit first. One read now serves everyone for a minute, concurrent
+  visitors share it, and a failed read falls back to a reading under ten minutes old, flagged as a
+  copy with its age, and to nothing after that.
+- **RPC errors can carry an API key in the endpoint URL.** The page, the route and the script
+  never repeat one; the server log gets the error name only.
+- **A P9 regression, found while building the page.** In P9 I stripped byte-order marks from the
+  docket and review pages by round-tripping them through PowerShell, which read UTF-8 as
+  Windows-1252 and wrote it back: the em dash, the middle dot and the `º` in "Nº" became two or
+  three characters of garbage, **on a pushed, user-facing page**. Type-check, lint and every test
+  were green. Fixed in `a2f7103`, with the non-ASCII characters verified identical to their
+  pre-damage versions, and `web/lib/encoding.test.ts` now scans the app, components, lib,
+  scripts, prisma and docs and fails with the file and line if it recurs.
+
+Verified: 140 new tests across the traction modules, the cache, the route, the page's view-model
+and the encoding scan. Mutation checks: 23 of 23 on the aggregation, 24 of 24 on the chain reader
+and formatter, 30 of 30 on the cache, the view-model, the server source and the route. Beyond
+that: the script was run read-only against the live devnet deployment; the page was loaded
+against live devnet at desktop width, at 375px and at 320px (which caught tables running off a
+phone screen, fixed) and with an unreachable RPC, where the page showed no figures, the route
+returned a 503 and the server log held the error name only; `next build` passes.
+
+What P10 does **not** do:
+
+- **It has not been seen on mainnet.** Every figure it has shown is devnet and headed as test
+  funds. The mainnet path (no heading, an Explorer link without a cluster parameter) is covered
+  by tests, not by a real mainnet read.
+- **It cannot tell which other wallets are yours.** A second wallet of yours looks independent
+  on-chain. The launch plan makes declaring team wallets a procedure and proposes a
+  `--team-wallets` option; it is **not built**.
+- **It does not report held tasks or verdict latency**, which live only in the database and so
+  are claims, not recomputable figures.
+- **The launch plan's thresholds are proposals**, and part of its competitor table is
+  unconfirmed where it says so (Superteam Earn's payout rules, Dework's current status,
+  Algora's fee, Kleros's costs). The pain it targets is supported only by anecdote.
 
 **P3 verification.** Six mutations were run against the new tests: deleting the
 admin check on `initialize_limits`, deleting the range check, deleting the pause

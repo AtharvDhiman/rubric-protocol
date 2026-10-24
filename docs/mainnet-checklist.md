@@ -328,6 +328,11 @@ tasks. The planner prints `initialize_limits` for exactly that reason. It starts
   **not** let anyone contest a verdict that has already landed.
 - ☐ If a fallback judge model is configured (`JUDGE_FALLBACK_MODEL`), it has been run
   against the judge prompt and its first rulings have been read.
+- ☐ **The launch plan has been read and its decisions made:** [launch-plan.md](launch-plan.md). The
+  stages ($1, then $5), the open-task limit you hold yourself (the cap bounds one task, not
+  the sum), what you will do when the judge is wrong, and the list of **team-controlled
+  wallets, written down before launch**. The traction figures (`/stats`, `scripts/traction-report.ts`)
+  can only set aside tasks where one wallet is on both sides; they cannot know your other wallets.
 
 ## Phase 7 — Making it permanent ⚠⚠
 

@@ -31,6 +31,7 @@ the reasoning is public and its hash is on-chain.
 | Devnet deploy | **Live** at `F2Uo5JUfGQtho8s9ZbwcpWBd8iJ4XvBqamUaqdjcrRxz`, config initialized |
 | Verifier operations: a wallet health check, a keyless retry script, key rotation with no gap, and a planner for the admin multisig | Built and tested. See [docs/verifier-runbook.md](docs/verifier-runbook.md). **The alert needs an external monitor you set up** — nothing here sends one |
 | Judge resilience (backoff, opt-in fallback model, outages recorded as "not a ruling") and human review of held tasks | Built and tested; review is **off unless `REVIEWER_ADDRESSES` is set**. See [docs/dispute-design.md](docs/dispute-design.md). The review panel has not been exercised with a real wallet |
+| Traction figures computed from the chain (a read-only script, a `/stats` page and `/api/stats`), and a launch plan | Built and tested, and seen only on devnet, where the page is headed **TEST NETWORK — NOT TRACTION**. The figures are activity, not demand. See [docs/launch-plan.md](docs/launch-plan.md) |
 
 **Verified by running it:**
 
@@ -39,7 +40,7 @@ the reasoning is public and its hash is on-chain.
   `solana-test-validator`; the 2 pending run under `npm run test:grace`, which builds
   the test-only `short-grace` feature. Plain `anchor test` does not work on
   anchor-cli 1.x: it defaults to surfpool, which is not installed.
-- `next build`, `tsc --noEmit` and `eslint` all clean; 622 web tests pass (7 more
+- `next build`, `tsc --noEmit` and `eslint` all clean; 870 web tests pass (7 more
   call the live judge API and run only when opted in)
 - `.next/static` contains no reference to `VERIFIER_SECRET_KEY` or `ANTHROPIC_API_KEY`
 
@@ -312,7 +313,8 @@ web/
   lib/hash.ts               canonical rubric hashing — load-bearing
   lib/server/               server-only: verifier keypair, Anchor client
   app/api/                  API routes
-  app/(app)/                docket, create, task/[id], my-work
+  app/(app)/                docket, create, task/[id], my-work, stats, review
+  scripts/traction-report.ts  traction figures from the chain; signs nothing
   components/               design-system components
   DESIGN.md                 the authority for all UI
 ```
