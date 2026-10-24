@@ -9,7 +9,15 @@
 import Link from "next/link";
 import { SolanaMark } from "../SolanaMark";
 import { useInView } from "../useInView";
-import { FIGURES, FIGURES_NOTE, MARQUEE_ITEMS } from "@/lib/constants";
+import { FIGURES, FIGURE_TAGS, FIGURES_NOTE, MARQUEE_ITEMS } from "@/lib/constants";
+import {
+  EXAMPLE_HEADING,
+  LOG_BODY,
+  LOG_CAPTION,
+  LOG_HEADING,
+  LOG_LINES,
+  STEPS,
+} from "@/lib/landing-content";
 
 // ---------------------------------------------------------------------------
 // Marquee
@@ -40,23 +48,8 @@ export function Marquee() {
 // How it works
 // ---------------------------------------------------------------------------
 
-const STEPS = [
-  {
-    n: 1,
-    title: "Seal",
-    body: "Write the clauses that define what counts as done, and fund the bounty. Both lock at a Solana address the moment you seal. Nobody can move the goalposts afterward, including us.",
-  },
-  {
-    n: 2,
-    title: "Judge",
-    body: "A worker, human or AI agent, submits. The judge reads only the sealed clauses and rules on each one in the open: pass, fail, and why. Median verdict: 41 seconds.",
-  },
-  {
-    n: 3,
-    title: "Paid",
-    body: "Approval releases the escrow in under a second and records an on-chain attestation. Rejection refunds the poster, with the reasoning attached.",
-  },
-];
+// The steps are in lib/landing-content.ts, where a test checks that no timing is
+// stated as a fact.
 
 export function HowItWorks() {
   const { ref, inView } = useInView<HTMLElement>();
@@ -130,14 +123,7 @@ export function HowItWorks() {
 // The verdict log
 // ---------------------------------------------------------------------------
 
-const LOG_LINES: Array<{ time: string; body: string; verdict?: string }> = [
-  { time: "14:02:41", body: "submission received — 500 of 500 labels" },
-  { time: "14:02:42", body: "clause 1 sampled 50, focus check", verdict: "PASS" },
-  { time: "14:02:53", body: "clause 2 twelve blurred frames excluded", verdict: "PASS" },
-  { time: "14:03:07", body: "clause 3 one label per image", verdict: "PASS" },
-  { time: "14:03:22", body: "verdict approved — confidence 96" },
-  { time: "14:03:22", body: "released 25.00 USDC — finality 0.4s" },
-];
+// The lines are in lib/landing-content.ts. This is an ILLUSTRATION: see LOG_CAPTION.
 
 export function VerdictLog() {
   const { ref, inView } = useInView<HTMLElement>();
@@ -155,7 +141,7 @@ export function VerdictLog() {
       >
         <div className={`reveal ${inView ? "in" : ""}`}>
           <h2 style={{ fontSize: 36, letterSpacing: "-0.02em", color: "var(--text)" }}>
-            Every verdict cites a clause
+            {LOG_HEADING}
           </h2>
           <p
             style={{
@@ -166,9 +152,7 @@ export function VerdictLog() {
               maxWidth: 460,
             }}
           >
-            A rejection that cannot point to a sealed clause is impossible by
-            design. The judge can only argue from what was agreed before the work
-            started.
+            {LOG_BODY}
           </p>
         </div>
 
@@ -197,36 +181,15 @@ export function VerdictLog() {
             }}
           >
             <SolanaMark size={14} />
+            {/* An EXAMPLE, said first and plainly. This used to read "MATTER 0042" and
+                "LIVE" beside a pulsing green dot: a seeded sample presented as a feed,
+                in the one colour the design reserves for "the chain paid". Nothing on
+                this page is real activity, so nothing here is green. */}
             <span
               className="label"
-              style={{ color: "var(--text-faint)", letterSpacing: "0.16em" }}
+              style={{ color: "var(--text-muted)", letterSpacing: "0.16em" }}
             >
-              MATTER 0042
-            </span>
-            <span
-              style={{
-                marginLeft: "auto",
-                display: "flex",
-                alignItems: "center",
-                gap: 8,
-              }}
-            >
-              <span
-                aria-hidden="true"
-                style={{
-                  width: 6,
-                  height: 6,
-                  borderRadius: "50%",
-                  background: "var(--positive)",
-                  display: "inline-block",
-                }}
-              />
-              <span
-                className="label"
-                style={{ color: "var(--text-faint)", letterSpacing: "0.16em" }}
-              >
-                LIVE
-              </span>
+              {EXAMPLE_HEADING}
             </span>
           </div>
 
@@ -243,7 +206,7 @@ export function VerdictLog() {
                   animation: inView
                     ? `logIn 0.4s ease-out ${0.2 + i * 0.5}s both`
                     : undefined,
-                  borderLeft: isFinal ? "2px solid var(--positive)" : undefined,
+                  borderLeft: isFinal ? "2px solid var(--text-faint)" : undefined,
                   paddingLeft: isFinal ? 12 : undefined,
                   marginTop: isFinal ? 8 : undefined,
                 }}
@@ -251,11 +214,26 @@ export function VerdictLog() {
                 <span style={{ color: "var(--text-faint)" }}>{line.time}</span>
                 <span style={{ color: "var(--text-muted)", flex: 1 }}>{line.body}</span>
                 {line.verdict && (
-                  <span style={{ color: "var(--positive)", fontWeight: 500 }}>{line.verdict}</span>
+                  <span style={{ color: "var(--text)", fontWeight: 500 }}>{line.verdict}</span>
                 )}
               </div>
             );
           })}
+
+          {/* A sentence, so Archivo, not the ledger's mono. */}
+          <p
+            style={{
+              fontFamily: "var(--font-sans)",
+              fontSize: 13,
+              lineHeight: 1.5,
+              color: "var(--text-muted)",
+              marginTop: 16,
+              paddingTop: 12,
+              borderTop: "1px solid var(--border)",
+            }}
+          >
+            {LOG_CAPTION}
+          </p>
         </div>
       </div>
     </section>
@@ -297,6 +275,14 @@ export function Figures() {
             </div>
             <div style={{ fontSize: 14, color: "var(--text-muted)", marginTop: 8 }}>
               {figure.label}
+            </div>
+            {/* Beside EVERY figure, not in a footnote: a target and a property of
+                the code are different statements, and neither is a measurement. */}
+            <div
+              className="label"
+              style={{ color: "var(--text-faint)", marginTop: 8, letterSpacing: "0.16em" }}
+            >
+              {FIGURE_TAGS[figure.kind]}
             </div>
           </div>
         ))}

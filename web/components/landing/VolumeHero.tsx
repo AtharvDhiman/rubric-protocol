@@ -1,6 +1,8 @@
 import Link from "next/link";
 
 import { Oracle } from "@/components/rig/Oracle";
+import { DEFAULT_CONFIDENCE_THRESHOLD, LAUNCH_MAX_BOUNTY_BASE_UNITS } from "@/lib/constants";
+import { EXAMPLE_HEADING, HERO_EXAMPLE } from "@/lib/landing-content";
 
 /**
  * The landing hero.
@@ -27,14 +29,13 @@ import { Oracle } from "@/components/rig/Oracle";
  * context fewer and one less thing that can disagree with itself.
  */
 
-/** Matter Nº 42 in lib/demo.ts: SETTLED, 3 clauses, all passing, confidence 94. */
-const HERO_MATTER = {
-  n: "0042",
-  confidence: 94,
-  threshold: 70,
-  clauses: 3,
-  passed: 3,
-} as const;
+/**
+ * An EXAMPLE matter, labelled as one. It used to be named "Nº 42" after a seeded
+ * record, which made it read as a real, checkable settled matter - true on a demo
+ * deployment and false on mainnet, where a real matter 42 could exist and this would
+ * have misdescribed it. The numbers are illustrative; the label says so.
+ */
+const HERO_MATTER = HERO_EXAMPLE;
 
 export function VolumeHero() {
   return (
@@ -82,13 +83,18 @@ export function VolumeHero() {
           </div>
 
           <dl className="vh-spec">
+            {/* Launch values, labelled as such. The cap lives on-chain and the admin
+                can change it, and the threshold is an environment setting, so a bare
+                "MAX BOUNTY 50.00" is a number that stops being true the day either
+                changes. They come from the constants, so they cannot drift from them.
+                The live cap is on /create, read from the chain. */}
             <div>
-              <dt className="label">MAX BOUNTY</dt>
-              <dd className="data">50.00 USDC</dd>
+              <dt className="label">LAUNCH CAP</dt>
+              <dd className="data">{(LAUNCH_MAX_BOUNTY_BASE_UNITS / 1_000_000).toFixed(2)} USDC</dd>
             </div>
             <div>
-              <dt className="label">THRESHOLD</dt>
-              <dd className="data">70</dd>
+              <dt className="label">DEFAULT THRESHOLD</dt>
+              <dd className="data">{DEFAULT_CONFIDENCE_THRESHOLD}</dd>
             </div>
             <div>
               <dt className="label">VERIFIERS</dt>
@@ -146,17 +152,15 @@ export function VolumeHero() {
               passedCount={HERO_MATTER.passed}
             />
 
-            {/* The readout. Every figure here is a real property of the matter
-                the object is drawing - Nº 42 in the seeded records - and the
-                matter is named, so the numbers are checkable rather than
-                atmospheric. The reference this came from printed "LOCATING
-                TRUTH VECTORS... CONFIDENCE: 99.9%", which is a number about
-                nothing; on a product whose pitch is "pay on proof", a readout
-                in the same mono face as figures the user is asked to verify
-                does not get to be decorative. */}
+            {/* The readout. It sits in the same mono face as figures the user is
+                asked to verify, so it does not get to state a fact that is not real.
+                The reference this came from printed "LOCATING TRUTH VECTORS...
+                CONFIDENCE: 99.9%", a number about nothing. These numbers describe
+                the matter the object is drawing, and that matter is an EXAMPLE, said
+                first: it is not a real record on this or any deployment. */}
             <div className="vh-hud telemetry" aria-hidden="true">
               <div>
-                MATTER Nº <span className="vh-hud-key">{HERO_MATTER.n}</span>
+                <span className="vh-hud-key">{EXAMPLE_HEADING}</span> MATTER
               </div>
               <div>
                 CONF <span className="vh-hud-key">{HERO_MATTER.confidence}</span>{" "}
@@ -176,10 +180,10 @@ export function VolumeHero() {
           {/* The same statement in text, for a reader who gets none of the
               above: the readout is aria-hidden because it is a duplicate. */}
           <p className="sr-only">
-            The instrument shows matter number {HERO_MATTER.n}, a settled
-            matter: {HERO_MATTER.passed} of {HERO_MATTER.clauses} sealed clauses
-            passed, at confidence {HERO_MATTER.confidence} against a threshold of{" "}
-            {HERO_MATTER.threshold}, and the escrow was released.
+            The instrument shows an example matter, not a real one: {HERO_MATTER.passed}{" "}
+            of {HERO_MATTER.clauses} sealed clauses passed, at confidence{" "}
+            {HERO_MATTER.confidence} against a threshold of {HERO_MATTER.threshold},
+            and the escrow was released.
           </p>
         </div>
       </div>

@@ -2,8 +2,9 @@
  * Shared constants for the web app.
  *
  * The figures shown on the landing page live here rather than being inlined in
- * JSX, because they are PROTOCOL TARGETS during beta, not measured results. Any
- * screen that renders them must also render the qualifier - see `FIGURES_NOTE`.
+ * JSX, because each is either a beta TARGET or a BY-DESIGN property, never a measured
+ * result. Any screen that renders them must also render the qualifier - see
+ * `FIGURES` and `FIGURES_NOTE`.
  */
 
 export const PROTOCOL_NAME = "Rubric";
@@ -65,23 +66,46 @@ export const CATEGORIES = [
 export type Category = (typeof CATEGORIES)[number];
 
 /**
- * Landing-page figures. TARGETS, not measurements. `FIGURES_NOTE` must be
- * rendered wherever these are - presenting a target as a result is a lie, and a
- * protocol whose whole pitch is verifiable claims cannot afford one.
+ * Landing-page figures. Every one is tagged with WHAT KIND of statement it is, and the
+ * tag is rendered beside it, because the two kinds must never be mistaken for each
+ * other - or for a measurement. A protocol whose whole pitch is verifiable claims
+ * cannot afford a number that reads as a result and is not one.
+ *
+ *  - "target":  a goal for the beta. Nothing has measured it. Shown as TARGET.
+ *  - "design":  a property of the code or the program, true by construction rather
+ *               than by statistics. Shown as BY DESIGN.
+ *
+ * There is deliberately no "measured" kind. When real figures exist (the docket
+ * computes them from real verdicts) they belong next to what they measure, not in a
+ * marketing strip.
+ *
+ * Two figures that used to be here are gone on purpose. "0.4s payment finality" was a
+ * slot time worded as finality, which is a different and much longer thing. And "100%
+ * of verdicts cite a sealed clause" overclaimed: the judge's code refuses a rejection
+ * it cannot tie to a clause, but the program does not check it, so it is not a
+ * property of the chain.
  */
 export const FIGURES = [
-  { value: "41s", label: "Median time to verdict" },
-  { value: "0.4s", label: "Payment finality on Solana" },
-  { value: FEE_PERCENT_LABEL, label: "Flat protocol fee" },
-  { value: "100%", label: "Of verdicts cite a sealed clause" },
+  { value: "41s", label: "Median time to verdict", kind: "target" },
+  { value: "1", label: "Transaction to rule and pay", kind: "design" },
+  { value: FEE_PERCENT_LABEL, label: "Flat protocol fee", kind: "design" },
+  { value: "0", label: "Clauses editable after sealing", kind: "design" },
 ] as const;
 
-export const FIGURES_NOTE = "Figures are protocol targets during beta.";
+export type FigureKind = (typeof FIGURES)[number]["kind"];
+
+export const FIGURE_TAGS: Record<FigureKind, string> = {
+  target: "TARGET",
+  design: "BY DESIGN",
+};
+
+export const FIGURES_NOTE =
+  "TARGET figures are goals for the beta, not measurements. BY DESIGN figures are properties of the code, not statistics.";
 
 export const MARQUEE_ITEMS = [
   "SEAL THE CLAUSES",
   "THE AI JUDGES",
-  "SOLANA PAYS IN 0.4s",
+  "VERDICT AND PAYOUT IN ONE TRANSACTION",
   "RECEIPTS FOREVER",
 ] as const;
 
