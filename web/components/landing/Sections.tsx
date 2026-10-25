@@ -162,7 +162,6 @@ export function VerdictLog() {
             animationDelay: "0.15s",
             background: "var(--sunk)",
             border: "1px solid var(--hairline)",
-            borderRadius: 2,
             padding: "20px 24px",
             fontFamily: "var(--font-mono)",
             fontSize: 13,

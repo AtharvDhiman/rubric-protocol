@@ -178,7 +178,6 @@ export default async function TaskPage({
           role="status"
           style={{
             border: "1px solid var(--warning)",
-            borderRadius: 2,
             padding: "12px 16px",
             marginBottom: 20,
           }}
@@ -327,7 +326,6 @@ export default async function TaskPage({
             <div
               style={{
                 border: "1px solid var(--hairline)",
-                borderRadius: 2,
                 padding: "16px 20px",
                 background: "var(--raised)",
               }}
@@ -552,7 +550,6 @@ export default async function TaskPage({
                     borderLeft: `2px solid ${
                       settled ? "var(--positive)" : "var(--negative)"
                     }`,
-                    borderRadius: 2,
                     padding: "16px 20px",
                     display: "flex",
                     justifyContent: "space-between",
