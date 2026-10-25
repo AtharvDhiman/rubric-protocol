@@ -654,3 +654,14 @@ deliberately, after an audit, and after testing on devnet with a $1 bounty.
 Open a sealed task → submit deliberately non-compliant work → watch it get
 REJECTED on-chain with the cited clause → submit compliant work → watch payment
 land in under a second.
+
+---
+
+## Contributing
+
+Contributions are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) for scope, setup, the checks
+to run, and how to report a security issue privately.
+
+## License
+
+MIT. See [LICENSE](LICENSE).
