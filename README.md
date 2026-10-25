@@ -175,6 +175,9 @@ Then fund the wallet:
 1. **Create** → write the acceptance criteria as numbered clauses. Be specific.
    The judge rules on exactly these words and nothing else, so a vague clause is
    a vague ruling — and you cannot fix it afterwards.
+   [docs/writing-clauses.md](docs/writing-clauses.md) is what "be specific"
+   means in practice: what the judge can see, the limits, and a checklist to run
+   before you seal.
 2. Set a bounty and a work window, then **Seal**. The confirmation shows the
    exact canonical text and its SHA-256 before you sign; check it, because this
    is the last moment anything can change.
