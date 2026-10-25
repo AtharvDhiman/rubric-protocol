@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  NO_TEAM_WALLETS_CAVEAT,
   STANDING_CAVEATS,
   buildTractionReport,
   feeFor,
@@ -336,6 +337,95 @@ describe("the caveats", () => {
   });
 });
 
+describe("team wallets: tasks the team funded or worked are set aside, never in the headline", () => {
+  const withTeam = (teamWallets: string[], records: TaskRecord[] = FIXTURE) =>
+    buildTractionReport(records, { ...CONFIG, teamWallets });
+
+  it("a declared wallet as POSTER sets its tasks aside, hand-computed on the fixture", () => {
+    // E posted an open task and a submitted one (3 USDC between them), and nothing else.
+    const r = withTeam(["E"]);
+    expect(r.teamControlled.tasks).toBe(2);
+    expect(r.teamControlled.open).toBe(1);
+    expect(r.teamControlled.submitted).toBe(1);
+    expect(r.teamControlled.postedVolume).toBe(3_000_000n);
+    expect(r.teamControlled.settled).toBe(0);
+    // The headline loses exactly those two: 8 tasks become 6, posted 24.5 becomes 21.5.
+    expect(r.independent.tasks).toBe(6);
+    expect(r.independent.postedVolume).toBe(21_500_000n);
+    expect(r.independent.open).toBe(0);
+    expect(r.independent.submitted).toBe(0);
+    expect(r.independent.posters).toBe(3);
+    expect(r.independent.pairs).toBe(4);
+    expect(r.independent.reciprocalPairs).toBe(1);
+    // The settled picture, and so the approval rate, is untouched: none of E's tasks had settled.
+    expect(r.independent.settledVolume).toBe(18_000_000n);
+    expect(r.independent.approvalRate).toBe(0.8);
+    // Six bounties, 0.5 1 2 3 5 10: the median is the mean of the middle two.
+    expect(r.independent.medianBounty).toBe(2_500_000n);
+  });
+
+  it("a declared wallet as WORKER also sets the task aside, even when a customer posted it", () => {
+    const r = withTeam(["T"], [rec({ creator: "CUSTOMER", worker: "T", state: "settled", approved: true, bountyAmount: 5n * M, decidedAt: at("2026-10-07T00:00:00Z") })]);
+    expect(r.teamControlled.tasks).toBe(1);
+    expect(r.teamControlled.settledVolume).toBe(5_000_000n);
+    expect(r.independent.tasks).toBe(0);
+    expect(r.independent.posters).toBe(0);
+    expect(r.weekly).toEqual([]);
+  });
+
+  it("a wallet that is not on either side changes nothing but the declared list", () => {
+    const base = buildTractionReport(FIXTURE, CONFIG);
+    const r = withTeam(["SomebodyElse"]);
+    const j = (x: unknown) => JSON.stringify(x, (_k, v) => (typeof v === "bigint" ? v.toString() : v));
+    expect(j(r.independent)).toBe(j(base.independent));
+    expect(j(r.selfDealt)).toBe(j(base.selfDealt));
+    expect(r.teamControlled.tasks).toBe(0);
+  });
+
+  it("a team wallet dealing with itself is counted once, as same-wallet", () => {
+    const r = withTeam(["T"], [rec({ creator: "T", worker: "T", state: "settled", approved: true, decidedAt: at("2026-10-07T00:00:00Z") })]);
+    expect(r.selfDealt.tasks).toBe(1);
+    expect(r.teamControlled.tasks).toBe(0);
+    expect(r.independent.tasks).toBe(0);
+  });
+
+  it("keeps team settlements out of the weekly series", () => {
+    const r = withTeam(["T"], [
+      rec({ creator: "T", worker: "B", state: "settled", approved: true, decidedAt: at("2026-10-07T00:00:00Z") }),
+      rec({ creator: "A", worker: "B", state: "settled", approved: true, bountyAmount: 2n * M, decidedAt: at("2026-10-21T00:00:00Z") }),
+    ]);
+    expect(r.weekly).toEqual([{ weekStart: "2026-10-19", settled: 1, volume: 2_000_000n }]);
+  });
+
+  it("echoes the declared wallets, sorted and without duplicates", () => {
+    expect(withTeam(["E", "B", "E"]).teamWallets).toEqual(["B", "E"]);
+    expect(buildTractionReport(FIXTURE, CONFIG).teamWallets).toEqual([]);
+  });
+
+  it("with none declared, says the headline cannot be called customer traction", () => {
+    const caveats = buildTractionReport(FIXTURE, CONFIG).caveats;
+    expect(caveats).toContain(NO_TEAM_WALLETS_CAVEAT);
+    expect(NO_TEAM_WALLETS_CAVEAT).toMatch(/NOT set aside/);
+    expect(NO_TEAM_WALLETS_CAVEAT).toMatch(/Do not quote the headline as customer traction/);
+    expect(buildTractionReport([], CONFIG).caveats).toContain(NO_TEAM_WALLETS_CAVEAT);
+  });
+
+  it("with some declared, drops that caveat and says an undeclared wallet still counts as independent", () => {
+    const caveats = withTeam(["E"]).caveats;
+    expect(caveats).not.toContain(NO_TEAM_WALLETS_CAVEAT);
+    expect(caveats.join(" ")).toMatch(/Only the 1 wallet\(s\) declared as the team's are set aside/);
+    expect(caveats.join(" ")).toMatch(/A team wallet that was not declared is counted as independent/);
+  });
+
+  it("states what was set aside, in USDC, only when something was", () => {
+    const line = withTeam(["E"]).caveats.find((c) => /declared team wallet as poster or worker/.test(c));
+    expect(line).toBe(
+      "2 task(s) had a declared team wallet as poster or worker (3.00 USDC posted, 0.00 USDC settled) and are excluded from the headline."
+    );
+    expect(withTeam(["SomebodyElse"]).caveats.some((c) => /declared team wallet as poster or worker/.test(c))).toBe(false);
+  });
+});
+
 // --- Properties that must hold for ANY data -------------------------------------------
 
 /** A seeded generator so a failure is reproducible. */
@@ -377,8 +467,12 @@ describe("invariants over random data", () => {
   it("every account is accounted for exactly once", () => {
     for (const i of cases) {
       const records = randomRecords(rng(i + 1), 1 + (i % 40));
-      const r = buildTractionReport(records, CONFIG);
-      expect(r.independent.tasks + r.selfDealt.tasks + r.otherMint + r.unknownState, `case ${i}`).toBe(r.recordsRead);
+      const teamWallets = i % 3 === 0 ? ["A", "D"] : i % 3 === 1 ? ["F"] : [];
+      const r = buildTractionReport(records, { ...CONFIG, teamWallets });
+      expect(
+        r.independent.tasks + r.selfDealt.tasks + r.teamControlled.tasks + r.otherMint + r.unknownState,
+        `case ${i}`
+      ).toBe(r.recordsRead);
     }
   });
 
@@ -387,13 +481,14 @@ describe("invariants over random data", () => {
       const r = buildTractionReport(randomRecords(rng(i + 1000), 1 + (i % 40)), CONFIG);
       expect(activityLike(r.independent), `case ${i}`).toBe(r.independent.tasks);
       expect(activityLike(r.selfDealt), `case ${i}`).toBe(r.selfDealt.tasks);
+      expect(activityLike(r.teamControlled), `case ${i}`).toBe(r.teamControlled.tasks);
     }
   });
 
   it("volumes are consistent: net plus fees is gross, and posted covers settled plus refunded", () => {
     for (const i of cases) {
       const r = buildTractionReport(randomRecords(rng(i + 2000), 1 + (i % 40)), CONFIG);
-      for (const a of [r.independent, r.selfDealt]) {
+      for (const a of [r.independent, r.selfDealt, r.teamControlled]) {
         expect(a.settledNet + a.settledFees, `case ${i}`).toBe(a.settledVolume);
         expect(a.postedVolume >= a.settledVolume + a.refundedVolume, `case ${i}`).toBe(true);
         expect(a.settledFees <= a.settledVolume, `case ${i}`).toBe(true);
@@ -444,6 +539,18 @@ describe("invariants over random data", () => {
       const records = randomRecords(next, 2 + (i % 30));
       const shuffled = [...records].sort(() => next() - 0.5);
       expect(json(buildTractionReport(shuffled, CONFIG)), `case ${i}`).toBe(json(buildTractionReport(records, CONFIG)));
+    }
+  });
+
+  it("adding a task a declared team wallet posted changes NOTHING in the headline", () => {
+    const j = (x: unknown) => JSON.stringify(x, (_k, v) => (typeof v === "bigint" ? v.toString() : v));
+    for (const i of cases.slice(0, 100)) {
+      const records = randomRecords(rng(i + 8000), 2 + (i % 30));
+      const config = { ...CONFIG, teamWallets: ["TEAM"] };
+      const before = buildTractionReport(records, config).independent;
+      const teamTask = rec({ creator: "TEAM", worker: "A", bountyAmount: 999n * M, state: "settled", approved: true, decidedAt: 1_785_000_000 });
+      const teamWorked = rec({ creator: "A", worker: "TEAM", bountyAmount: 999n * M, state: "settled", approved: true, decidedAt: 1_785_000_000 });
+      expect(j(buildTractionReport([...records, teamTask, teamWorked], config).independent), `case ${i}`).toBe(j(before));
     }
   });
 

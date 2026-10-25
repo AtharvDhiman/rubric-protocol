@@ -18,6 +18,12 @@
  *              because RPC URLs often carry an API key.
  *   --program  the program id, if it is not the one in lib/idl/rubric.json.
  *   --json     machine-readable output. Amounts are exact decimal strings.
+ *   --team-wallets  the wallets the team controls, comma separated (or TEAM_WALLETS). A task
+ *              with one of them as poster or worker is set aside, shown beside the headline.
+ *              Without it the report cannot tell your other wallets from customers and says so.
+ *              A bad entry stops the report, because an entry silently dropped would let
+ *              the team's own volume into the headline. A rejected entry is never printed
+ *              back: the likeliest mistake is pasting a secret key.
  *
  * On any cluster other than mainnet the report is headed TEST NETWORK - NOT TRACTION before
  * a single figure. Read the caveats it prints: this measures activity, not demand, and the
@@ -33,6 +39,7 @@ import path from "node:path";
 import { AnchorProvider, Program, type Idl } from "@anchor-lang/core";
 import { Connection, PublicKey } from "@solana/web3.js";
 import { loadTractionReport, readProvenance, type TractionProgram } from "../lib/traction-chain";
+import { parseTeamWallets } from "../lib/team-wallets";
 import { formatTractionText, tractionToJson } from "../lib/traction-format";
 
 function fatal(message: string): never {
@@ -46,7 +53,7 @@ function arg(name: string): string | undefined {
 }
 const flag = (name: string) => process.argv.includes(`--${name}`);
 
-const KNOWN = new Set(["--rpc", "--program", "--json"]);
+const KNOWN = new Set(["--rpc", "--program", "--json", "--team-wallets"]);
 
 async function main() {
   // Strict, like the other scripts: a mistyped flag silently doing something else is how a
@@ -57,6 +64,20 @@ async function main() {
 
   const rpc = arg("rpc") ?? process.env.RPC_URL;
   if (!rpc || rpc.startsWith("--")) fatal("Missing --rpc (or RPC_URL). There is no default cluster, on purpose.");
+
+  // Before any network call: a bad list must stop the report, not follow a slow RPC read.
+  let teamInput = process.env.TEAM_WALLETS;
+  if (process.argv.includes("--team-wallets")) {
+    const value = arg("team-wallets");
+    if (value === undefined || value.startsWith("--")) {
+      fatal("--team-wallets needs a comma-separated list of addresses. Leave it out to declare none.");
+    }
+    teamInput = value;
+  }
+  const team = parseTeamWallets(teamInput);
+  if (team.problems.length > 0) {
+    fatal(`The list of team wallets is invalid, so no report was produced.\n  ${team.problems.join("\n  ")}`);
+  }
 
   const idlPath = path.join(process.cwd(), "lib", "idl", "rubric.json");
   const idl = JSON.parse(fs.readFileSync(idlPath, "utf8")) as Idl & { address: string };
@@ -86,7 +107,7 @@ async function main() {
   const program = new Program({ ...idl, address: programId.toBase58() }, provider);
 
   const provenance = await readProvenance(connection, programId);
-  const { report } = await loadTractionReport(program as unknown as TractionProgram);
+  const { report } = await loadTractionReport(program as unknown as TractionProgram, { teamWallets: team.wallets });
 
   console.log(flag("json") ? tractionToJson(report, provenance) : formatTractionText(report, provenance));
 }

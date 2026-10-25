@@ -406,7 +406,7 @@ proves nothing.
 | **P7** | Verifier operations (launch-plan item 3), as five pieces: key rotation with no gap, a wallet health check, a preflight and operational holds, a retry script, and an admin-action planner. Runbook: [verifier-runbook.md](verifier-runbook.md) | `298c49b`, `d496b8b`, `4a11824`, `037cdf5`, `9e30174`, `a4d369c` | see below |
 | **P8** | Judge reliability and human review (launch-plan item 4): backoff, an opt-in fallback model, outages recorded as "not a ruling", HELD-versus-REJECTED made clear, and a reviewer path for held tasks. Design: [dispute-design.md](dispute-design.md) | `6be37bd`, `4ccc054`, `646640e`, `44bba6a` | see **P8 verification** |
 | **P9** | Trust and honesty (launch-plan item 5): the landing page stops presenting an illustration as activity, sample data can never appear on mainnet, a mainnet banner, and a notice and a way off a shared hosting address. [custom-domain.md](custom-domain.md) | `595553c`, `acb45cb`, `6587461` | see **P9** below |
-| **P10** | Traction and a launch plan (launch-plan item 6): figures computed from the chain, a read-only report script, a `/stats` page and `/api/stats` headed as test funds on any cluster but mainnet, and [launch-plan.md](launch-plan.md) | `481faca`, `6975c10`, `68b381f`, `a2f7103`, and the docs commit | see **P10** below |
+| **P10** | Traction and a launch plan (launch-plan item 6): figures computed from the chain, a read-only report script, a `/stats` page and `/api/stats` headed as test funds on any cluster but mainnet, and [launch-plan.md](launch-plan.md) | `481faca`, `6975c10`, `68b381f`, `a2f7103`, `56bcddf`, and the team wallets commit | see **P10** below |
 
 **P7 verification, and its limits.** The pure decisions are unit tested (rotation
 17, health 19, holds and stuck-task selection 19, retry 40, admin planner 50), and
@@ -527,7 +527,7 @@ What P9 does **not** do:
   close it is.
 
 **P10: traction and a launch plan (launch-plan item 6)** — `481faca`, `6975c10`, `68b381f`,
-`a2f7103`, and the commit that adds [launch-plan.md](launch-plan.md).
+`a2f7103`, `56bcddf` (which adds [launch-plan.md](launch-plan.md)), and the commit that adds the team wallets.
 
 The metrics are computed from the program's Task accounts, not from the database, so nothing
 seeded can be counted and anyone can recompute them. Tasks are never closed, so the chain is a
@@ -542,6 +542,15 @@ complete record. Findings, mostly about what a traction number can honestly clai
   independent repeat posters, not volume.
 - **The chain cannot give a latency.** It stores when a verdict landed (`decided_at`) but not
   when the work was submitted, so the report states it says nothing about speed.
+- **The operator's own wallets look like customers.** A second wallet of the team's is
+  indistinguishable on-chain from an outside one, and it is the easiest way to flatter the
+  numbers without lying. The report takes a declared list (`TEAM_WALLETS`, or `--team-wallets` on
+  the script) and sets aside any task a declared wallet posted or worked, in its own block beside
+  the headline. It is built to fail closed: an entry that is not a valid address stops the report
+  instead of being skipped, a rejected entry is never echoed (the likeliest mistake is pasting a
+  secret key), the list is checked before the cache so an earlier good reading cannot mask a bad
+  list as "the chain could not be reached", and with none declared the headline says so and
+  says not to quote it as customer traction.
 - **A refund is not a rejection.** A task can be refunded because the judge rejected the work or
   because the poster reclaimed an undecided one. Counting both as rejections would understate the
   approval rate; the report separates them and gives the number of decisions with the rate.
@@ -559,10 +568,14 @@ complete record. Findings, mostly about what a traction number can honestly clai
   pre-damage versions, and `web/lib/encoding.test.ts` now scans the app, components, lib,
   scripts, prisma and docs and fails with the file and line if it recurs.
 
-Verified: 140 new tests across the traction modules, the cache, the route, the page's view-model
-and the encoding scan. Mutation checks: 23 of 23 on the aggregation, 24 of 24 on the chain reader
-and formatter, 30 of 30 on the cache, the view-model, the server source and the route. Beyond
-that: the script was run read-only against the live devnet deployment; the page was loaded
+Verified: 189 tests across the traction modules, the cache, the team wallet list, the route, the
+page's view-model and the encoding scan. Mutation checks: 23 of 23 on the aggregation, 24 of 24 on
+the chain reader and formatter, 30 of 30 on the cache, the view-model, the server source and the
+route, and 25 of 25 on the team wallet code (a 26th, a length pre-check in the address parser,
+survived because it was dead code, since the canonical round trip already rejects everything it
+did, and was removed). Writing those tests also caught one of my own: a case built on a random key
+failed about 1.5% of runs, because a 43-character key with one character appended is sometimes a
+valid address. It now uses a fixed one. Beyond that: the script was run read-only against the live devnet deployment; the page was loaded
 against live devnet at desktop width, at 375px and at 320px (which caught tables running off a
 phone screen, fixed) and with an unreachable RPC, where the page showed no figures, the route
 returned a 503 and the server log held the error name only; `next build` passes.
@@ -572,9 +585,9 @@ What P10 does **not** do:
 - **It has not been seen on mainnet.** Every figure it has shown is devnet and headed as test
   funds. The mainnet path (no heading, an Explorer link without a cluster parameter) is covered
   by tests, not by a real mainnet read.
-- **It cannot tell which other wallets are yours.** A second wallet of yours looks independent
-  on-chain. The launch plan makes declaring team wallets a procedure and proposes a
-  `--team-wallets` option; it is **not built**.
+- **It knows only the wallets it is told about.** A second wallet of yours that you did not
+  declare in `TEAM_WALLETS` looks independent on-chain and counts as independent; the caveats say
+  so. Declaring them is the operator's job ([launch-plan.md](launch-plan.md#declaring-the-teams-wallets)).
 - **It does not report held tasks or verdict latency**, which live only in the database and so
   are claims, not recomputable figures.
 - **The launch plan's thresholds are proposals**, and part of its competitor table is

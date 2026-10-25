@@ -13,8 +13,9 @@ import { isTestNetwork, type Provenance } from "./traction-chain";
 import {
   TEST_NETWORK_EXPLANATION,
   TEST_NETWORK_HEADING,
+  approvalText,
+  headlineKicker,
   orNone,
-  pct,
   usdc,
   type CacheMeta,
 } from "./traction-format";
@@ -38,8 +39,14 @@ export interface TractionView {
   notice: { heading: string; explanation: string } | null;
   /** Set when the chain could not be read just now and this is an earlier reading. */
   stale: { ageSeconds: number } | null;
+  /** What the headline wallets have in common, including whether any team wallets were declared. */
+  headlineKicker: string;
   headline: ViewRow[];
   setAside: ViewRow[];
+  /** Tasks where a declared team wallet is the poster or the worker. Zeros when none declared. */
+  teamControlled: ViewRow[];
+  /** The declared team wallets. Empty means none were declared, which the page says. */
+  teamWallets: string[];
   weekly: WeekRow[];
   caveats: string[];
   provenance: ViewRow[];
@@ -136,7 +143,7 @@ function headlineRows(ind: IndependentActivity): ViewRow[] {
     ...money,
     {
       label: "Approval rate",
-      value: `${pct(ind.approvalRate)} of ${ind.settled + ind.refundedRejected} decided`,
+      value: approvalText(ind.approvalRate, ind.settled + ind.refundedRejected),
       note: "settled / (settled + rejected); reclaims do not count",
     },
     {
@@ -154,8 +161,11 @@ export function buildTractionView(report: TractionReport, p: Provenance, cache?:
       ? { heading: TEST_NETWORK_HEADING, explanation: TEST_NETWORK_EXPLANATION }
       : null,
     stale: cache?.stale ? { ageSeconds: cache.ageSeconds } : null,
+    headlineKicker: headlineKicker(report),
     headline: headlineRows(report.independent),
     setAside: activityRows(report.selfDealt),
+    teamControlled: activityRows(report.teamControlled),
+    teamWallets: report.teamWallets,
     weekly: report.weekly.map((w) => ({ week: w.weekStart, settled: String(w.settled), volume: usdc(w.volume) })),
     caveats: report.caveats,
     provenance: [

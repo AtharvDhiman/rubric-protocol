@@ -13,6 +13,7 @@
 
 import "server-only";
 
+import { requireTeamWallets } from "../team-wallets";
 import { loadTractionReport, readProvenance, type Provenance, type TractionProgram } from "../traction-chain";
 import type { TractionReport } from "../traction";
 import { singleFlightCache, type Cached } from "../ttl-cache";
@@ -26,11 +27,14 @@ export interface TractionSnapshot {
 export const FRESH_MS = 60_000;
 export const STALE_MS = 600_000;
 
-async function readSnapshot(): Promise<TractionSnapshot> {
+export async function readSnapshot(): Promise<TractionSnapshot> {
+  // First, before any network call. A bad list throws TeamWalletsError and nothing is read: an
+  // entry silently dropped would let the team's own volume into the headline.
+  const teamWallets = requireTeamWallets(process.env.TEAM_WALLETS);
   const program = readOnlyProgram();
   // The slot first, then the accounts: the accounts are at or after the slot we report.
   const provenance = await readProvenance(serverConnection(), program.programId);
-  const { report } = await loadTractionReport(program as unknown as TractionProgram);
+  const { report } = await loadTractionReport(program as unknown as TractionProgram, { teamWallets });
   return { report, provenance };
 }
 
@@ -48,7 +52,7 @@ export function createTractionSource(
         } catch (error) {
           // The name only. An RPC error's message can carry the endpoint URL, and RPC URLs
           // very often contain an API key.
-          console.error("[stats] could not read the chain:", error instanceof Error ? error.name : "unknown error");
+          console.error("[stats] could not produce the figures:", error instanceof Error ? error.name : "unknown error");
           throw error;
         }
       });
@@ -58,5 +62,15 @@ export function createTractionSource(
 
 const source = createTractionSource();
 
-/** The current reading, from the cache if it is fresh. Throws if there is nothing to show. */
-export const getTraction = () => source.get();
+/**
+ * The current reading, from the cache if it is fresh. Throws if there is nothing to show.
+ *
+ * The team wallet list is checked HERE, before the cache is asked. Inside the cache's loader a
+ * bad list would be masked by the stale-copy fallback: an earlier good reading would be served,
+ * flagged "the chain could not be reached", which is the wrong explanation for a configuration
+ * error. Checked first, a bad list always fails loudly.
+ */
+export async function getTraction() {
+  requireTeamWallets(process.env.TEAM_WALLETS);
+  return source.get();
+}

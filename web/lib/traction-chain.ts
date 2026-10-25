@@ -61,7 +61,10 @@ export function configAddress(programId: PublicKey): PublicKey {
  * discriminator. That is all of them, in any state, which is the point: settled and
  * refunded tasks are never closed, so the chain is a complete record.
  */
-export async function loadTractionReport(program: TractionProgram): Promise<TractionResult> {
+export async function loadTractionReport(
+  program: TractionProgram,
+  options: { teamWallets?: readonly string[] } = {}
+): Promise<TractionResult> {
   let config: RawConfig;
   try {
     config = (await program.account.config.fetch(configAddress(program.programId))) as RawConfig;
@@ -78,6 +81,7 @@ export async function loadTractionReport(program: TractionProgram): Promise<Trac
   const report = buildTractionReport(records, {
     mint: config.bountyMint.toBase58(),
     feeBps: config.feeBps,
+    teamWallets: options.teamWallets,
   });
   return { report, records };
 }

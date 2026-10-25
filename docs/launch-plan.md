@@ -34,6 +34,8 @@ What it tests: whether anyone outside the team will post a second task.
 Gates before Stage 0, all from the checklist: Phases 0–4 done, the mainnet banner showing, the
 external monitor on `GET /api/health/verifier` proven to page a human, no sample rows in the
 production database, and a domain of your own moved to at least two weeks before launch.
+One more gate comes from this plan: **every wallet you control is listed in `TEAM_WALLETS` on
+the production deployment** ([section 6](#declaring-the-teams-wallets)).
 
 ---
 
@@ -173,7 +175,9 @@ This is checklist Phase 5, run as a set of experiments with the outcome written 
 4. Make the monitor fire once for real (checklist Phase 5).
 
 **Exit:** all three endings observed on mainnet, costs written down, the alert proven.
-These tasks are team-funded and **must never appear in a traction claim.**
+These tasks are team-funded, so the wallets that post and work them must already be in
+`TEAM_WALLETS`: the report then sets them aside, and they **must never appear in a traction
+claim.**
 
 ### Stage 1 — Pilot at $1 (about 2–3 weeks)
 
@@ -213,7 +217,8 @@ At these sizes you will hit it. A confidently wrong verdict pays or refunds the 
 and **cannot be undone on-chain**. Decide before launch whether you will make that person
 whole from team funds. At $1–5 it is cheap and it protects the pilot, but it must be
 **described as a team payment, never as something the protocol does**, and it must be counted
-in the traction report as team-funded.
+in the traction report as team-funded, which means the wallet that pays is in `TEAM_WALLETS`
+too.
 
 ### What participants are told
 
@@ -358,21 +363,38 @@ result):
   example, "100.0% of 1 decided", on purpose);
 - put the weekly series in the story if it is two points.
 
-### A gap in the tooling you should know about
+### Declaring the team's wallets
 
-The report separates tasks where **one wallet** both posted and worked. It cannot know which
-*other* wallets are yours: a second wallet of yours posting a task that a third wallet of
-yours works looks independent on-chain. Today the defence is procedural:
+"Independent" is only as good as the list of wallets that are **not** independent. The report
+always sets aside a task where **one wallet** both posted and worked it. It sets aside a task
+where a **declared team wallet** posted or worked it too, but it cannot find your wallets by
+itself: a second wallet of yours posting a task that a third wallet of yours works looks
+independent on-chain. So you tell it.
 
-- **declare every team-controlled wallet in writing before launch**, and keep the list;
-- **do not quote a traction figure for any period in which a team wallet posted or worked a
-  task, unless you subtract those tasks and say so**; the JSON report carries aggregates, not
-  per-task rows, so doing that by hand means reading the Task accounts yourself;
-- count the Stage 0 canary and any make-good payments as team-funded.
+- **List every wallet you control in `TEAM_WALLETS`** on the deployment (comma separated,
+  server-side, not a `NEXT_PUBLIC_` variable; a change takes effect on redeploy), and give the
+  same list to the script. Include the Stage 0 canary wallets, the wallet that pays any
+  make-good, and any wallet used by someone you pay to test.
 
-A `--team-wallets` option that sets those tasks aside, shown beside the headline the way
-same-wallet tasks already are, is a small change to `lib/traction.ts`. I have **not**
-built it, because it extends what we agreed. It is the first thing I would add before launch.
+  ```bash
+  cd web
+  npx tsx scripts/traction-report.ts --rpc <paid mainnet rpc> --team-wallets <wallet1>,<wallet2>
+  ```
+
+- **Either side counts.** A task a team wallet *posted* is not demand, and a task a team wallet
+  *worked* is not supply from outside, so both are set aside, in their own block beside the
+  headline. When a customer posts and you do the work, this understates the headline. That is
+  the safe direction to be wrong in.
+- **A bad entry stops the report.** A mistyped address silently dropped would let your own
+  volume into the headline, so the page shows "THE LIST OF TEAM WALLETS IS INVALID" and no
+  figures, and the script refuses. A rejected entry is never echoed back, because the likeliest
+  mistake is pasting a secret key into the variable.
+- **With none declared, the report says so**: "NO team wallets were declared" in the headline,
+  and "Do not quote the headline as customer traction". Treat that as the report declining to
+  vouch for the number, which is what it is doing.
+- **It knows only what you tell it.** A team wallet you did not declare counts as independent,
+  and the caveats say so. The page lists the declared wallets, so a reader can see who was set
+  aside. Publish the list.
 
 ---
 
@@ -395,7 +417,7 @@ built it, because it extends what we agreed. It is the first thing I would add b
 Fill these in; the plan cannot be run without them.
 
 - Who signs for the admin multisig, and who will hold the verifier key?
-- Which wallets are team-controlled? (List them now.)
+- Which wallets are team-controlled? (List them now; they go in `TEAM_WALLETS`.)
 - Which 5–10 communities or sponsors will you talk to first, and which of them do you
   already know?
 - How many hours a week can you give for the eight to ten weeks?

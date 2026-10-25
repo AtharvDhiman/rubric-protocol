@@ -206,7 +206,7 @@ describe("the text report", () => {
     );
     expect(formatTractionText(withOpen, prov("mainnet"))).toMatch(/approval rate\s+50\.0% of 2 decided/);
     const empty = formatTractionText(buildTractionReport([], { mint: "M", feeBps: 200 }), prov("mainnet"));
-    expect(empty).toMatch(/approval rate\s+n\/a of 0 decided/);
+    expect(empty).toMatch(/approval rate\s+n\/a \(nothing decided yet\)/);
   });
 
   it("never leaks a raw bigint literal", () => {
@@ -270,5 +270,71 @@ describe("usdc", () => {
 
   it("is exact beyond Number's safe range", () => {
     expect(usdc(18_446_744_073_709_551_615n)).toBe("18446744073709.551615 USDC");
+  });
+});
+
+describe("team wallets through the reader", () => {
+  it("loadTractionReport passes the declared wallets to the report", async () => {
+    // The default on-chain task is A -> B, settled. Declaring B (the worker) sets it aside.
+    const { program } = fakeProgram([onChainTask()]);
+    const { report } = await loadTractionReport(program, { teamWallets: [B.toBase58()] });
+    expect(report.teamWallets).toEqual([B.toBase58()]);
+    expect(report.teamControlled.tasks).toBe(1);
+    expect(report.teamControlled.settledVolume).toBe(5_000_000n);
+    expect(report.independent.tasks).toBe(0);
+  });
+
+  it("declaring nobody is the default, and nothing is set aside", async () => {
+    const { program } = fakeProgram([onChainTask()]);
+    const { report } = await loadTractionReport(program);
+    expect(report.teamWallets).toEqual([]);
+    expect(report.teamControlled.tasks).toBe(0);
+    expect(report.independent.tasks).toBe(1);
+  });
+});
+
+describe("the text report and the team's wallets", () => {
+  const records: TaskRecord[] = [
+    { creator: "A", worker: "B", mint: "M", bountyAmount: 5_000_000n, state: "settled", approved: true, decidedAt: 1_790_000_000 },
+    { creator: "TEAMWALLET", worker: "B", mint: "M", bountyAmount: 7_000_000n, state: "settled", approved: true, decidedAt: 1_790_000_000 },
+  ];
+  const prov = { programId: "Prog", cluster: "mainnet" as const, genesisHash: "abcdefgh1234", slot: 42, fetchedAt: "t" };
+  const declared = buildTractionReport(records, { mint: "M", feeBps: 200, teamWallets: ["TEAMWALLET"] });
+  const undeclared = buildTractionReport(records, { mint: "M", feeBps: 200 });
+
+  it("sets the team's task aside in its own block, with the declared wallets listed", () => {
+    const text = formatTractionText(declared, prov);
+    const block = text.slice(text.indexOf("SET ASIDE, TEAM-CONTROLLED"), text.indexOf("READ THIS BEFORE QUOTING"));
+    expect(block).toMatch(/tasks\s+1 /);
+    expect(block).toContain("7.00 USDC");
+    expect(block).toMatch(/declared\s+1 wallet\(s\):/);
+    expect(block).toContain("TEAMWALLET");
+    // And the headline has only the customer's 5.00.
+    const headline = text.slice(text.indexOf("HEADLINE"), text.indexOf("SET ASIDE"));
+    expect(headline).toContain("5.00 USDC");
+    expect(headline).not.toContain("7.00 USDC");
+  });
+
+  it("says in the headline that team wallets were declared, and not that none were", () => {
+    const text = formatTractionText(declared, prov);
+    expect(text).toMatch(/HEADLINE\s+\(poster and worker are different wallets, and neither is a declared team wallet\)/);
+    expect(text).not.toMatch(/NO team wallets were declared/);
+  });
+
+  it("with none declared, says so in the headline, in the block and in the caveats, and counts the team's task", () => {
+    const text = formatTractionText(undeclared, prov);
+    expect(text).toMatch(/HEADLINE\s+\(.*NO team wallets were declared, so team activity is NOT set aside\)/);
+    expect(text).toMatch(/none declared\. Pass --team-wallets \(or TEAM_WALLETS\)/);
+    expect(text).toContain("Do not quote the headline as customer traction");
+    // 12.00 = 5 + 7: the team's task is in the headline, which is exactly what the warning says.
+    const headline = text.slice(text.indexOf("HEADLINE"), text.indexOf("SET ASIDE"));
+    expect(headline).toContain("12.00 USDC");
+  });
+
+  it("the JSON carries the team bucket and the declared list, with exact amounts", () => {
+    const parsed = JSON.parse(tractionToJson(declared, prov));
+    expect(parsed.report.teamWallets).toEqual(["TEAMWALLET"]);
+    expect(parsed.report.teamControlled.settledVolume).toBe("7000000");
+    expect(parsed.report.independent.settledVolume).toBe("5000000");
   });
 });

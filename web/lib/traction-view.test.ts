@@ -75,7 +75,7 @@ describe("the headline", () => {
     const empty = buildTractionView(buildTractionReport([], { mint: "M", feeBps: 200 }), prov());
     const text = JSON.stringify(empty.headline);
     expect(text).not.toMatch(/NaN|undefined|null/);
-    expect(empty.headline.find((r) => r.label === "Approval rate")?.value).toBe("n/a of 0 decided");
+    expect(empty.headline.find((r) => r.label === "Approval rate")?.value).toBe("n/a (nothing decided yet)");
     expect(empty.headline.find((r) => r.label === "Median bounty")?.value).toBe("n/a");
     expect(empty.weekly).toEqual([]);
   });
@@ -238,5 +238,40 @@ describe("agreement with the script's text report", () => {
     expect(v.headline.find((r) => r.label === "Posters")?.value).toBe("2");
     expect(text).toMatch(/approval rate\s+50\.0% of 2 decided/);
     expect(v.headline.find((r) => r.label === "Approval rate")?.value).toBe("50.0% of 2 decided");
+  });
+});
+
+describe("the team's wallets on the page", () => {
+  const records2: TaskRecord[] = [
+    { creator: "A", worker: "B", mint: "M", bountyAmount: 5_000_000n, state: "settled", approved: true, decidedAt: 1_790_000_000 },
+    { creator: "TEAMWALLET", worker: "B", mint: "M", bountyAmount: 7_000_000n, state: "settled", approved: true, decidedAt: 1_790_000_000 },
+  ];
+  const declared = buildTractionView(buildTractionReport(records2, { mint: "M", feeBps: 200, teamWallets: ["TEAMWALLET"] }), prov());
+  const undeclared = buildTractionView(buildTractionReport(records2, { mint: "M", feeBps: 200 }), prov());
+
+  it("lists the declared wallets and sets the team's task aside in its own rows", () => {
+    expect(declared.teamWallets).toEqual(["TEAMWALLET"]);
+    expect(declared.teamControlled.find((r) => r.label === "Tasks")?.value).toBe("1");
+    expect(declared.teamControlled.find((r) => r.label === "Settled")?.value).toBe("7.00 USDC");
+    expect(JSON.stringify(declared.headline)).not.toContain("7.00 USDC");
+  });
+
+  it("says in the headline kicker that neither side is a declared team wallet", () => {
+    expect(declared.headlineKicker).toBe("poster and worker are different wallets, and neither is a declared team wallet");
+  });
+
+  it("with none declared, the kicker says so, the list is empty and the team's task is in the headline", () => {
+    expect(undeclared.teamWallets).toEqual([]);
+    expect(undeclared.headlineKicker).toMatch(/NO team wallets were declared/);
+    expect(undeclared.headline.find((r) => r.label === "Settled")?.value).toBe("12.00 USDC");
+    expect(undeclared.caveats.join(" ")).toMatch(/Do not quote the headline as customer traction/);
+  });
+
+  it("the page and the script still print the same amounts when a team is declared", () => {
+    const amounts = (s: string) => new Set(s.match(/\d+(?:\.\d+)? USDC/g) ?? []);
+    const report2 = buildTractionReport(records2, { mint: "M", feeBps: 200, teamWallets: ["TEAMWALLET"] });
+    const fromText = amounts(formatTractionText(report2, prov("mainnet")));
+    const fromView = amounts(JSON.stringify([declared.headline, declared.setAside, declared.teamControlled, declared.weekly, declared.caveats]));
+    expect([...fromView].sort()).toEqual([...fromText].sort());
   });
 });

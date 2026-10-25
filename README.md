@@ -31,7 +31,7 @@ the reasoning is public and its hash is on-chain.
 | Devnet deploy | **Live** at `F2Uo5JUfGQtho8s9ZbwcpWBd8iJ4XvBqamUaqdjcrRxz`, config initialized |
 | Verifier operations: a wallet health check, a keyless retry script, key rotation with no gap, and a planner for the admin multisig | Built and tested. See [docs/verifier-runbook.md](docs/verifier-runbook.md). **The alert needs an external monitor you set up** — nothing here sends one |
 | Judge resilience (backoff, opt-in fallback model, outages recorded as "not a ruling") and human review of held tasks | Built and tested; review is **off unless `REVIEWER_ADDRESSES` is set**. See [docs/dispute-design.md](docs/dispute-design.md). The review panel has not been exercised with a real wallet |
-| Traction figures computed from the chain (a read-only script, a `/stats` page and `/api/stats`), and a launch plan | Built and tested, and seen only on devnet, where the page is headed **TEST NETWORK — NOT TRACTION**. The figures are activity, not demand. See [docs/launch-plan.md](docs/launch-plan.md) |
+| Traction figures computed from the chain (a read-only script, a `/stats` page and `/api/stats`), and a launch plan | Built and tested, and seen only on devnet, where the page is headed **TEST NETWORK — NOT TRACTION**. The figures are activity, not demand, and the team's own wallets are set aside only if declared in `TEAM_WALLETS`. See [docs/launch-plan.md](docs/launch-plan.md) |
 
 **Verified by running it:**
 

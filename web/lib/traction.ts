@@ -207,10 +207,21 @@ export interface TractionReport {
   independent: IndependentActivity;
   /** Poster and worker are the SAME wallet. Never in the headline; shown beside it. */
   selfDealt: Activity;
+  /** A declared team wallet is the poster or the worker. Never in the headline; shown beside it. */
+  teamControlled: Activity;
+  /** The wallets the operator declared as the team's, sorted. Empty means none were declared. */
+  teamWallets: string[];
   /** Independent settled tasks by the week they were decided. */
   weekly: WeeklyPoint[];
   caveats: string[];
 }
+
+/**
+ * Printed whenever no team wallet was declared. "Independent" is only as good as the list of
+ * wallets that are NOT independent, so with no list the headline cannot be called traction.
+ */
+export const NO_TEAM_WALLETS_CAVEAT =
+  "No team-controlled wallets were declared, so tasks the team funded or worked are NOT set aside and are counted in the headline. Do not quote the headline as customer traction until they are declared.";
 
 /** Always printed. Not conditional: they are true of every figure this module makes. */
 export const STANDING_CAVEATS = [
@@ -239,12 +250,26 @@ export function weekStartUtc(unixSeconds: number): string {
   return d.toISOString().slice(0, 10);
 }
 
+export interface TractionConfig {
+  mint: string;
+  feeBps: number;
+  /**
+   * Wallets the team controls, declared by the operator. A task with one of them as poster or
+   * worker is not customer demand, however it looks on-chain, so it is set aside. The report
+   * can only know the wallets it is told about: an undeclared team wallet counts as
+   * independent, and the caveats say so.
+   */
+  teamWallets?: readonly string[];
+}
+
 export function buildTractionReport(
   records: readonly TaskRecord[],
-  config: { mint: string; feeBps: number }
+  config: TractionConfig
 ): TractionReport {
+  const team = new Set(config.teamWallets ?? []);
   const independent = emptyActivity();
   const selfDealt = emptyActivity();
+  const teamControlled = emptyActivity();
   let otherMint = 0;
   let unknownState = 0;
 
@@ -266,8 +291,17 @@ export function buildTractionReport(
       continue;
     }
 
+    // Checked first, so a team wallet dealing with itself is counted once, as same-wallet.
     if (r.worker !== null && r.worker === r.creator) {
       tally(selfDealt, r, config.feeBps);
+      continue;
+    }
+
+    // Either side. A team-funded task is not demand, and a task the team worked is not supply
+    // from outside, so both are set aside. This understates the headline when a customer posts
+    // and the team does the work, which is the safe direction to be wrong in.
+    if (team.has(r.creator) || (r.worker !== null && team.has(r.worker))) {
+      tally(teamControlled, r, config.feeBps);
       continue;
     }
 
@@ -324,6 +358,8 @@ export function buildTractionReport(
       approvalRate: decided === 0 ? null : independent.settled / decided,
     },
     selfDealt,
+    teamControlled,
+    teamWallets: [...team].sort(),
     weekly: [...weeks.values()].sort((a, b) => (a.weekStart < b.weekStart ? -1 : 1)),
     caveats: [],
   };
@@ -338,6 +374,18 @@ export function caveatsFor(report: TractionReport): string[] {
     lines.push(
       `${report.selfDealt.tasks} task(s) were posted and worked by the same wallet (${usdc(report.selfDealt.postedVolume)} posted, ${usdc(report.selfDealt.settledVolume)} settled) and are excluded from the headline.`
     );
+  }
+  if (report.teamWallets.length === 0) {
+    lines.push(NO_TEAM_WALLETS_CAVEAT);
+  } else {
+    lines.push(
+      `Only the ${report.teamWallets.length} wallet(s) declared as the team's are set aside. A team wallet that was not declared is counted as independent.`
+    );
+    if (report.teamControlled.tasks > 0) {
+      lines.push(
+        `${report.teamControlled.tasks} task(s) had a declared team wallet as poster or worker (${usdc(report.teamControlled.postedVolume)} posted, ${usdc(report.teamControlled.settledVolume)} settled) and are excluded from the headline.`
+      );
+    }
   }
   if (report.independent.reciprocalPairs > 0) {
     lines.push(

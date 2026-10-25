@@ -16,6 +16,7 @@
 
 import { MetaRow } from "@/components/MetaRow";
 import { getTraction } from "@/lib/server/traction";
+import { TeamWalletsError } from "@/lib/team-wallets";
 import {
   buildTractionView,
   splitFigures,
@@ -44,14 +45,25 @@ function Prose({ text }: { text: string }) {
   );
 }
 
-function SectionHead({ id, title, kicker }: { id: string; title: string; kicker?: string }) {
+function SectionHead({
+  id,
+  title,
+  kicker,
+  warn = false,
+}: {
+  id: string;
+  title: string;
+  kicker?: string;
+  /** Unresolved, not failed: the held-state colour, used when something the reader needs is missing. */
+  warn?: boolean;
+}) {
   return (
     <header style={{ marginBottom: 12 }}>
       <h2 id={id} className="label label-11" style={{ color: "var(--text)" }}>
         {title}
       </h2>
       {kicker && (
-        <p className="label" style={{ margin: "6px 0 0" }}>
+        <p className="label" style={{ margin: "6px 0 0", color: warn ? "var(--warning)" : undefined }}>
           {kicker}
         </p>
       )}
@@ -149,15 +161,23 @@ function TestNetworkNotice({ notice }: { notice: NonNullable<TractionView["notic
   );
 }
 
-function Unavailable() {
+/**
+ * Two different failures, told apart because the fix is different. A chain that cannot be read
+ * will come back; a team wallet list that is invalid will not until someone fixes the
+ * configuration, and saying "the chain could not be read" would send them to the wrong place.
+ * Neither message carries a value from the configuration or from the RPC.
+ */
+function Unavailable({ reason }: { reason: "chain" | "team-wallets" }) {
+  const misconfigured = reason === "team-wallets";
   return (
     <section aria-labelledby="unavailable" style={{ marginTop: 32 }}>
-      <h2 id="unavailable" className="label label-11" style={{ color: "var(--text)" }}>
-        THE CHAIN COULD NOT BE READ JUST NOW
+      <h2 id="unavailable" className="label label-11" style={{ color: misconfigured ? "var(--warning)" : "var(--text)" }}>
+        {misconfigured ? "THE LIST OF TEAM WALLETS IS INVALID" : "THE CHAIN COULD NOT BE READ JUST NOW"}
       </h2>
       <p style={{ fontSize: 15, color: "var(--text-muted)", margin: "10px 0 0", maxWidth: "62ch" }}>
-        No figures are shown, rather than guessed ones. Nothing about escrow depends on this page.
-        Reload in a minute.
+        {misconfigured
+          ? "No figures are shown, because figures computed without a correct list could include the team's own activity. This is a configuration fix for whoever runs this site. Nothing about escrow depends on this page."
+          : "No figures are shown, rather than guessed ones. Nothing about escrow depends on this page. Reload in a minute."}
       </p>
     </section>
   );
@@ -165,15 +185,17 @@ function Unavailable() {
 
 export default async function StatsPage() {
   let view: TractionView | null = null;
+  let failure: "chain" | "team-wallets" = "chain";
   try {
     const { value, ageMs, stale } = await getTraction();
     view = buildTractionView(value.report, value.provenance, {
       stale,
       ageSeconds: Math.round(ageMs / 1000),
     });
-  } catch {
-    // Already logged, by name only, where the read failed. The page says only that it failed.
+  } catch (error) {
+    // Already logged, by name only, where the read failed. The page says only which kind it was.
     view = null;
+    failure = error instanceof TeamWalletsError ? "team-wallets" : "chain";
   }
 
   return (
@@ -184,7 +206,7 @@ export default async function StatsPage() {
       </p>
 
       {view === null ? (
-        <Unavailable />
+        <Unavailable reason={failure} />
       ) : (
         <>
           {/* Before any figure, and whenever the cluster is not mainnet. */}
@@ -215,7 +237,8 @@ export default async function StatsPage() {
                 <SectionHead
                   id="headline"
                   title="HEADLINE"
-                  kicker="Poster and worker are different wallets"
+                  kicker={view.headlineKicker}
+                  warn={view.teamWallets.length === 0}
                 />
                 <LedgerTable labelledBy="headline" rows={view.headline} />
               </section>
@@ -227,6 +250,39 @@ export default async function StatsPage() {
                   kicker="Poster and worker are the same wallet"
                 />
                 <LedgerTable labelledBy="set-aside" rows={view.setAside} />
+              </section>
+
+              <section aria-labelledby="team">
+                <SectionHead
+                  id="team"
+                  title="SET ASIDE: TEAM-CONTROLLED WALLETS"
+                  kicker={
+                    view.teamWallets.length > 0
+                      ? "A declared team wallet posted or worked the task"
+                      : "None declared"
+                  }
+                  warn={view.teamWallets.length === 0}
+                />
+                {view.teamWallets.length > 0 ? (
+                  <>
+                    <LedgerTable labelledBy="team" rows={view.teamControlled} />
+                    <p className="label" style={{ margin: "20px 0 8px" }}>
+                      DECLARED WALLETS
+                    </p>
+                    <ul style={{ margin: 0, padding: 0, listStyle: "none", display: "grid", gap: 6 }}>
+                      {view.teamWallets.map((wallet) => (
+                        <li key={wallet} className="data data--long">
+                          {wallet}
+                        </li>
+                      ))}
+                    </ul>
+                  </>
+                ) : (
+                  <p style={{ fontSize: 15, margin: 0, maxWidth: "62ch" }}>
+                    No team wallets were declared, so nothing is set aside here, and anything the team funded or
+                    worked is counted in the headline above.
+                  </p>
+                )}
               </section>
 
               <section aria-labelledby="weekly">

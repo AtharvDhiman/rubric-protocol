@@ -13,6 +13,7 @@ vi.mock("@/lib/server/traction", () => ({ getTraction: mocks.getTraction }));
 
 import { GET } from "@/app/api/stats/route";
 import { buildTractionReport, type TaskRecord } from "@/lib/traction";
+import { TeamWalletsError } from "@/lib/team-wallets";
 import type { Provenance } from "@/lib/traction-chain";
 
 const records: TaskRecord[] = [
@@ -112,5 +113,28 @@ describe("a failed read with nothing to fall back on", () => {
     const body = await (await GET()).json();
     expect(body.report).toBeUndefined();
     expect(body.provenance).toBeUndefined();
+  });
+});
+
+describe("a team wallet list that cannot be trusted", () => {
+  it("is told apart from an unreachable chain, with the error's own fixed sentence", async () => {
+    mocks.getTraction.mockRejectedValue(new TeamWalletsError(["Entry 2 is not a valid Solana address."]));
+    const response = await GET();
+    expect(response.status).toBe(503);
+    expect(response.headers.get("cache-control")).toBe("no-store");
+    expect(await response.json()).toEqual({
+      error: "The list of team-controlled wallets is invalid, so no figures are produced.",
+    });
+  });
+
+  it("carries no figures, and no entry from the list", async () => {
+    mocks.getTraction.mockRejectedValue(new TeamWalletsError(["Entry 2 is not a valid Solana address."]));
+    const text = await (await GET()).text();
+    expect(text).not.toMatch(/Entry 2|report|provenance/);
+  });
+
+  it("an ordinary failure still gets the chain sentence", async () => {
+    mocks.getTraction.mockRejectedValue(new Error("down"));
+    expect((await (await GET()).json()).error).toBe("Could not read the traction figures from the chain.");
   });
 });

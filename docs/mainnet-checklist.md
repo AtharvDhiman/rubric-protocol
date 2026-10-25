@@ -331,8 +331,10 @@ tasks. The planner prints `initialize_limits` for exactly that reason. It starts
 - ☐ **The launch plan has been read and its decisions made:** [launch-plan.md](launch-plan.md). The
   stages ($1, then $5), the open-task limit you hold yourself (the cap bounds one task, not
   the sum), what you will do when the judge is wrong, and the list of **team-controlled
-  wallets, written down before launch**. The traction figures (`/stats`, `scripts/traction-report.ts`)
-  can only set aside tasks where one wallet is on both sides; they cannot know your other wallets.
+  wallets, written down before launch**, and set as `TEAM_WALLETS` on the deployment. The traction
+  figures (`/stats`, `scripts/traction-report.ts`) set aside tasks where one wallet is on both
+  sides, and tasks a declared team wallet posted or worked; they cannot know a wallet you did not
+  declare, and with none declared they say the headline is not customer traction.
 
 ## Phase 7 — Making it permanent ⚠⚠
 

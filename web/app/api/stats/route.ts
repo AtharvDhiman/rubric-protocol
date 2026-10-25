@@ -15,6 +15,7 @@
  */
 
 import { getTraction } from "@/lib/server/traction";
+import { TeamWalletsError } from "@/lib/team-wallets";
 import { tractionToJson } from "@/lib/traction-format";
 
 export const runtime = "nodejs";
@@ -37,8 +38,12 @@ export async function GET() {
         "cache-control": stale ? "no-store" : "public, s-maxage=30, stale-while-revalidate=60",
       },
     });
-  } catch {
-    return new Response(JSON.stringify({ error: "Could not read the traction figures from the chain." }), {
+  } catch (error) {
+    // A configuration error is told apart from an unreachable chain, because the fix differs.
+    // TeamWalletsError carries a fixed sentence, never a value from the configuration.
+    const message =
+      error instanceof TeamWalletsError ? error.message : "Could not read the traction figures from the chain.";
+    return new Response(JSON.stringify({ error: message }), {
       status: 503,
       headers: { "content-type": JSON_TYPE, "cache-control": "no-store" },
     });

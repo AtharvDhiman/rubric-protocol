@@ -20,6 +20,9 @@ export const TEST_NETWORK_EXPLANATION =
 export { usdc };
 
 export const pct = (rate: number | null) => (rate === null ? "n/a" : `${(rate * 100).toFixed(1)}%`);
+/** The approval rate with the number of decisions it rests on, or a plain statement that nothing has been decided. */
+export const approvalText = (rate: number | null, decided: number) =>
+  rate === null ? "n/a (nothing decided yet)" : `${pct(rate)} of ${decided} decided`;
 export const orNone = (v: bigint | null) => (v === null ? "n/a" : usdc(v));
 
 /** How to check the figures without trusting us. */
@@ -28,6 +31,28 @@ export function verifyInstructions(p: Provenance): string[] {
     `Every figure is computed from the Task accounts owned by program ${p.programId}, read with getProgramAccounts on ${p.cluster} at slot ${p.slot}.`,
     "Tasks are never closed, so the chain is a complete record: nothing is missing, and nothing can be added from a database.",
     "To reproduce it, run web/scripts/traction-report.ts against any RPC endpoint for the same cluster, or derive the same counts from any indexer.",
+  ];
+}
+
+/**
+ * What the headline's wallets have in common, said where the headline starts. It names the
+ * declared team wallets when there are some, and says plainly that there are none when there
+ * are not: "independent" is only as good as that list.
+ */
+export function headlineKicker(report: TractionReport): string {
+  return report.teamWallets.length > 0
+    ? "poster and worker are different wallets, and neither is a declared team wallet"
+    : "poster and worker are different wallets; NO team wallets were declared, so team activity is NOT set aside";
+}
+
+function teamLines(report: TractionReport): string[] {
+  if (report.teamWallets.length === 0) {
+    return ["  none declared. Pass --team-wallets (or TEAM_WALLETS) to set the team's own tasks aside."];
+  }
+  return [
+    ...activityLines(report.teamControlled),
+    `  declared      ${report.teamWallets.length} wallet(s):`,
+    ...report.teamWallets.map((w) => `                ${w}`),
   ];
 }
 
@@ -57,17 +82,20 @@ export function formatTractionText(report: TractionReport, p: Provenance): strin
     `  read at     slot ${p.slot}, ${p.fetchedAt}`,
     `  accounts    ${report.recordsRead} Task accounts read`,
     "",
-    "HEADLINE  (poster and worker are different wallets)",
+    `HEADLINE  (${headlineKicker(report)})`,
     `  posters         ${ind.posters}   (${ind.repeatPosters} posted more than once, ${ind.repeatSettledPosters} had more than one settled)`,
     `  workers         ${ind.workers}`,
     `  poster-worker pairs  ${ind.pairs}`,
     ...activityLines(ind),
     // The sample size goes with the rate: 100% of one task is not a finding.
-    `  approval rate   ${pct(ind.approvalRate)} of ${ind.settled + ind.refundedRejected} decided   (settled / (settled + rejected); reclaims do not count)`,
+    `  approval rate   ${approvalText(ind.approvalRate, ind.settled + ind.refundedRejected)}   (settled / (settled + rejected); reclaims do not count)`,
     `  median bounty   ${orNone(ind.medianBounty)}   (median settled ${orNone(ind.medianSettledBounty)})`,
     "",
     "SET ASIDE, shown so nothing is hidden  (poster and worker are the SAME wallet)",
     ...activityLines(report.selfDealt),
+    "",
+    "SET ASIDE, TEAM-CONTROLLED  (a declared team wallet posted or worked the task)",
+    ...teamLines(report),
     ""
   );
 
