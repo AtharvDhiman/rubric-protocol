@@ -606,11 +606,17 @@ Config PDA   4q6XLrWj6FTJA2YnC5S9ZKDEahMVTEYZ6mX9td35fMX2   (initialized)
 Data length  352,376 bytes      Rent  2.45374104 SOL
 ```
 
-Deployed with `--max-len` at exactly the binary size, because the default
-allocates 2x for upgrade headroom and costs 4.906 SOL. The consequence is real:
-**this deployment can only be upgraded to a binary of the same size or smaller.**
-To lift that, `solana program close` it (the rent is refunded) and redeploy
-without `--max-len` once you have ~5 SOL.
+Deployed with `--max-len` at exactly the binary size. This section used to say the default
+allocates twice that and that the deployment could therefore only ever be upgraded to a
+binary of the same size or smaller. **Both were wrong.** The CLI's default is the binary's own
+length, and an upgrade to a larger binary extends the account automatically and charges the
+extra rent (checked on devnet with throwaway programs: 32,736 more bytes cost about 0.17 SOL).
+The current source builds to 385,112 bytes, larger than this deployment's 352,376, so
+upgrading it will need that extra rent.
+
+Do **not** `solana program close` this program to redeploy it: a closed program id can never
+be reused (*"Program ... has been closed, use a new Program Id"*), and the web app, the
+`Config` and every task name this address.
 
 **Whoever holds the upgrade authority is the only account that can initialize the
 config.** That falls out of the front-running fix in `initialize_config`: the

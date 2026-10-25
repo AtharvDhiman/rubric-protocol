@@ -406,7 +406,8 @@ proves nothing.
 | **P7** | Verifier operations (launch-plan item 3), as five pieces: key rotation with no gap, a wallet health check, a preflight and operational holds, a retry script, and an admin-action planner. Runbook: [verifier-runbook.md](verifier-runbook.md) | `298c49b`, `d496b8b`, `4a11824`, `037cdf5`, `9e30174`, `a4d369c` | see below |
 | **P8** | Judge reliability and human review (launch-plan item 4): backoff, an opt-in fallback model, outages recorded as "not a ruling", HELD-versus-REJECTED made clear, and a reviewer path for held tasks. Design: [dispute-design.md](dispute-design.md) | `6be37bd`, `4ccc054`, `646640e`, `44bba6a` | see **P8 verification** |
 | **P9** | Trust and honesty (launch-plan item 5): the landing page stops presenting an illustration as activity, sample data can never appear on mainnet, a mainnet banner, and a notice and a way off a shared hosting address. [custom-domain.md](custom-domain.md) | `595553c`, `acb45cb`, `6587461` | see **P9** below |
-| **P10** | Traction and a launch plan (launch-plan item 6): figures computed from the chain, a read-only report script, a `/stats` page and `/api/stats` headed as test funds on any cluster but mainnet, and [launch-plan.md](launch-plan.md) | `481faca`, `6975c10`, `68b381f`, `a2f7103`, `56bcddf`, and the team wallets commit | see **P10** below |
+| **P10** | Traction and a launch plan (launch-plan item 6): figures computed from the chain, a read-only report script, a `/stats` page and `/api/stats` headed as test funds on any cluster but mainnet, and [launch-plan.md](launch-plan.md) | `481faca`, `6975c10`, `68b381f`, `a2f7103`, `56bcddf`, `9b5e955` | see **P10** below |
+| **P11** | A devnet rehearsal of the Stage 0 canary and of the deploy and upgrade mechanics, with throwaway programs and keys; corrects several claims in these docs | the docs commit | see **P11** below |
 
 **P7 verification, and its limits.** The pure decisions are unit tested (rotation
 17, health 19, holds and stuck-task selection 19, retry 40, admin planner 50), and
@@ -594,6 +595,50 @@ What P10 does **not** do:
   unconfirmed where it says so (Superteam Earn's payout rules, Dework's current status,
   Algora's fee, Kleros's costs). The pain it targets is supported only by anecdote.
 
+**P11: a devnet rehearsal (mainnet readiness)** — 2026-10-25, with throwaway keys and programs on devnet
+only. The throwaway programs have been closed and their rent recovered; a few small accounts they
+created (the mock mint and token accounts) remain, worth a few thousandths of a SOL.
+
+What ran, at the program level (no web app, no judge): a fresh program built from the current source
+and deployed with an exact `--max-len`; `initialize_config` and `initialize_limits` (cap $1) with a
+mock 6-decimal mint; then a settled task (worker received 0.98 USDC, the fee destination 0.02, the
+escrow closed), a rejected task (full refund) and an Open task reclaimed after its deadline (refused
+with `DeadlineNotPassed` before it, refunded after). Each actor sent and paid for its own
+transactions, so every cost could be read off a balance. Separately, two throwaway programs were used
+to test closing a program and upgrading to a larger binary.
+
+It **corrected my own documentation** in five places, which is the main reason it was worth doing:
+
+- **The launch plan said the verifier pays a first-time worker's token-account rent. It does not.**
+  `submit_work` requires the worker's account to exist, and the app creates it in the worker's own
+  transaction. A verdict costs the verifier the 0.000005 SOL fee; the one exception is the fee
+  destination's token account on the first verdict, 0.00148844 SOL, once.
+- **The README said `--max-len` defaults to double the binary.** It defaults to the binary's own
+  length (the CLI help and its v3.1.10 source).
+- **The README said the devnet program could only be upgraded to a binary of the same size or smaller.**
+  It extends automatically; 32,736 more bytes cost about 0.17 SOL. The current source (385,112
+  bytes) is larger than the deployed one (352,376), so the devnet upgrade will use that.
+- **The README said to close the program and redeploy it.** A closed program id cannot be reused.
+- **The checklist's cost figures were for an old binary.** The current one is 385,112 bytes: rent
+  1.957 SOL, a real deploy 1.96 SOL, about 3.9 SOL at the peak.
+
+It also found that `anchor upgrade` is deprecated, and that the devnet wallet which would perform the
+upgrade holds 0.40 SOL against the ~2.2 SOL the buffer needs at the peak.
+
+What P11 does **not** cover:
+
+- **The web app and the judge**, which were exercised earlier on the live devnet deployment, not here.
+- **A multisig as admin.** A plain key was used, so the ordering trap in checklist Phase 3 is untested.
+- **Reclaim of a *Submitted* task**, which needs the 7-day grace and is covered only by the local
+  `short-grace` tests.
+- **The verifiable build.** Docker is not installed on that machine, so `anchor build --verifiable`
+  was not run and the checklist's requirement for it still stands.
+- **The `anchor` upgrade wrapper**, which stalled on devnet's public RPC dropping writes. The tested
+  command is `solana program deploy`.
+- **The state migration** of real `Config` and `Task` accounts under the upgraded binary.
+- **Mainnet.** Devnet and mainnet charge the same rent per byte today and share a loader, but none of
+  this has run on mainnet.
+
 **P3 verification.** Six mutations were run against the new tests: deleting the
 admin check on `initialize_limits`, deleting the range check, deleting the pause
 check in `create_task`, deleting the cap check, deleting the admin check on the
@@ -615,8 +660,12 @@ review and an audit slot, not a patch.
 ### Upgrading the devnet deployment
 
 `create_task` now requires the `Limits` account, so an upgraded program takes no
-tasks until the admin has created it. Nothing here was run against devnet. The order
-matters, because it decides what a visitor sees while you work:
+tasks until the admin has created it. **The upgrade mechanics were rehearsed on devnet with
+throwaway programs** (2026-10-25): a program mirroring the live one (the old 352,376-byte binary
+at an exact `--max-len`) was upgraded to the current 385,112-byte binary and succeeded, with the
+account extended automatically for about **0.17 SOL** of extra rent. The state migration itself
+(real `Config` and `Task` accounts under the new binary) was **not** rehearsed. The order matters,
+because it decides what a visitor sees while you work:
 
 1. **Deploy the web app first.** Its create page reads `Limits`, finds none, and says
    *"limits not set up, new tasks cannot be sealed"* instead of letting someone sign a
@@ -628,16 +677,29 @@ matters, because it decides what a visitor sees while you work:
 
    ```bash
    anchor build                       # default features - NEVER --features short-grace
-   anchor upgrade target/deploy/rubric.so \
+   solana program deploy target/deploy/rubric.so \
      --program-id F2Uo5JUfGQtho8s9ZbwcpWBd8iJ4XvBqamUaqdjcrRxz \
-     --provider.cluster devnet --provider.wallet <devnet upgrade authority keypair>
+     --upgrade-authority <devnet upgrade authority keypair> \
+     --keypair <the wallet that pays> --url devnet
    ```
+
+   This is the command that was tested. It writes the new binary to a buffer first, so the
+   paying wallet needs about **2.2 SOL at the peak** (the buffer, 1.957 SOL, is refunded) and
+   keeps about **0.17 SOL** of it as the extra rent. The devnet wallet in `~/.config/solana/id.json`
+   held 0.40 SOL when I looked, so it needs funding before this will work. `anchor upgrade`,
+   which this section used to give, is **deprecated** in anchor-cli 1.1.2 ("use `anchor program
+   upgrade`"). I did not manage to test either `anchor` form: the attempt stalled on devnet's
+   public RPC dropping write transactions, so use the CLI command above, which went through.
+   If a deploy fails partway it leaves a buffer holding that SOL; close it with
+   `solana program close <buffer> --bypass-warning`.
 
 3. **Create `Limits` immediately:** `cd web && npx tsx scripts/init-limits.ts --admin <devnet admin keypair>`.
    It refuses mainnet, checks the key really is `Config.admin`, and runs once.
 4. Existing tasks and the `Config` are untouched: `Task` is pinned at 239 bytes by
    test 29 and no `Config` field changed.
 
-Rehearse the whole sequence against a throwaway program id first. In particular, re-check
-on a real cluster that **upgrading needs only the upgrade authority and not the program
-keypair** (R-11 — already shown on a local validator, which uses the same loader).
+Do **not** close the program to redeploy it: a closed program id can never be reused (checked on
+devnet: *"Program ... has been closed, use a new Program Id"*), and the app, the `Config` and every
+task name this address. The upgrade needs the **upgrade authority**; in the rehearsal it was given
+the program's keypair file as well, so that the upgrade works from the public address alone is
+still shown only on a local validator (R-11), which uses the same loader.

@@ -152,18 +152,33 @@ the same).
 ### Costs to expect (and measure, not guess)
 
 - **The fee is 2% and cannot be waived**: $0.02 on a $1 task. This is not a revenue plan.
-- **The verifier pays network fees**, and **when a worker or poster has no USDC token
-  account, the verifier creates it and pays its rent** (`ataPreInstructions` in
-  `web/lib/server/program.ts`). For a $1 task that rent is likely to exceed the task's entire
-  $0.02 fee, and a first-time worker triggers it (the exact comparison depends on the SOL price). I have not measured it on mainnet. Run
-  `solana rent 165 --url mainnet-beta` for today's figure, and record the real per-verdict
-  cost during Stage 0.
+- **Measured on a devnet rehearsal** (a throwaway program id; rent is the same on devnet and
+  mainnet today, so the figures carry over, but they are SOL amounts and not dollars). A token
+  account costs **0.00148844 SOL** of rent, a task account **0.0018644 SOL**, and a transaction
+  fee is **0.000005 SOL**.
+  - **The worker pays their own token account**, in their own transaction, the first time they
+    submit: 0.0014934 SOL once, then only the fee. `submit_work` needs that account to exist and
+    the app creates it for them. I earlier wrote that the verifier pays this. It does not.
+  - **The verifier pays the network fee only: 0.000005 SOL per verdict.** The one exception is
+    the fee destination's token account, which the verifier creates on the first verdict if it
+    does not exist (0.00148844 SOL, once). Create that account beforehand (checklist Phase 3) and
+    the verifier's cost per verdict is the fee alone.
+  - **The poster pays 0.0033578 SOL per task up front**, of which 0.0018644 (the task account) is
+    never returned and 0.0014884 (the escrow token account) comes back **on every ending**: I
+    saw it on a reclaim directly, and the poster's final balance was exactly two token-account
+    rents better than a model without it, which accounts for the settled and the rejected task.
+    So a task costs its poster about 0.0018694 SOL net, plus the $ bounty if it settles.
+  - So a verifier wallet holding 0.03 SOL covers several thousand verdicts. Keep it funded anyway:
+    an empty wallet looks exactly like a broken judge.
 - **The judge's free tier is rate limited.** A busy pilot day can hold tasks as "not a
   ruling". `scripts/retry-stuck.ts` judges them again; nothing runs it for you.
 
 ### Stage 0 — Canary (you fund every task; about a day)
 
-This is checklist Phase 5, run as a set of experiments with the outcome written down.
+This is checklist Phase 5, run as a set of experiments with the outcome written down. The three
+endings below were **rehearsed on devnet at the program level** with throwaway keys, and behaved
+as specified ([security-review.md](security-review.md), P11). That did not cover the web app, the
+judge or a multisig, so this stage is still the first time they run together with real USDC.
 
 1. Set the cap to **$1** at initialisation: `--max-bounty 1` on `mainnet-init-plan.ts`.
 2. With a fresh wallet holding real USDC, create **$1 tasks** and run all three endings from

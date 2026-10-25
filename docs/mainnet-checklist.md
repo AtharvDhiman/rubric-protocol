@@ -98,9 +98,12 @@ to each before starting.
   solana rent $(( $(stat -c %s target/verifiable/rubric.so) + 45 )) --url mainnet-beta
   ```
 
-  For reference, the binary I built was **352,376 bytes**, which prices at about
-  **1.79 SOL** at today's rent, so plan on having roughly **4 SOL** available at
-  the peak plus fees. Re-run the command on deploy day.
+  For reference, the binary built from the current source is **385,112 bytes**
+  (352,376 was an older build, the one the live devnet program was deployed from). Its
+  program-data account costs **1.9572478 SOL** of rent (`solana rent`, the same on devnet
+  and mainnet today). I deployed it to devnet with an exact `--max-len` and the real cost
+  was **1.96000592 SOL**, peaking at about twice that, **~3.9 SOL**, until the buffer is
+  refunded. Plan on roughly **4.1 SOL** at the peak. Re-run the command on deploy day.
 
 ## Phase 2 — Deploy ⚠
 
@@ -108,7 +111,7 @@ Use a hardware wallet for the deployer. The deployer is the **initial upgrade
 authority**, which is the most powerful key in the system.
 
 - ☐ Fund the Ledger address with at least twice the rent figure above, plus fees
-  (about 4 SOL for the current binary).
+  (about 4.1 SOL for the current binary).
 - ☐ Deploy:
 
   ```bash
@@ -134,6 +137,21 @@ authority**, which is the most powerful key in the system.
 
 - ☐ Delete `./mainnet-program-keypair.json` (after the rehearsal confirmed it is
   not needed for upgrades).
+
+**Two things I had wrong about the deploy, both checked on devnet with throwaway programs:**
+
+- **`--max-len` does not default to double the binary.** With the flag omitted, the
+  program-data account is sized to exactly the binary: the CLI's own help says so
+  ("default: the length of the original deployed program") and its v3.1.10 source sets it to
+  the program length. That is not a trap, because a later upgrade to a **larger** binary
+  extends the account on its own and charges the extra rent (measured: 32,736 more bytes
+  cost about 0.17 SOL). If you would rather size it with room to spare, pass `--max-len`
+  and budget for twice the rent.
+- **A closed program id can never be reused.** `solana program close` on a program, then a
+  deploy to the same address, failed with *"Program … has been closed, use a new Program
+  Id"*. Closing returns the rent, but it is a one-way door for that address, and every
+  Config, Task and client setting that names it would have to move to a new id. Do not treat
+  "close it and redeploy" as an undo.
 
 ## Phase 3 — Initialise ⚠ (one shot)
 
@@ -268,6 +286,15 @@ tasks. The planner prints `initialize_limits` for exactly that reason. It starts
   a mismatch must fail loudly, not quietly hold every task.
 
 ## Phase 5 — Canary
+
+**Rehearsed on devnet on 2026-10-25** against a throwaway program id (since closed), signed only
+by throwaway keys: a settled task (worker received 0.98 USDC, the fee destination 0.02), a rejected
+task (full refund) and an Open task reclaimed after its deadline (refused with `DeadlineNotPassed`
+before it, refunded after). A cap of $1 was set at initialisation. Costs are in
+[launch-plan.md](launch-plan.md#costs-to-expect-and-measure-not-guess). **It did not cover:** the web
+app and the judge, reclaim of a *Submitted* task (it needs the 7-day grace), a multisig as admin
+(a plain key was used), the verifiable build (no Docker on that machine), or anything about mainnet
+itself. It is a rehearsal of the program, not a substitute for the canary below.
 
 - ☐ With a **fresh wallet** that holds real USDC, create a **$1** task, submit
   work from a second wallet, and let the judge rule. Confirm the explorer shows
